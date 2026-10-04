@@ -6,6 +6,7 @@
 }:
 let
   t3code = import ../../../../modules/t3code.nix { inherit pkgs inputs; };
+  claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
   pair = pkgs.writeShellApplication {
     name = "t3-hestia-pair";
     runtimeInputs = [
@@ -21,6 +22,8 @@ in
   environment.systemPackages = [
     t3code
     pair
+    claudeCode
+    pkgs.ghostty.terminfo
   ];
 
   services.caddy.virtualHosts."https://hestia.vpn.miksu.app:3773" = {
@@ -41,6 +44,7 @@ in
     ];
     wants = [ "network-online.target" ];
     path = [
+      claudeCode
       pkgs.git
       pkgs.gh
       pkgs.openssh

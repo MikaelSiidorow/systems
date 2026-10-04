@@ -396,7 +396,9 @@
           export DEFAULT_USER=$(whoami)
 
           # fnm (Fast Node Manager) integration
-          eval "$(fnm env --use-on-cd --shell zsh)"
+          if (( $+commands[fnm] )); then
+            eval "$(fnm env --use-on-cd --shell zsh)"
+          fi
         ''
       ]
       # Darwin lacks systemd-user cgroups, so cmux pty close leaves orphaned
