@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wger-celery-worker
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: wger-celery-worker
+  template:
+    metadata:
+      labels:
+        app: wger-celery-worker
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: worker
+          image: ghcr.io/mikaelsiidorow/wger:production
+          imagePullPolicy: Always
+          command: [/start-worker]
+          envFrom:
+            - configMapRef:
+                name: wger-config
+            - secretRef:
+                name: wger-secrets
+            - secretRef:
+                name: wger-email
+                optional: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: media
+              mountPath: /home/wger/media
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: wger-media
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wger-celery-beat
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: wger-celery-beat
+  template:
+    metadata:
+      labels:
+        app: wger-celery-beat
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: beat
+          image: ghcr.io/mikaelsiidorow/wger:production
+          imagePullPolicy: Always
+          command: [/start-beat]
+          envFrom:
+            - configMapRef:
+                name: wger-config
+            - secretRef:
+                name: wger-secrets
+            - secretRef:
+                name: wger-email
+                optional: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 192Mi
+          volumeMounts:
+            - name: beat
+              mountPath: /home/wger/beat
+      volumes:
+        - name: beat
+          persistentVolumeClaim:
+            claimName: wger-celery-beat

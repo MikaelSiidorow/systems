@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: wger-powersync
+  namespace: wger
+  labels:
+    release: kube-prometheus-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  namespaceSelector:
+    matchNames:
+      - wger
+  selector:
+    matchLabels:
+      app: wger-powersync
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s

@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: refinery-app
+  namespace: refinery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: refinery-app
+  template:
+    metadata:
+      labels:
+        app: refinery-app
+        app.kubernetes.io/name: refinery-app
+        app.kubernetes.io/component: app
+        app.kubernetes.io/part-of: refinery
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/mikaelsiidorow/refinery/app:production
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 50m
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          envFrom:
+            - configMapRef:
+                name: refinery-config
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3000"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: DATABASE_URL
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: ENCRYPTION_KEY
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: GITHUB_CLIENT_SECRET
+            - name: LINKEDIN_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: LINKEDIN_CLIENT_SECRET
+            - name: ZERO_UPSTREAM_DB
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: DATABASE_URL
+            - name: ZERO_REPLICA_FILE
+              value: /tmp/sync-replica.db
+            - name: ZERO_MUTATE_URL
+              value: http://refinery-app/api/zero/mutate
+            - name: ZERO_MUTATE_FORWARD_COOKIES
+              value: "true"
+            - name: ZERO_QUERY_URL
+              value: http://refinery-app/api/zero/get_queries
+            - name: ZERO_QUERY_FORWARD_COOKIES
+              value: "true"

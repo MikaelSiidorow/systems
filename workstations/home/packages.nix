@@ -1,62 +1,12 @@
-# Common packages - platform-agnostic
+# Workstation development toolchain. Shared shell tools live in
+# modules/home/core, coding agents in modules/home/agents.
 {
   pkgs,
   lib,
-  inputs,
   isDarwin ? false,
   ...
 }:
 {
-  programs = {
-    bat.enable = true;
-
-    eza = {
-      enable = true;
-      enableZshIntegration = true;
-      git = true;
-      icons = "auto";
-    };
-
-    ripgrep.enable = true;
-
-    fzf = {
-      enable = true;
-      enableZshIntegration = true;
-    };
-
-    zoxide = {
-      enable = true;
-      enableZshIntegration = true;
-    };
-
-    starship = {
-      enable = true;
-      enableZshIntegration = true;
-      settings = {
-        format = lib.concatStrings [
-          "$directory"
-          "$git_branch"
-          "$git_status"
-          "$nix_shell"
-          "$cmd_duration"
-          "$line_break"
-          "$character"
-        ];
-        directory = {
-          style = "bold blue";
-          truncation_length = 3;
-          truncate_to_repo = true;
-        };
-        git_branch.style = "bold purple";
-        character = {
-          success_symbol = "[>](bold green)";
-          error_symbol = "[>](bold red)";
-        };
-        cmd_duration.min_time = 2000;
-      };
-    };
-  };
-
   home = {
     # Global treefmt config — used as fallback when no repo-local treefmt.toml exists
     file.".config/treefmt/treefmt.toml".source = ./treefmt.toml;
@@ -64,19 +14,6 @@
     packages =
       with pkgs;
       [
-        # Core utilities
-        coreutils
-        wget
-        jq
-        gettext
-        fd
-        btop
-        tldr
-        trash-cli
-
-        # Version control
-        gh
-
         # Languages & runtimes
         python3
         fnm
@@ -98,8 +35,11 @@
         sqlite
 
         # Cloud
-        google-cloud-sdk
-        terraform
+        (azure-cli.withExtensions [
+          (azure-cli.extensions.containerapp.overridePythonAttrs {
+            pythonRelaxDeps = [ "kubernetes" ];
+          })
+        ])
 
         # Media
         ffmpeg
@@ -119,17 +59,15 @@
 
         # Security
         _1password-cli
-
-        # AI tools
-        inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
       ]
       # Platform-specific packages (NixOS/Linux only - macOS uses Homebrew)
       ++ lib.optionals (!isDarwin) [
-        inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
-        inputs.opencode-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
-
-        # Application launcher
-        # inputs.zap.packages.${pkgs.stdenv.hostPlatform.system}.default
+        terraform
+      ]
+      # Platform-specific packages (macOS only)
+      ++ lib.optionals isDarwin [
+        opentofu
+        google-cloud-sdk
       ];
   };
 }

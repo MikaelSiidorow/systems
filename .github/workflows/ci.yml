@@ -1,0 +1,110 @@
+name: CI
+
+# The single entry point for pull requests. Branch rules require only the
+# CI Summary job below, so which checks gate a merge is decided here.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  # deploy.yml's nix-cache job asks for this on pushes to main; a called
+  # workflow cannot be granted more than its caller.
+  actions: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Posts a "running" placeholder; the report job replaces it with results.
+  report-start:
+    runs-on: ubuntu-latest
+    # Fork PRs get a read-only token and cannot comment.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        with:
+          script: |
+            const { start } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/ci-report.ts`);
+            await start({ github, context });
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      workstations: ${{ steps.filter.outputs.workstations }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            workstations:
+              - 'workstations/**'
+              - 'modules/**'
+              - '.github/workflows/workstations.yml'
+              - '.github/workflows/ci.yml'
+
+  workstations:
+    needs: changes
+    if: needs.changes.outputs.workstations == 'true'
+    uses: ./.github/workflows/workstations.yml
+
+  infra:
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+
+  summary:
+    name: CI Summary
+    needs: [changes, workstations, infra]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "* | *" cancelled "*)
+              echo "❌ CI failed. Check the logs above."
+              exit 1
+              ;;
+          esac
+          echo "✅ All CI checks passed!"
+
+  # One comment for the whole run, rebuilt from the sections that the checks
+  # upload as pr-report-* artifacts. Not part of CI Summary.
+  report:
+    name: CI report
+    needs: [report-start, changes, workstations, infra]
+    if: always()
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: pr-report-*
+          merge-multiple: true
+          path: report
+      - uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        env:
+          WORKSTATIONS_RESULT: ${{ needs.workstations.result }}
+          INFRA_RESULT: ${{ needs.infra.result }}
+        with:
+          script: |
+            const { finish } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/ci-report.ts`);
+            await finish({ github, context }, {
+              dir: 'report',
+              results: {
+                workstations: process.env.WORKSTATIONS_RESULT,
+                infra: process.env.INFRA_RESULT,
+              },
+            });

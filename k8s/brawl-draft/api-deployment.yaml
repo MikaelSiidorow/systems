@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brawl-draft-api
+  namespace: brawl-draft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brawl-draft-api
+  template:
+    metadata:
+      labels:
+        app: brawl-draft-api
+        app.kubernetes.io/name: brawl-draft-api
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: brawl-draft
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/mikaelsiidorow/brawl-draft-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: BRAWL_STARS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: brawl-draft-secrets
+                  key: BRAWL_STARS_API_KEY
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30

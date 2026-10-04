@@ -40,7 +40,7 @@
           app = "/Applications/cmux.app";
         }
         {
-          app = "${pkgs.vscode}/Applications/Visual Studio Code.app";
+          app = "${pkgs.zed-editor}/Applications/Zed.app";
         }
       ];
     };
@@ -50,6 +50,15 @@
     # displayas:   0=stack 1=folder
     # showas:      0=auto 1=fan 2=grid 3=list
     CustomUserPreferences = {
+      # Keep natural scrolling on the trackpad, but reverse vertical scrolling
+      # for external mouse wheels.
+      "com.pilotmoon.scroll-reverser" = {
+        InvertScrollingOn = true;
+        ReverseX = false;
+        ReverseY = true;
+        ReverseTrackpad = false;
+        ReverseMouse = true;
+      };
       "com.apple.dock".persistent-others = [
         {
           tile-type = "directory-tile";

@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: wger
+resources:
+  - storage.yaml
+  - services.yaml
+  - redis.yaml
+  - web.yaml
+  - celery.yaml
+  - bootstrap.yaml
+  - powersync.yaml
+  - fineli-import.yaml
+  - monitoring.yaml
+  - ingress.yaml
+configMapGenerator:
+  - name: wger-config
+    envs:
+      - config/wger.env
+    files:
+      - powersync.yaml=config/powersync.yaml
+      - sync_rules.yaml=config/sync_rules.yaml
+      - nginx.conf=config/nginx.conf
+      - redis.conf=config/redis.conf
+  - name: wger-bootstrap
+    files:
+      - bootstrap.py=config/bootstrap.py
+  - name: wger-fineli-import
+    files:
+      - import-fineli.py=config/import-fineli.py

@@ -1,0 +1,19 @@
+# Terraform
+**/.terraform/
+terraform/*.tfvars
+terraform/*.tfvars.json
+*.tfstate
+*.tfstate.*
+**/tfplan
+
+# Logs
+*.log
+
+# Local overrides
+.env
+.vscode/
+.idea/
+*.swp
+
+# K8s secrets (applied manually)
+k8s/**/secrets.yaml

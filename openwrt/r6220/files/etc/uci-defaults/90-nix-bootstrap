@@ -1,0 +1,8 @@
+#!/bin/sh
+
+uci -q batch <<'EOF'
+set system.@system[0].hostname='cerberus'
+commit system
+EOF
+
+exit 0

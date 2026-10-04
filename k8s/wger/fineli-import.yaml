@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wger-fineli-import
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  # This object is an inert template for an explicitly triggered one-off Job.
+  schedule: "0 0 1 1 *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: importer
+              image: ghcr.io/mikaelsiidorow/wger:production
+              imagePullPolicy: Always
+              command:
+                - /bin/sh
+                - -ec
+              args:
+                - python3 manage.py shell < /config/import-fineli.py
+              env:
+                - name: FINELI_DRY_RUN
+                  value: "false"
+              envFrom:
+                - configMapRef:
+                    name: wger-config
+                - secretRef:
+                    name: wger-secrets
+              volumeMounts:
+                - name: config
+                  mountPath: /config/import-fineli.py
+                  subPath: import-fineli.py
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          volumes:
+            - name: config
+              configMap:
+                name: wger-fineli-import
+                items:
+                  - key: import-fineli.py
+                    path: import-fineli.py

@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wger-bootstrap
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: ghcr.io/mikaelsiidorow/wger:production
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - python3 manage.py shell < /config/bootstrap.py
+          envFrom:
+            - configMapRef:
+                name: wger-config
+            - secretRef:
+                name: wger-secrets
+            - secretRef:
+                name: wger-admin-bootstrap
+          volumeMounts:
+            - name: config
+              mountPath: /config/bootstrap.py
+              subPath: bootstrap.py
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 384Mi
+      volumes:
+        - name: config
+          configMap:
+            name: wger-bootstrap
+            items:
+              - key: bootstrap.py
+                path: bootstrap.py

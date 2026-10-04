@@ -1,0 +1,172 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 82.18.0
+    helm:
+      values: |
+        grafana:
+          ingress:
+            enabled: true
+            ingressClassName: traefik
+            hosts:
+              - grafana.miksu.app
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-dns
+            tls:
+              - secretName: grafana-tls
+                hosts:
+                  - grafana.miksu.app
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          persistence:
+            enabled: false
+          resources:
+            requests:
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              url: http://loki.loki.svc.cluster.local:3100
+              access: proxy
+              isDefault: false
+              jsonData:
+                derivedFields:
+                  - name: TraceID
+                    matcherRegex: '"trace_id":"(\w+)"'
+                    url: '$${__value.raw}'
+                    datasourceUid: tempo
+                    matcherType: regex
+            - name: Tempo
+              type: tempo
+              uid: tempo
+              url: http://tempo.tempo.svc.cluster.local:3200
+              access: proxy
+              isDefault: false
+              jsonData:
+                tracesToLogsV2:
+                  datasourceUid: loki
+                  filterByTraceID: false
+                  filterBySpanID: false
+                tracesToMetrics:
+                  datasourceUid: prometheus
+                nodeGraph:
+                  enabled: true
+                serviceMap:
+                  datasourceUid: prometheus
+
+        prometheus:
+          prometheusSpec:
+            enableRemoteWriteReceiver: true
+            scrapeInterval: 60s
+            retention: 7d
+            resources:
+              requests:
+                memory: 512Mi
+              limits:
+                memory: 1Gi
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  resources:
+                    requests:
+                      storage: 10Gi
+
+        alertmanager:
+          alertmanagerSpec:
+            secrets:
+              - alertmanager-telegram-token
+            resources:
+              requests:
+                memory: 32Mi
+              limits:
+                memory: 64Mi
+          config:
+            global:
+              resolve_timeout: 5m
+            route:
+              receiver: telegram
+              group_by: ['alertname', 'namespace']
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              routes:
+                - receiver: 'null'
+                  matchers:
+                    - alertname = "Watchdog"
+                - receiver: 'null'
+                  matchers:
+                    - alertname = "InfoInhibitor"
+            receivers:
+              - name: 'null'
+              - name: telegram
+                telegram_configs:
+                  - bot_token_file: /etc/alertmanager/secrets/alertmanager-telegram-token/bot-token
+                    chat_id: -1003049249814
+                    parse_mode: HTML
+                    message: |-
+                      {{ range .Alerts }}
+                      {{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} <b>{{ .Labels.alertname }}</b>
+                      <b>Severity:</b> {{ .Labels.severity }}
+                      <b>Namespace:</b> {{ .Labels.namespace }}
+                      {{ if .Annotations.description }}{{ .Annotations.description }}{{ else }}{{ .Annotations.summary }}{{ end }}
+                      {{ end }}
+            inhibit_rules:
+              - source_matchers:
+                  - severity = "critical"
+                target_matchers:
+                  - severity = "warning"
+                equal: ['alertname', 'namespace']
+
+        prometheusOperator:
+          resources:
+            requests:
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+
+        prometheus-node-exporter:
+          resources:
+            requests:
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+
+        kube-state-metrics:
+          resources:
+            requests:
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+
+        kubeEtcd:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeProxy:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

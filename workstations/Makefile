@@ -1,16 +1,19 @@
 # Multi-host Nix configuration Makefile
-# Supports nix-darwin, NixOS, and standalone home-manager
+# Supports nix-darwin (macOS) and home-manager (Linux standalone)
 
 # Detect platform
 HOSTNAME := $(shell hostname -s)
 UNAME := $(shell uname -s)
-SHELL_SOURCES := $(shell git ls-files '*.sh' '*.bash' ':!home/agents/skills/**')
+# Shared home-manager modules in ../modules are checked along with this flake.
+SHELL_SOURCES := $(shell git ls-files '*.sh' '*.bash') \
+	$(addprefix ../modules/,$(shell git -C ../modules ls-files '*.sh' '*.bash' ':!home/agents/skills/**'))
 CHECK_SHELL := nix develop .\#checks -c
 
 # darwin-rebuild auto-resolves darwinConfigurations.$(scutil --get LocalHostName)
 # when no flake attr is specified, so we pass `.` and let it pick.
-# NixOS and home-manager have no equivalent default, so we pass full targets.
+# home-manager has no equivalent default, so we pass the full target.
 ifeq ($(UNAME),Darwin)
+	HOSTNAME := $(shell scutil --get LocalHostName)
 	DARWIN_REBUILD := $(shell command -v darwin-rebuild 2>/dev/null || true)
 	ifeq ($(DARWIN_REBUILD),)
 		BUILD_CMD := nix run .\#darwin-rebuild --
@@ -19,11 +22,13 @@ ifeq ($(UNAME),Darwin)
 	endif
 	FLAKE_TARGET := .
 	DISPLAY_TARGET := darwinConfigurations.$(HOSTNAME)
+	SWITCH_FLAGS :=
 	HOST_KIND := darwin
 else ifeq ($(HOSTNAME),nixos-laptop)
 	BUILD_CMD := sudo nixos-rebuild
 	FLAKE_TARGET := .\#nixos-laptop
 	DISPLAY_TARGET := nixosConfigurations.nixos-laptop
+	SWITCH_FLAGS :=
 	HOST_KIND := nixos
 else
 	HOME_MANAGER := $(shell command -v home-manager 2>/dev/null || true)
@@ -32,8 +37,9 @@ else
 	else
 		BUILD_CMD := home-manager
 	endif
-	FLAKE_TARGET := .\#mikaelsiidorow@pop-os
+	FLAKE_TARGET := .\#mikaelsiidorow@tpad
 	DISPLAY_TARGET := $(FLAKE_TARGET)
+	SWITCH_FLAGS := -b backup
 	HOST_KIND := home
 endif
 
@@ -59,7 +65,8 @@ help:
 	@echo "Other targets:"
 	@echo "  make format-check - Check formatting without activating"
 	@echo "  make lint         - Run ShellCheck, deadnix, and statix"
-	@echo "  make popos        - Build and activate Pop!_OS configuration"
+	@echo "  make plasma-vm    - Build and launch the NixOS Plasma preview"
+	@echo "  make tpad         - Build and activate the ThinkPad (Pop!_OS) configuration"
 	@echo "  make diff         - Show what would change"
 	@echo "  make history      - Show system generations"
 	@echo "  make rollback     - Rollback to previous generation"
@@ -68,7 +75,7 @@ help:
 .PHONY: switch
 switch:
 	@echo "Building $(DISPLAY_TARGET)..."
-	$(BUILD_CMD) switch --flake $(FLAKE_TARGET)
+	$(BUILD_CMD) switch $(SWITCH_FLAGS) --flake $(FLAKE_TARGET)
 
 # Build without activating
 .PHONY: build
@@ -79,14 +86,16 @@ build:
 # Check formatting in treefmt's CI mode
 .PHONY: format-check
 format-check:
-	$(CHECK_SHELL) treefmt --config-file home/treefmt.toml --ci
+	$(CHECK_SHELL) treefmt --config-file home/treefmt.toml --tree-root . --ci
+	$(CHECK_SHELL) treefmt --config-file home/treefmt.toml --tree-root ../modules --ci
 
 # Lint shell and Nix sources
 .PHONY: lint
 lint:
 	$(CHECK_SHELL) shellcheck $(SHELL_SOURCES)
-	$(CHECK_SHELL) deadnix --fail .
+	$(CHECK_SHELL) deadnix --fail . ../modules
 	$(CHECK_SHELL) statix check .
+	$(CHECK_SHELL) statix check ../modules
 
 # Check formatting, lint, and flake outputs
 .PHONY: check
@@ -97,10 +106,7 @@ check: format-check lint
 .PHONY: diff
 diff:
 	@echo "Checking changes for $(DISPLAY_TARGET)..."
-ifeq ($(HOST_KIND),darwin)
-	$(BUILD_CMD) build --flake $(FLAKE_TARGET)
-	nix store diff-closures /run/current-system ./result
-else ifeq ($(HOST_KIND),nixos)
+ifneq ($(HOST_KIND),home)
 	$(BUILD_CMD) build --flake $(FLAKE_TARGET)
 	nix store diff-closures /run/current-system ./result
 else
@@ -123,9 +129,9 @@ update-fast:
 		claude-code-nix \
 		codex-cli-nix \
 		opencode-nix \
+		nix-homebrew \
 		homebrew-core \
-		homebrew-cask \
-		homebrew-cmux
+		homebrew-cask
 
 # Update and switch
 .PHONY: upgrade
@@ -157,26 +163,27 @@ deep-clean:
 # Format all supported repository files
 .PHONY: fmt
 fmt:
-	$(CHECK_SHELL) treefmt --config-file home/treefmt.toml
+	$(CHECK_SHELL) treefmt --config-file home/treefmt.toml --tree-root .
+	$(CHECK_SHELL) treefmt --config-file home/treefmt.toml --tree-root ../modules
 
 # Host-specific overrides (use when not running on the target host)
-.PHONY: popos
-popos:
-	home-manager switch --flake .#mikaelsiidorow@pop-os
+.PHONY: tpad
+tpad:
+	home-manager switch -b backup --flake .#mikaelsiidorow@tpad
 
 # Show system generations
 .PHONY: history
 history:
-ifeq ($(HOST_KIND),home)
-	home-manager generations
-else
+ifneq ($(HOST_KIND),home)
 	sudo nix-env --list-generations --profile /nix/var/nix/profiles/system
+else
+	home-manager generations
 endif
 
 # Rollback to previous generation
 .PHONY: rollback
 rollback:
-ifeq ($(HOST_KIND),darwin)
+ifeq ($(UNAME),Darwin)
 	$(BUILD_CMD) rollback
 else ifeq ($(HOST_KIND),nixos)
 	$(BUILD_CMD) switch --rollback
@@ -199,3 +206,9 @@ info:
 # Test build without switching (useful for CI/testing)
 .PHONY: test
 test: check build
+
+# Preview the NixOS Plasma desktop without activating it on the host.
+.PHONY: plasma-vm
+plasma-vm:
+	nix build .\#nixosConfigurations.nixos-laptop-vm.config.system.build.vm -o result-plasma-vm
+	./result-plasma-vm/bin/run-nixos-laptop-vm

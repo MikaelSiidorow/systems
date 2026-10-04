@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: brawl-draft-collector-prune
+  namespace: brawl-draft
+spec:
+  schedule: "0 20 * * *"
+  timeZone: Europe/Helsinki
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: brawl-draft-collector-prune
+            app.kubernetes.io/name: brawl-draft-collector-prune
+            app.kubernetes.io/component: collector-maintenance
+            app.kubernetes.io/part-of: brawl-draft
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: prune
+              image: ghcr.io/mikaelsiidorow/brawl-draft-collector:latest
+              imagePullPolicy: Always
+              command:
+                - sh
+                - -c
+              args:
+                - |
+                  exec bun src/commands/prune.ts --execute
+              resources:
+                requests:
+                  memory: 512Mi
+                  cpu: 100m
+                limits:
+                  memory: 2Gi
+              env:
+                - name: COLLECTOR_DB_FILE
+                  value: /data/brawl-draft.sqlite
+                - name: COLLECTOR_SQLITE_CACHE_KIB
+                  value: "65536"
+                - name: COLLECTOR_PRUNE_KEEP_LATEST_MATCHES
+                  value: "5000000"
+                - name: COLLECTOR_PRUNE_OLDER_THAN_DAYS
+                  value: "31"
+                - name: COLLECTOR_PRUNE_DROP_BELOW_RANK
+                  value: "13"
+                - name: COLLECTOR_PRUNE_RANK_MIN_KNOWN_PLAYERS
+                  value: "3"
+                - name: COLLECTOR_PRUNE_PROTECT_RANK
+                  value: "16"
+                - name: COLLECTOR_PRUNE_PROTECT_RANK_MIN_KNOWN_PLAYERS
+                  value: "6"
+                - name: COLLECTOR_PRUNE_QUEUE_DROP_BELOW_RANK
+                  value: "13"
+                - name: COLLECTOR_PRUNE_QUEUE_MAX_PLAYERS
+                  value: "250000"
+                - name: COLLECTOR_PRUNE_QUEUE_PROTECT_RANK
+                  value: "16"
+                - name: COLLECTOR_PRUNE_QUEUE_DELETE_BATCH_SIZE
+                  value: "25000"
+                - name: COLLECTOR_MAINTENANCE_LOCK_FILE
+                  value: /data/collector-maintenance.lock
+                - name: COLLECTOR_PRUNE_LOCK_SETTLE_SECONDS
+                  value: "600"
+              volumeMounts:
+                - name: collector-data
+                  mountPath: /data
+          volumes:
+            - name: collector-data
+              persistentVolumeClaim:
+                claimName: brawl-draft-collector-data-v2

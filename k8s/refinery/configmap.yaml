@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: refinery-config
+  namespace: refinery
+data:
+  GITHUB_CLIENT_ID: Ov23li3xF2UVxcaHB5bc
+  GITHUB_REDIRECT_URL: https://refinery.miksu.app/sign-in/github/callback
+  LINKEDIN_CLIENT_ID: 771vf7jib7433b
+  LINKEDIN_REDIRECT_URL: https://refinery.miksu.app/api/oauth/linkedin/callback
+  PUBLIC_SERVER: https://refinery-zero.miksu.app
+  COOKIE_DOMAIN: .miksu.app
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy.alloy.svc.cluster.local:4318

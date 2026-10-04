@@ -38,6 +38,7 @@
         with pkgs.nur.repos.rycee.firefox-addons;
         [
           ublock-origin
+          consent-o-matic
           sponsorblock
           darkreader
           refined-github
@@ -76,6 +77,7 @@
         "privacy.donottrackheader.enabled" = true;
         "privacy.globalprivacycontrol.enabled" = true;
         "dom.security.https_only_mode" = true;
+        "network.lna.skip-domains" = "hestia.home.arpa";
         "browser.urlbar.suggest.quicksuggest.sponsored" = false;
         "browser.newtabpage.activity-stream.showSponsored" = false;
         "browser.newtabpage.activity-stream.showSponsoredTopSites" = false;

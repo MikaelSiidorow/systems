@@ -5,6 +5,7 @@
   ...
 }:
 let
+  xcodeBuildServer = pkgs.callPackage ../pkgs/xcode-build-server { };
   zedLsp = path: arguments: {
     binary = {
       inherit path arguments;
@@ -14,8 +15,18 @@ let
   nodeLangServer =
     package: binary: arguments:
     zedLsp "${package}/bin/${binary}" arguments;
+  sourcekitLsp = pkgs.writeShellApplication {
+    name = "sourcekit-lsp";
+    runtimeInputs = [ xcodeBuildServer ];
+    text = ''
+      export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+      exec /usr/bin/xcrun sourcekit-lsp "$@"
+    '';
+  };
 in
 {
+  home.packages = pkgs.lib.optionals isDarwin [ xcodeBuildServer ];
+
   programs.zed-editor = {
     enable = true;
     package = pkgs.zed-editor;
@@ -47,6 +58,9 @@ in
       "nix"
       "oxc"
       "toml"
+    ]
+    ++ pkgs.lib.optionals isDarwin [
+      "swift"
     ]
     ++ pkgs.lib.optionals (!isDarwin) [
       "gdscript"
@@ -80,7 +94,9 @@ in
         dockerfile-language-server = nodeLangServer pkgs.dockerfile-language-server "docker-langserver" [
           "--stdio"
         ];
-        nil = zedLsp "${pkgs.nil}/bin/nil" [ ];
+        nil = (zedLsp "${pkgs.nil}/bin/nil" [ ]) // {
+          initialization_options.nix.flake.autoArchive = true;
+        };
         nixd = zedLsp "${pkgs.nixd}/bin/nixd" [ ];
         package-version-server = zedLsp "${pkgs.package-version-server}/bin/package-version-server" [ ];
         rust-analyzer = zedLsp "${pkgs.rust-analyzer}/bin/rust-analyzer" [ ];
@@ -92,6 +108,9 @@ in
         tailwindcss-language-server =
           nodeLangServer pkgs.tailwindcss-language-server "tailwindcss-language-server"
             [ "--stdio" ];
+      }
+      // pkgs.lib.optionalAttrs isDarwin {
+        sourcekit-lsp = zedLsp "${sourcekitLsp}/bin/sourcekit-lsp" [ ];
       }
       // pkgs.lib.optionalAttrs (!isDarwin) {
         tinymist = (zedLsp "${pkgs.tinymist}/bin/tinymist" [ "lsp" ]) // {

@@ -16,7 +16,7 @@ the files removed from the root logical volume.
    that the backup can be read.
 2. Back up `~/.config/sops/age/keys.txt` separately. It is required to decrypt the
    repository secrets after installation.
-3. Commit and push the `nixos-2` branch, or copy the repository to separate media.
+3. Commit and push the `wip/nixos-plasma` branch, or copy the repository to separate media.
    Formatting the root logical volume removes the local checkout.
 4. Create and boot an official NixOS installer USB in UEFI mode.
 
@@ -66,13 +66,13 @@ Do not format the EFI, LUKS, or swap partitions.
 Clone the pushed installation branch into the future home directory:
 
 ```bash
-sudo git clone --branch nixos-2 \
-  https://github.com/MikaelSiidorow/nix-config.git \
-  /mnt/home/mikaelsiidorow/nix-config
+sudo git clone --branch wip/nixos-plasma \
+  https://github.com/MikaelSiidorow/systems.git \
+  /mnt/home/mikaelsiidorow/systems
 sudo chown -R 1000:100 /mnt/home/mikaelsiidorow
 
 sudo nixos-install \
-  --flake /mnt/home/mikaelsiidorow/nix-config#nixos-laptop
+  --flake /mnt/home/mikaelsiidorow/systems/workstations#nixos-laptop
 ```
 
 Set the normal user's password after installation:

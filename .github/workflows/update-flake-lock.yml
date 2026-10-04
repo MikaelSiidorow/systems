@@ -1,0 +1,117 @@
+name: Update flake.lock
+
+# Each flake keeps its own lock and gets its own pull request.
+# - workstations: fast-moving inputs daily, all inputs on Mondays; auto-merged
+#   once the required CI Summary passes.
+# - infra: all inputs on Mondays; merged by hand because merging deploys.
+# - openwrt: all inputs daily, since OpenWrt republishes package indexes and
+#   the pinned hashes drift; auto-merged once the firmware builds. Merging
+#   deploys nothing, router deploys stay manual.
+on:
+  schedule:
+    - cron: "17 0 * * 0,2-6"
+    - cron: "17 0 * * 1"
+  workflow_dispatch:
+    inputs:
+      flake:
+        description: "Flake to update"
+        type: choice
+        options: [workstations, infra, openwrt]
+        default: workstations
+      target:
+        description: "Inputs to update (fast applies to workstations only)"
+        type: choice
+        options: [fast, all]
+        default: fast
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Select flakes and inputs
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_FLAKE: ${{ inputs.flake }}
+          INPUT_TARGET: ${{ inputs.target }}
+        run: |
+          ws_fast='{"flake":"workstations","target":"fast","command":"make -s update-fast","title":"chore(workstations): update fast inputs","automerge":true}'
+          ws_all='{"flake":"workstations","target":"all","command":"make -s update","title":"chore(workstations): update inputs","automerge":true}'
+          infra_all='{"flake":"infra","target":"all","command":"nix flake update","title":"chore(infra): update inputs","automerge":false}'
+          openwrt_all='{"flake":"openwrt","target":"all","command":"nix flake update","title":"chore(openwrt): update inputs","automerge":true}'
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            case "$INPUT_FLAKE/$INPUT_TARGET" in
+              workstations/fast) include="$ws_fast" ;;
+              workstations/all) include="$ws_all" ;;
+              infra/*) include="$infra_all" ;;
+              openwrt/*) include="$openwrt_all" ;;
+            esac
+          elif [ "$SCHEDULE" = "17 0 * * 1" ]; then
+            include="$ws_all,$infra_all,$openwrt_all"
+          else
+            include="$ws_fast,$openwrt_all"
+          fi
+          echo "matrix={\"include\":[$include]}" >> "$GITHUB_OUTPUT"
+
+  update:
+    name: Update ${{ matrix.flake }} (${{ matrix.target }})
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      # PRs opened with GITHUB_TOKEN don't trigger CI, so use a GitHub App token.
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Update inputs
+        working-directory: ${{ matrix.flake }}
+        env:
+          COMMAND: ${{ matrix.command }}
+        run: |
+          {
+            echo '```'
+            $COMMAND 2>&1 | grep -v -E '^(warning:|unpacking )'
+            echo '```'
+          } > "$RUNNER_TEMP/body.md"
+
+      - name: Create pull request
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: update/${{ matrix.flake }}-${{ matrix.target }}
+          delete-branch: true
+          add-paths: ${{ matrix.flake }}/flake.lock
+          commit-message: ${{ matrix.title }}
+          title: ${{ matrix.title }}
+          body-path: ${{ runner.temp }}/body.md
+          labels: dependencies
+
+      - name: Enable auto-merge
+        if: matrix.automerge && steps.pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
+        run: gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"

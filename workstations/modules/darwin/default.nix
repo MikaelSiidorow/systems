@@ -4,6 +4,57 @@
   pkgs,
   ...
 }:
+let
+  # The upstream zip contains an AppleDouble sidecar that unzip materializes as
+  # a regular file, invalidating the otherwise notarized app's code signature.
+  scrollReverser = pkgs.scroll-reverser.overrideAttrs (oldAttrs: {
+    postInstall = (oldAttrs.postInstall or "") + ''
+      rm -f "$out/Applications/Scroll Reverser.app/Contents/Resources/._IntroShot.png"
+    '';
+  });
+
+  # Notify once per new commit when GitHub main has workstation changes the
+  # running system lacks.
+  systemsUpdateCheck = pkgs.writeShellApplication {
+    name = "systems-update-check";
+    runtimeInputs = [
+      pkgs.git
+      pkgs.jq
+    ];
+    text = ''
+      repo="$HOME/systems"
+      state="''${XDG_CACHE_HOME:-$HOME/.cache}/systems-update-check"
+
+      remote=$(git ls-remote https://github.com/MikaelSiidorow/systems refs/heads/main | cut -f1)
+      current=$(/run/current-system/sw/bin/darwin-version --json | jq -r '.configurationRevision // empty')
+      # Builds from uncommitted changes record "<rev>-dirty"; compare their base commit.
+      current="''${current%-dirty}"
+
+      [ -n "$current" ] || exit 0
+      [ -n "$remote" ] || exit 0
+      [ "$remote" != "$current" ] || exit 0
+      [ "$(cat "$state" 2>/dev/null)" != "$remote" ] || exit 0
+
+      git -C "$repo" fetch -q origin main || exit 0
+      mkdir -p "$(dirname "$state")"
+
+      # Running system already includes remote main (e.g. unpushed local commits).
+      if git -C "$repo" merge-base --is-ancestor "$remote" "$current" 2>/dev/null; then
+        exit 0
+      fi
+
+      # infra/, k8s/ and terraform/ are deployed elsewhere; only workstation
+      # changes need a rebuild here.
+      if git -C "$repo" diff --quiet "$current" "$remote" -- workstations 2>/dev/null; then
+        echo "$remote" >"$state"
+        exit 0
+      fi
+
+      /usr/bin/osascript -e 'display notification "New workstation commits on GitHub main" with title "systems"'
+      echo "$remote" >"$state"
+    '';
+  };
+in
 {
   imports = [
     ./system.nix
@@ -11,8 +62,25 @@
   ];
 
   environment.systemPackages = [
+    # pkgs-unstable.notion-app # Now installed and updated by the enterprise MDM.
+    scrollReverser
     pkgs.vim
   ];
+
+  launchd.user.agents = {
+    # Start Scroll Reverser in the user's GUI session at login. KeepAlive is
+    # intentionally omitted so quitting the app does not immediately reopen it.
+    scroll-reverser.serviceConfig = {
+      Program = "${scrollReverser}/Applications/Scroll Reverser.app/Contents/MacOS/Scroll Reverser";
+      RunAtLoad = true;
+    };
+
+    systems-update-check.serviceConfig = {
+      Program = "${systemsUpdateCheck}/bin/systems-update-check";
+      RunAtLoad = true;
+      StartInterval = 2 * 60 * 60;
+    };
+  };
 
   services.skhd.enable = true;
 

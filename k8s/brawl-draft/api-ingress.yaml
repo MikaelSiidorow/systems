@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: brawl-draft-api
+  namespace: brawl-draft
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - brawl.miksu.app
+      secretName: brawl-draft-api-tls
+  rules:
+    - host: brawl.miksu.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: brawl-draft-api
+                port:
+                  number: 80

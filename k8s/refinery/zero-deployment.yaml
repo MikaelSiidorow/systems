@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: refinery-zero
+  namespace: refinery
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: refinery-zero
+  template:
+    metadata:
+      labels:
+        app: refinery-zero
+        app.kubernetes.io/name: refinery-zero
+        app.kubernetes.io/component: zero
+        app.kubernetes.io/part-of: refinery
+    spec:
+      containers:
+        - name: zero
+          image: ghcr.io/mikaelsiidorow/refinery/zero:production
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4848
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 50m
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /keepalive
+              port: 4848
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /keepalive
+              port: 4848
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /keepalive
+              port: 4848
+            periodSeconds: 30
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: ZERO_LOG_FORMAT
+              value: json
+            - name: ZERO_APP_ID
+              value: refinery
+            - name: ZERO_UPSTREAM_DB
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: DATABASE_URL
+            - name: ZERO_REPLICA_FILE
+              value: /data/sync-replica.db
+            - name: ZERO_QUERY_URL
+              value: http://refinery-app/api/zero/get-queries
+            - name: ZERO_QUERY_FORWARD_COOKIES
+              value: "true"
+            - name: ZERO_MUTATE_URL
+              value: http://refinery-app/api/zero/mutate
+            - name: ZERO_MUTATE_FORWARD_COOKIES
+              value: "true"
+            - name: ZERO_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: refinery-secrets
+                  key: ZERO_ADMIN_PASSWORD
+          volumeMounts:
+            - name: replica-data
+              mountPath: /data
+      volumes:
+        - name: replica-data
+          persistentVolumeClaim:
+            claimName: zero-replica-data

@@ -1,17 +1,18 @@
 # Nix Configuration
 
-[![CI](https://github.com/MikaelSiidorow/nix-config/actions/workflows/ci.yml/badge.svg)](https://github.com/MikaelSiidorow/nix-config/actions/workflows/ci.yml)
+[![Workstations](https://github.com/MikaelSiidorow/systems/actions/workflows/workstations.yml/badge.svg)](https://github.com/MikaelSiidorow/systems/actions/workflows/workstations.yml)
 
-Multi-platform Nix configuration supporting macOS, NixOS, and standalone Home Manager.
+Nix configuration for macOS (nix-darwin) and Linux (home-manager standalone).
 
 Configured hosts:
 
-| Attr                    | Platform       | Notes                      |
-| ----------------------- | -------------- | -------------------------- |
-| `MacBook-Air`           | aarch64-darwin | nix-darwin                 |
-| `MacBook-Pro`           | aarch64-darwin | nix-darwin                 |
-| `nixos-laptop`          | x86_64-linux   | NixOS on ThinkPad X1 Gen 9 |
-| `mikaelsiidorow@pop-os` | x86_64-linux   | home-manager standalone    |
+| Host   | Attr                            | Platform       | Notes                                 |
+| ------ | ------------------------------- | -------------- | ------------------------------------- |
+| `mbp`  | `Mikael-MacBook-Pro-H7D6Q4TMVY` | aarch64-darwin | nix-darwin; attr is the LocalHostName |
+| `tpad` | `mikaelsiidorow@tpad`           | x86_64-linux   | home-manager standalone on Pop!\_OS   |
+
+Hestia's NixOS configuration and the OpenWrt router configurations live in
+[`infra/`](../infra/) in this repository.
 
 ## Quick Start
 
@@ -23,31 +24,27 @@ The flake assumes Determinate Nix (`nix.enable = false`), so the upstream instal
 # 1. Install Determinate Nix
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
-# 2. Set LocalHostName to match a darwinConfigurations attr.
+# 2. Install Rosetta. Colima uses it to run amd64 containers on Apple silicon.
+softwareupdate --install-rosetta --agree-to-license
+
+# 3. Set LocalHostName to match a darwinConfigurations attr.
 #    darwin-rebuild reads scutil --get LocalHostName as the default target.
-sudo scutil --set HostName MacBook-Pro
-sudo scutil --set LocalHostName MacBook-Pro
-sudo scutil --set ComputerName MacBook-Pro
+sudo scutil --set HostName Mikael-MacBook-Pro-H7D6Q4TMVY
+sudo scutil --set LocalHostName Mikael-MacBook-Pro-H7D6Q4TMVY
+sudo scutil --set ComputerName Mikael-MacBook-Pro-H7D6Q4TMVY
 
-# 3. Clone.
-git clone https://github.com/MikaelSiidorow/nix-config.git ~/nix-config
-cd ~/nix-config
+# 4. Clone.
+git clone https://github.com/MikaelSiidorow/systems.git ~/systems
+cd ~/systems/workstations
 
-# 4. Bootstrap nix-darwin using the locked flake input. After this, `make switch` is available.
+# 5. Bootstrap nix-darwin using the locked flake input. After this, `make switch` is available.
 #    Succeeds without secrets; sops-nix decryption fails quietly until the age key exists.
 nix run .#darwin-rebuild -- switch --flake .
 
-# 5. Restore the SOPS age key (see "SOPS age key restore" below), then `make switch` again to decrypt.
+# 6. Restore the SOPS age key (see "SOPS age key restore" below), then `make switch` again to decrypt.
 ```
 
 If you need a different hostname, add it to `darwinHosts` (top of `flake.nix`) before switching.
-
-### NixOS (ThinkPad X1 Carbon Gen 9)
-
-The `nixos-2` branch is the Plasma installation candidate. Its storage configuration
-preserves this laptop's existing LUKS container, LVM layout, EFI partition, and
-randomly encrypted swap. See [docs/nixos-install.md](docs/nixos-install.md) for the
-destructive migration procedure from Pop!\_OS.
 
 Optional: append `extra-substituters = https://cache.flakehub.com` to `/etc/nix/nix.custom.conf` if you want the FlakeHub cache actually queried (Determinate marks it trusted but doesn't query it). Leave the `access-tokens` line alone.
 
@@ -82,7 +79,10 @@ age-keygen -y ~/.config/sops/age/keys.txt   # optional: prints only the public a
 mkdir -p ~/.config/sops/age && chmod 700 ~/.config/sops ~/.config/sops/age
 
 nix shell nixpkgs#rbw nixpkgs#pinentry-curses -c sh -c '
-  rbw config set base_url "https://vault.bitwarden.eu"
+  rbw config set base_url "https://api.bitwarden.eu"
+  rbw config set identity_url "https://identity.bitwarden.eu"
+  rbw config set ui_url "https://vault.bitwarden.eu"
+  rbw config set notifications_url "https://notifications.bitwarden.eu"
   rbw config set email "<bitwarden-account-email>"
   rbw register
   rbw login
@@ -102,8 +102,8 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 mkdir -p ~/.config/nix
 echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
 
-git clone https://github.com/MikaelSiidorow/nix-config.git ~/nix-config
-cd ~/nix-config
+git clone https://github.com/MikaelSiidorow/systems.git ~/systems
+cd ~/systems/workstations
 
 # Restore the SOPS age key using the commands above before activating.
 ```
@@ -112,11 +112,22 @@ Activate Home Manager:
 
 ```bash
 # Bootstrap using the locked home-manager input.
-nix run .#home-manager -- switch --flake .#mikaelsiidorow@pop-os -b backup
+nix run .#home-manager -- switch --flake .#mikaelsiidorow@tpad -b backup
 
 # Subsequent updates
 make switch
 ```
+
+Pop!\_OS owns the privileged `tailscaled` system service rather than Home
+Manager. After installing and enabling Tailscale through the host OS, apply the
+repeatable Headscale client preferences with:
+
+```bash
+tailscale-headscale-setup
+```
+
+The command connects to `https://hs.miksu.app`, accepts Headscale DNS, and
+accepts the home LAN subnet route. It is safe to run again.
 
 ## Common Commands
 
@@ -131,7 +142,7 @@ make check        # Validate flake
 make fmt          # Format code
 ```
 
-On macOS `make switch` passes `--flake .` and lets `darwin-rebuild` resolve to `darwinConfigurations.$(hostname -s)`. Run `make help` for the full list.
+On macOS `make switch` passes `--flake .` and lets `darwin-rebuild` resolve to `darwinConfigurations.$(scutil --get LocalHostName)`. Run `make help` for the full list.
 
 Homebrew packages are not upgraded during `make switch`; run `make brew-upgrade` when you want casks and brews updated.
 
@@ -139,7 +150,7 @@ Homebrew packages are not upgraded during `make switch`; run `make brew-upgrade`
 
 The default package set is `nixpkgs` on `nixos-26.05`. Fast-moving user apps can use `nixpkgs-unstable` explicitly; Firefox and Vesktop are wired this way so app updates can move ahead of the default package set.
 
-Use `make update-fast` to update app/catalog inputs without moving the default stable package set: `nixpkgs-unstable`, NUR, nix-index database, Claude Code, Codex, OpenCode, and Homebrew taps. Use `make update` when you want all flake inputs updated together.
+Use `make update-fast` to update app/catalog inputs without moving the default stable package set: `nixpkgs-unstable`, NUR, nix-index database, Claude Code, Codex, OpenCode, and Homebrew (`nix-homebrew` plus taps; brew and cask DSL must stay in sync). Use `make update` when you want all flake inputs updated together.
 
 `bitwarden-desktop` is not currently installed from Nix because `nixos-26.05` packages it with Electron 39, which nixpkgs marks EOL/insecure. The Firefox Bitwarden extension remains managed by Nix.
 
@@ -150,6 +161,7 @@ Secrets use `sops-nix` with a single personal age recipient. The age private key
 Current managed secret:
 
 - `ssh/git_signing_key` -> `~/.ssh/git_signing_key`, used for SSH commit and tag signing.
+- `hf/token` -> the Home Manager sops secret directory, kept for Hugging Face access.
 
 Git signing is declarative in `home/git.nix` and uses `mikael@siidorow.com`. The public key is written to `~/.ssh/git_signing_key.pub`; add it to GitHub as an SSH **Signing key** if it is not already present:
 
@@ -174,13 +186,16 @@ Not managed by the flake (bring over manually):
 ```
 ├── flake.nix              # Hosts, overlays, system constructors
 ├── Makefile               # Build commands (OS-detected)
-├── hosts/                 # Per-host modules (Linux only; darwin lives in flake.nix)
-├── modules/{common,darwin,nixos}/
-├── home/                  # User environment (home-manager)
-│   ├── claude-code/       # CLAUDE.md + statusline
-│   └── ...
-└── pkgs/                  # Custom packages (mergiraf with PO grammar)
+├── hosts/{mbp,tpad}/      # Per-host modules
+├── modules/darwin/
+├── home/                  # Workstation home-manager: desktop apps, git, sops, dev toolchain
+├── pkgs/                  # Custom packages and wrappers
+└── profiles/apple/        # Configuration profiles, installed by opening them on the device
 ```
+
+Shared home-manager modules live outside this flake, in `../modules/home/`:
+`core/` (shell and everyday CLI tools) and `agents/` (coding agent CLIs,
+skills and config). Both are imported by `home/default.nix`.
 
 ## Troubleshooting
 
@@ -197,3 +212,11 @@ drivers through `/run/opengl-driver`. After a driver update, run the
 ## License
 
 MIT
+
+## NixOS Plasma preview
+
+On `wip/nixos-plasma`, run `cd workstations && make plasma-vm`. The VM uses
+Plasma 6 on Wayland, logs in automatically, and has password `test` for sudo.
+It does not activate NixOS on your laptop. VM disk state stays in the directory
+where you launch it. See [the installation guide](docs/nixos-install.md) before
+considering a physical installation.

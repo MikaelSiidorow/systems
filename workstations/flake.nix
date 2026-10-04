@@ -8,9 +8,9 @@
     # Fast lane for browsers and selected fast-moving desktop apps.
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # Darwin (macOS) support
+    # Darwin (macOS) support; keep the release aligned with nixpkgs.
     nix-darwin = {
-      url = "github:LnL7/nix-darwin/master";
+      url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -38,8 +38,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Homebrew integration for macOS. Taps are pinned for reproducibility;
-    # homebrew-cask is patched in mkDarwinSystem (see patchedHomebrewCask).
+    # Homebrew integration for macOS. Taps are pinned for reproducibility.
     nix-homebrew.url = "github:zhaofengli-wip/nix-homebrew/main";
 
     homebrew-core = {
@@ -49,11 +48,6 @@
 
     homebrew-cask = {
       url = "github:homebrew/homebrew-cask";
-      flake = false;
-    };
-
-    homebrew-cmux = {
-      url = "github:manaflow-ai/homebrew-cmux";
       flake = false;
     };
 
@@ -75,16 +69,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Keep client and server together; Renovate updates both revision pins.
+    llm-agents.url = "github:numtide/llm-agents.nix/83984ebbbe5322b261d9fdc24eb15cf44f23abec";
+
     # OpenCode with automatic updates (for NixOS/Linux)
     opencode-nix = {
       url = "github:dan-online/opencode-nix";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Local Claude Code and Codex session analytics
-    aeye = {
-      url = "github:MikaelSiidorow/aeye";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
     plasma-manager = {
@@ -112,7 +103,6 @@
       nix-homebrew,
       homebrew-core,
       homebrew-cask,
-      homebrew-cmux,
       nur,
       plasma-manager,
       nix-cachyos-kernel,
@@ -121,7 +111,7 @@
     let
       inherit (nixpkgs) lib;
 
-      # NixOS / Linux home-manager (pop-os) account.
+      # Linux home-manager (tpad, Pop!_OS) account.
       username = "mikaelsiidorow";
       # macOS account (different local username).
       darwinUsername = "mikael";
@@ -160,9 +150,13 @@
 
       # Darwin hosts: attr key is the LocalHostName (must match
       # `scutil --get LocalHostName`, which is what darwin-rebuild uses
-      # to resolve the default flake target).
+      # to resolve the default flake target). `hostname` is the
+      # directory under hosts/.
       darwinHosts = {
-        "mikael-mbp-2026" = "aarch64-darwin";
+        "Mikael-MacBook-Pro-H7D6Q4TMVY" = {
+          system = "aarch64-darwin";
+          hostname = "mbp";
+        };
       };
 
       # Helper function to create a darwin system
@@ -170,22 +164,11 @@
         {
           system,
           username,
-          hostname ? null,
+          hostname,
           extraModules ? [ ],
         }:
         let
           pkgs-unstable = mkPkgsUnstable system;
-
-          # Offline tap parsing treats `depends_on macos: :sym` as an exact
-          # match, rejecting newer macOS (e.g. orbstack on Tahoe). Rewrite bare
-          # symbols to ">= :sym" to match Homebrew's API behaviour. Existing
-          # comparators and arrays are left alone (regex matches only `: :sym`).
-          patchedHomebrewCask = pkgs-unstable.runCommand "homebrew-cask-patched" { } ''
-            cp -r ${homebrew-cask} $out
-            chmod -R u+w $out
-            find $out/Casks -name '*.rb' -print0 \
-              | xargs -0 sed -i -E 's/depends_on macos: (:[a-z_]+)/depends_on macos: ">= \1"/'
-          '';
         in
         nix-darwin.lib.darwinSystem {
           inherit system;
@@ -207,12 +190,9 @@
               ];
             }
 
-            # Common darwin host wiring (was hosts/macbook-air/default.nix)
             {
-              imports = [ ./modules/darwin ];
+              imports = [ ./hosts/${hostname} ];
               nixpkgs.hostPlatform = system;
-              system.primaryUser = username;
-              users.users.${username}.home = "/Users/${username}";
             }
 
             # Homebrew integration
@@ -221,11 +201,10 @@
               nix-homebrew = {
                 enable = true;
                 user = username;
-                # homebrew-core pin is what enables offline mode; cask is patched.
+                # Pinning homebrew-core enables offline mode.
                 taps = {
                   "homebrew/homebrew-core" = homebrew-core;
-                  "homebrew/homebrew-cask" = patchedHomebrewCask;
-                  "manaflow-ai/homebrew-cmux" = homebrew-cmux;
+                  "homebrew/homebrew-cask" = homebrew-cask;
                 };
                 mutableTaps = false;
                 autoMigrate = true;
@@ -347,9 +326,9 @@
     {
       # Darwin (macOS) configurations
       darwinConfigurations = builtins.mapAttrs (
-        hostname: system:
+        _: host:
         mkDarwinSystem {
-          inherit system hostname;
+          inherit (host) system hostname;
           username = darwinUsername;
         }
       ) darwinHosts;
@@ -358,13 +337,13 @@
       packages = builtins.listToAttrs (
         map (system: {
           name = system;
-          value = {
-            mergiraf =
-              let
-                pkgs = import nixpkgs { inherit system; };
-              in
-              pkgs.callPackage ./pkgs/mergiraf-custom { };
-          };
+          value =
+            let
+              pkgs = import nixpkgs { inherit system; };
+            in
+            {
+              mergiraf = pkgs.callPackage ./pkgs/mergiraf-custom { };
+            };
         }) supportedSystems
       );
 
@@ -469,9 +448,9 @@
 
       # Home-manager standalone configurations (for non-NixOS systems)
       homeConfigurations = {
-        "mikaelsiidorow@pop-os" = mkHomeConfig {
+        "mikaelsiidorow@tpad" = mkHomeConfig {
           system = "x86_64-linux";
-          hostname = "pop-os";
+          hostname = "tpad";
         };
       };
 

@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brawl-draft-collector
+  namespace: brawl-draft
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: brawl-draft-collector
+  template:
+    metadata:
+      labels:
+        app: brawl-draft-collector
+        app.kubernetes.io/name: brawl-draft-collector
+        app.kubernetes.io/component: collector
+        app.kubernetes.io/part-of: brawl-draft
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: collector
+          image: ghcr.io/mikaelsiidorow/brawl-draft-collector:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+          env:
+            - name: BRAWL_STARS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: brawl-draft-secrets
+                  key: BRAWL_STARS_API_KEY
+            - name: COLLECTOR_DB_FILE
+              value: /data/brawl-draft.sqlite
+            - name: COLLECTOR_SQLITE_CACHE_KIB
+              value: "65536"
+            - name: COLLECTOR_REQUESTS_PER_MINUTE
+              value: "3000"
+            - name: COLLECTOR_TICK_LIMIT
+              value: "500"
+            - name: COLLECTOR_TICK_CONCURRENCY
+              value: "16"
+            - name: COLLECTOR_PROFILE_LIMIT
+              value: "3000"
+            - name: COLLECTOR_PROFILE_DEBT_LIMIT
+              value: "3000"
+            - name: COLLECTOR_PROFILE_DEBT_RECENT_MATCH_LIMIT
+              value: "50000"
+            - name: COLLECTOR_TICK_PROFILE_LIMIT
+              value: "3000"
+            - name: COLLECTOR_PROFILE_CONCURRENCY
+              value: "16"
+            - name: COLLECTOR_MAX_BATTLE_AGE_DAYS
+              value: "31"
+            - name: COLLECTOR_MIN_MATCH_RANK
+              value: "13"
+            - name: COLLECTOR_MIN_MATCH_RANK_KNOWN_PLAYERS
+              value: "3"
+            - name: COLLECTOR_MIN_DISCOVERED_PLAYER_RANK
+              value: "13"
+            - name: COLLECTOR_MIN_DISCOVERED_MATCH_RANK
+              value: "13"
+            - name: COLLECTOR_MIN_DISCOVERED_MATCH_RANK_KNOWN_PLAYERS
+              value: "3"
+            - name: COLLECTOR_CYCLE_SLEEP_SECONDS
+              value: "0"
+            - name: COLLECTOR_STOP_DB_SIZE_GIB
+              value: "8"
+            - name: COLLECTOR_MAINTENANCE_LOCK_FILE
+              value: /data/collector-maintenance.lock
+            - name: COLLECTOR_MAINTENANCE_SLEEP_SECONDS
+              value: "60"
+            - name: COLLECTOR_SQLITE_BUSY_SLEEP_SECONDS
+              value: "60"
+          volumeMounts:
+            - name: collector-data
+              mountPath: /data
+      volumes:
+        - name: collector-data
+          persistentVolumeClaim:
+            claimName: brawl-draft-collector-data-v2

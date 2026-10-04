@@ -1,0 +1,585 @@
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "Component to deploy"
+        required: true
+        type: choice
+        options:
+          - all
+          - nixos
+          - k8s-terraform
+          - terraform
+  # Pull requests run this through ci.yml, which owns the required CI Summary;
+  # the changes job below picks which checks apply.
+  workflow_call:
+  push:
+    branches: [main]
+    paths:
+      - "infra/nixos/**"
+      - ".sops.yaml"
+      - "infra/flake.nix"
+      - "infra/flake.lock"
+      - "terraform/**"
+      - ".github/workflows/deploy.yml"
+      - ".github/scripts/reconcile-wger.sh"
+permissions:
+  contents: read
+  pull-requests: write
+env:
+  K3S_HOST: ${{ vars.K3S_HOST }}
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      nixos: ${{ steps.filter.outputs.nixos }}
+      openwrt: ${{ steps.filter.outputs.openwrt }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+      k8s_terraform: ${{ steps.filter.outputs.k8s_terraform }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            nixos:
+              - 'infra/nixos/**'
+              - 'infra/flake.nix'
+              - 'infra/flake.lock'
+              - '.github/workflows/deploy.yml'
+            # Router changes only; OpenWrt has its own flake and lock, updated
+            # daily because OpenWrt republishes package indexes often.
+            openwrt:
+              - 'openwrt/**'
+              - '.sops.yaml'
+            terraform:
+              # Top-level files only; terraform/k8s/ is k8s_terraform. A '!' entry
+              # would match every other path, since the patterns are OR'd.
+              - 'terraform/*'
+              - '.github/workflows/deploy.yml'
+            k8s_terraform:
+              - 'terraform/k8s/**'
+              - 'terraform/mail.tf'
+              - 'terraform/outputs.tf'
+              - '.github/workflows/deploy.yml'
+              - '.github/scripts/reconcile-wger.sh'
+  nixos-preview:
+    needs: changes
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.nixos == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - uses: actions/checkout@v6
+        with:
+          path: pr
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+      - name: Restore and save Nix store
+        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          # PR caches are only visible to the same PR; main saves the shared one.
+          save: false
+      - name: Build base config
+        id: build-base
+        run: |
+          # Bases from before the flake moved into infra/ keep it at the root.
+          base=./base/infra
+          [ -f "$base/flake.nix" ] || base=./base
+          nix build "$base#nixosConfigurations.k8s-server.config.system.build.toplevel" -o result-base
+        continue-on-error: true
+      - name: Build PR config
+        id: build-pr
+        run: nix build ./pr/infra#nixosConfigurations.k8s-server.config.system.build.toplevel -o result-pr
+        continue-on-error: true
+      - name: Evaluate PR deploy config
+        id: check-pr
+        run: nix eval --json ./pr/infra#deploy > /dev/null
+        continue-on-error: true
+      - name: Evaluate PR Hestia config
+        id: build-hestia
+        run: nix eval --raw ./pr/infra#nixosConfigurations.hestia.config.system.build.toplevel.drvPath
+        continue-on-error: true
+      - name: Diff closures
+        id: diff
+        if: steps.build-base.outcome == 'success' && steps.build-pr.outcome == 'success'
+        run: |
+          output=$(nix store diff-closures ./result-base ./result-pr 2>&1) || true
+          if [ -z "$output" ]; then
+            output="No changes detected."
+          fi
+          {
+            echo "diff<<EOF"
+            echo "$output"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+      - name: Write CI report section
+        if: always()
+        env:
+          BUILD_BASE: ${{ steps.build-base.outcome }}
+          BUILD_PR: ${{ steps.build-pr.outcome }}
+          CHECK_PR: ${{ steps.check-pr.outcome }}
+          BUILD_HESTIA: ${{ steps.build-hestia.outcome }}
+          DIFF: ${{ steps.diff.outputs.diff }}
+        run: |
+          mark() { [ "$1" = success ] && echo ✅ || echo ❌; }
+          status=success
+          for outcome in "$BUILD_BASE" "$BUILD_PR" "$CHECK_PR" "$BUILD_HESTIA"; do
+            [ "$outcome" = success ] || status=failure
+          done
+          if [ "$status" = failure ]; then
+            summary="build or evaluation failed"
+          elif [ "$DIFF" = "No changes detected." ]; then
+            summary="no k8s-server closure changes; Hestia evaluates"
+          else
+            status=changes
+            n=$(printf '%s\n' "$DIFF" | grep -c .)
+            [ "$n" = 1 ] && noun=change || noun=changes
+            summary="$n k8s-server closure $noun; Hestia evaluates"
+          fi
+          {
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Build k8s-server (base) | $(mark "$BUILD_BASE") |"
+            echo "| Build k8s-server (PR) | $(mark "$BUILD_PR") |"
+            echo "| Evaluate deploy config | $(mark "$CHECK_PR") |"
+            echo "| Evaluate Hestia | $(mark "$BUILD_HESTIA") |"
+            echo
+            echo '```'
+            echo "${DIFF:-No closure diff available.}"
+            echo '```'
+          } >"$RUNNER_TEMP/details.md"
+          pr/.github/scripts/report-section.sh nixos 20 "k8s-server + Hestia" "$status" "$summary" "$RUNNER_TEMP/details.md"
+      - name: Upload CI report section
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-report-nixos
+          path: ${{ runner.temp }}/report/nixos.json
+      - name: Fail on build error
+        if: |
+          steps.build-base.outcome == 'failure' ||
+          steps.build-pr.outcome == 'failure' ||
+          steps.check-pr.outcome == 'failure' ||
+          steps.build-hestia.outcome == 'failure'
+        run: exit 1
+  # The committed Traefik CRDs must match the chart version pinned in k3s.nix,
+  # e.g. after a manual chart bump. Renovate regenerates them itself.
+  traefik-crds:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.nixos == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check the committed Traefik CRDs
+        run: |
+          file=infra/nixos/hosts/k8s-server/traefik-crds.yaml
+          version=$(awk '/chart: traefik$/ {f=1} f && /version:/ {print $2; exit}' infra/nixos/hosts/k8s-server/k3s.nix)
+          .github/scripts/traefik-crds.sh "$version" "$RUNNER_TEMP/traefik-crds.yaml"
+          if ! diff -q "$file" "$RUNNER_TEMP/traefik-crds.yaml" >/dev/null; then
+            echo "::error file=$file::Out of date for traefik chart $version. Run: .github/scripts/traefik-crds.sh $version"
+            exit 1
+          fi
+  nix-cache:
+    needs: changes
+    if: github.event_name == 'push' && needs.changes.outputs.nixos == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+      - name: Restore and save Nix store
+        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 0
+          purge-primary-key: never
+      - name: Build k8s-server config
+        run: nix build ./infra#nixosConfigurations.k8s-server.config.system.build.toplevel --no-link
+  openwrt-check:
+    needs: changes
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.openwrt == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v30
+      - name: Build router firmware and deployment tools
+        id: build
+        run: nix build ./openwrt#cerberus-firmware ./openwrt#hermes-firmware ./openwrt#cerberus-deploy ./openwrt#hermes-deploy --no-link
+      - name: Write CI report section
+        if: always()
+        env:
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          if [ "$BUILD" = success ]; then
+            status=success summary="cerberus + hermes firmware and deploy tools build"
+          else
+            status=failure summary="firmware or deploy tool build failed"
+          fi
+          .github/scripts/report-section.sh openwrt 30 "OpenWrt routers" "$status" "$summary"
+      - name: Upload CI report section
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-report-openwrt
+          path: ${{ runner.temp }}/report/openwrt.json
+  terraform:
+    needs: changes
+    # Dependabot PRs only get Dependabot secrets, so their plans cannot reach
+    # the cloud providers; an action version bump cannot change a plan anyway.
+    if: |
+      (github.event_name == 'pull_request' && needs.changes.outputs.terraform == 'true' &&
+        github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event_name == 'push' && needs.changes.outputs.terraform == 'true') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["terraform", "all"]'), github.event.inputs.component))
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      SCW_ACCESS_KEY: ${{ vars.SCW_ACCESS_KEY }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+      TF_VAR_scaleway_organization_id: ${{ vars.SCW_ORGANIZATION_ID }}
+      TF_VAR_scaleway_project_id: ${{ vars.SCW_PROJECT_ID }}
+      TF_VAR_scaleway_billing_alert_email: ${{ vars.SCW_BILLING_ALERT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ~1.12
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+      - name: Terraform Init
+        id: init
+        run: terraform init
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
+      - name: Check for infrastructure changes
+        id: plan-changes
+        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
+        run: |
+          if terraform show -json tfplan | jq -e '
+            ([.resource_changes[]? | select(.change.actions != ["no-op"])] | length == 0) and
+            ([(.output_changes // {})[] | select(.actions != ["no-op"])] | length == 0)' >/dev/null; then
+            echo "none=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Write CI report section
+        if: always() && github.event_name == 'pull_request'
+        env:
+          FMT: ${{ steps.fmt.outcome }}
+          INIT: ${{ steps.init.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          PLAN: ${{ steps.plan.outcome }}
+          PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
+          NO_CHANGES: ${{ steps.plan-changes.outputs.none }}
+        run: |
+          mark() { case "$1" in success) echo ✅ ;; skipped | "") echo ⏭️ ;; *) echo ❌ ;; esac; }
+          if [ "$INIT" != success ] || [ "$VALIDATE" != success ] || [ "$PLAN" != success ]; then
+            status=failure summary="init, validate or plan failed"
+          elif [ "$FMT" != success ]; then
+            status=failure summary="terraform fmt found unformatted files"
+          elif [ "$NO_CHANGES" = true ]; then
+            status=success summary="no changes"
+          else
+            status=changes
+            summary=$(printf '%s\n' "$PLAN_OUTPUT" | grep -oE '[0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy' | head -1)
+            summary=${summary:-changes}
+          fi
+          {
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Format | $(mark "$FMT") |"
+            echo "| Init | $(mark "$INIT") |"
+            echo "| Validate | $(mark "$VALIDATE") |"
+            echo "| Plan | $(mark "$PLAN") |"
+            echo
+            echo '```terraform'
+            echo "${PLAN_OUTPUT:-No plan output.}"
+            echo '```'
+          } >"$RUNNER_TEMP/details.md"
+          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" terraform 40 "Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
+      - name: Upload CI report section
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-report-terraform
+          path: ${{ runner.temp }}/report/terraform.json
+      - name: Fail on format or plan error
+        if: steps.fmt.outcome == 'failure' || steps.plan.outcome == 'failure'
+        run: exit 1
+      # Renovate updates that change no infrastructure merge themselves once
+      # CI Summary passes. The app token makes that merge trigger the deploy.
+      - name: Create GitHub App token
+        id: app-token
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
+          steps.plan-changes.outputs.none == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Enable auto-merge for a no-op update
+        if: steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Only when every changed file belongs to this Terraform root.
+          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^terraform/[^/]+$'; then
+            echo "The PR changes files outside this Terraform root; leaving it for review."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: terraform apply -auto-approve tfplan
+  nixos:
+    needs: [changes, terraform]
+    if: |
+      always() &&
+      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
+      ((github.event_name == 'push' && needs.changes.outputs.nixos == 'true') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["nixos", "all"]'), github.event.inputs.component)))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+      - name: Deploy NixOS
+        run: ssh root@${{ env.K3S_HOST }} "nixos-rebuild switch --flake 'github:MikaelSiidorow/systems/${{ github.sha }}?dir=infra#k8s-server'"
+  k8s-terraform:
+    needs: [changes, terraform, nixos]
+    if: |
+      always() &&
+      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
+      (needs.nixos.result == 'success' || needs.nixos.result == 'skipped') &&
+      ((github.event_name == 'pull_request' && needs.changes.outputs.k8s_terraform == 'true' &&
+        github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event_name == 'push' && needs.changes.outputs.k8s_terraform == 'true') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["k8s-terraform", "all"]'), github.event.inputs.component)))
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/k8s
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ~1.12
+      - name: Setup SSH and K8s access
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+          ssh -fN -L 6443:127.0.0.1:6443 root@${{ env.K3S_HOST }}
+          ssh root@${{ env.K3S_HOST }} cat /etc/rancher/k3s/k3s.yaml > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+      - name: Ensure wger namespace exists
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: |
+          ssh root@${{ env.K3S_HOST }} \
+            "k3s kubectl create namespace wger --dry-run=client -o yaml | k3s kubectl apply -f -"
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+      - name: Terraform Init
+        id: init
+        run: terraform init
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
+        env:
+          KUBE_CONFIG_PATH: /tmp/kubeconfig
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_refinery_postgres_password: ${{ secrets.REFINERY_POSTGRES_PASSWORD }}
+          TF_VAR_refinery_encryption_key: ${{ secrets.REFINERY_ENCRYPTION_KEY }}
+          TF_VAR_refinery_github_client_secret: ${{ secrets.REFINERY_GITHUB_CLIENT_SECRET }}
+          TF_VAR_refinery_linkedin_client_secret: ${{ secrets.REFINERY_LINKEDIN_CLIENT_SECRET }}
+          TF_VAR_refinery_zero_admin_password: ${{ secrets.REFINERY_ZERO_ADMIN_PASSWORD }}
+          TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          TF_VAR_brawl_stars_api_key: ${{ secrets.BRAWL_STARS_API_KEY }}
+          TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
+          TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
+          TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
+          TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
+          TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
+      - name: Check for infrastructure changes
+        id: plan-changes
+        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
+        run: |
+          if terraform show -json tfplan | jq -e '
+            ([.resource_changes[]? | select(.change.actions != ["no-op"])] | length == 0) and
+            ([(.output_changes // {})[] | select(.actions != ["no-op"])] | length == 0)' >/dev/null; then
+            echo "none=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Detect Wger credential changes
+        id: wger-changes
+        if: steps.plan.outcome == 'success'
+        run: |
+          set -o pipefail
+          changed="$(
+            terraform show -json tfplan |
+              jq -r '
+                any(
+                  .resource_changes[]?;
+                  (
+                    .address == "kubernetes_secret_v1.wger_secrets" or
+                    (.address | startswith("kubernetes_secret_v1.wger_email"))
+                  ) and .change.actions != ["no-op"]
+                )
+              '
+          )"
+          if [[ "$changed" != "true" && "$changed" != "false" ]]; then
+            echo "Unexpected Wger change result: $changed" >&2
+            exit 1
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+      - name: Write CI report section
+        if: always() && github.event_name == 'pull_request'
+        env:
+          FMT: ${{ steps.fmt.outcome }}
+          INIT: ${{ steps.init.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          PLAN: ${{ steps.plan.outcome }}
+          PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
+          NO_CHANGES: ${{ steps.plan-changes.outputs.none }}
+          WGER_CHANGED: ${{ steps.wger-changes.outputs.changed }}
+        run: |
+          mark() { case "$1" in success) echo ✅ ;; skipped | "") echo ⏭️ ;; *) echo ❌ ;; esac; }
+          if [ "$INIT" != success ] || [ "$VALIDATE" != success ] || [ "$PLAN" != success ]; then
+            status=failure summary="init, validate or plan failed"
+          elif [ "$FMT" != success ]; then
+            status=failure summary="terraform fmt found unformatted files"
+          elif [ "$NO_CHANGES" = true ]; then
+            status=success summary="no changes"
+          else
+            status=changes
+            summary=$(printf '%s\n' "$PLAN_OUTPUT" | grep -oE '[0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy' | head -1)
+            summary=${summary:-changes}
+          fi
+          if [ "$WGER_CHANGED" = true ]; then summary="$summary; wger credentials change"; fi
+          {
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Format | $(mark "$FMT") |"
+            echo "| Init | $(mark "$INIT") |"
+            echo "| Validate | $(mark "$VALIDATE") |"
+            echo "| Plan | $(mark "$PLAN") |"
+            echo
+            echo '```terraform'
+            echo "${PLAN_OUTPUT:-No plan output.}"
+            echo '```'
+          } >"$RUNNER_TEMP/details.md"
+          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" k8s-terraform 50 "k8s Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
+      - name: Upload CI report section
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-report-k8s-terraform
+          path: ${{ runner.temp }}/report/k8s-terraform.json
+      - name: Fail on format or plan error
+        if: steps.fmt.outcome == 'failure' || steps.plan.outcome == 'failure'
+        run: exit 1
+      # Renovate updates that change no infrastructure merge themselves once
+      # CI Summary passes. The app token makes that merge trigger the deploy.
+      - name: Create GitHub App token
+        id: app-token
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
+          steps.plan-changes.outputs.none == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Enable auto-merge for a no-op update
+        if: steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Only when every changed file belongs to this Terraform root.
+          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^terraform/k8s/[^/]+$'; then
+            echo "The PR changes files outside this Terraform root; leaving it for review."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          KUBE_CONFIG_PATH: /tmp/kubeconfig
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_refinery_postgres_password: ${{ secrets.REFINERY_POSTGRES_PASSWORD }}
+          TF_VAR_refinery_encryption_key: ${{ secrets.REFINERY_ENCRYPTION_KEY }}
+          TF_VAR_refinery_github_client_secret: ${{ secrets.REFINERY_GITHUB_CLIENT_SECRET }}
+          TF_VAR_refinery_linkedin_client_secret: ${{ secrets.REFINERY_LINKEDIN_CLIENT_SECRET }}
+          TF_VAR_refinery_zero_admin_password: ${{ secrets.REFINERY_ZERO_ADMIN_PASSWORD }}
+          TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          TF_VAR_brawl_stars_api_key: ${{ secrets.BRAWL_STARS_API_KEY }}
+          TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
+          TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
+          TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
+          TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
+          TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
+        run: terraform apply -auto-approve tfplan
+      - name: Reconcile changed wger credentials
+        if: |
+          github.ref == 'refs/heads/main' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          steps.wger-changes.outputs.changed == 'true'
+        env:
+          WGER_POSTGRES_PASSWORD: ${{ secrets.WGER_POSTGRES_PASSWORD }}
+        run: ../../.github/scripts/reconcile-wger.sh "${{ env.K3S_HOST }}"

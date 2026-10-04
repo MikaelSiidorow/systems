@@ -87,20 +87,11 @@ let
     };
 
   machines = {
-    pop-os = {
+    tpad = {
       linux.vicinae.enableGnomeExtension = false;
       darwin.raycast.linkLocalExtensions = false;
     };
 
-    nixos-laptop = {
-      # The locked NixOS package set has GNOME Shell 50.1, which is compatible
-      # with pkgs.gnomeExtensions.vicinae. Keep this false until GNOME is
-      # actually enabled on the NixOS host.
-      linux.vicinae.enableGnomeExtension = false;
-    };
-
-    MacBook-Air = { };
-    MacBook-Pro = { };
   };
 
   machine = lib.recursiveUpdate {

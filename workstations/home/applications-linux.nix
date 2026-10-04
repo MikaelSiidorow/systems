@@ -40,6 +40,7 @@ in
   home.packages =
     (with pkgs; [
       # Communication
+      pkgs-unstable.thunderbird
       pkgs-unstable.vesktop
       # telegram-desktop - using flatpak instead due to graphics driver issues
 
@@ -54,7 +55,6 @@ in
       sweethome3d.application
 
       # Cloud
-      azure-cli
       stripe-cli
 
       # Document processing

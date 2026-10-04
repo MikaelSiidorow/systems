@@ -1,5 +1,14 @@
 # Minimal KDE preferences; Plasma owns everything not listed here.
+{ pkgs, inputs, ... }:
+let
+  t3code = import ../../modules/t3code.nix {
+    inherit pkgs inputs;
+    codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  };
+in
 {
+  home.packages = [ t3code.desktop ];
+
   programs.plasma = {
     enable = true;
 

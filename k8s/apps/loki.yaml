@@ -1,0 +1,115 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # Community fork of the Loki chart; grafana/helm-charts stopped at 6.55.
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: loki
+    targetRevision: 18.13.7
+    helm:
+      values: |
+        deploymentMode: Monolithic
+
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: loki_index_
+                  period: 24h
+          limits_config:
+            retention_period: 168h
+          rulerConfig:
+            alertmanager_url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+            storage:
+              type: local
+              local:
+                directory: /var/loki/rules
+            rule_path: /var/loki/rules-temp
+            ring:
+              kvstore:
+                store: inmemory
+            enable_api: true
+          storage:
+            type: filesystem
+
+        singleBinary:
+          replicas: 1
+          resources:
+            requests:
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          persistence:
+            storageClass: local-path
+            size: 10Gi
+          extraVolumes:
+            - name: alerting-rules
+              configMap:
+                name: loki-alerting-rules
+          extraVolumeMounts:
+            - name: alerting-rules
+              mountPath: /var/loki/rules/fake
+              readOnly: true
+
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        backend:
+          replicas: 0
+
+        gateway:
+          enabled: false
+
+        resultsCache:
+          enabled: false
+        chunksCache:
+          enabled: false
+
+        minio:
+          enabled: false
+
+        extraObjects:
+          - apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: loki-alerting-rules
+            data:
+              rules.yaml: |
+                groups:
+                  - name: application-errors
+                    rules:
+                      - alert: ApplicationError
+                        expr: |
+                          sum by (namespace, app, level) (
+                            count_over_time({namespace=~"refinery|brawl-draft"} | json | level=~"error|fatal" [1m])
+                          ) > 0
+                        for: 0m
+                        labels:
+                          severity: critical
+                        annotations:
+                          summary: "{{`{{ $labels.level | title }} in {{ $labels.namespace }}/{{ $labels.app }}`}}"
+                          description: "{{`{{ $labels.namespace }}/{{ $labels.app }} logged {{ $value }} {{ $labels.level }}-level message(s) in the last minute.`}}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: loki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

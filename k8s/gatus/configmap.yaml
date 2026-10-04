@@ -1,0 +1,135 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gatus-config
+  namespace: gatus
+data:
+  config.yaml: |
+    storage:
+      type: sqlite
+      path: /data/gatus.db
+
+    ui:
+      title: miksu.app status
+      header: miksu.app status
+
+    alerting:
+      telegram:
+        token: ${TELEGRAM_BOT_TOKEN}
+        id: "-1003049249814"
+        default-alert:
+          send-on-resolved: true
+
+    endpoints:
+      - name: Refinery
+        group: Apps
+        url: https://refinery.miksu.app
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[RESPONSE_TIME] < 5000"
+          - "[CERTIFICATE_EXPIRATION] > 168h"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Refinery Zero
+        group: Apps
+        url: https://refinery-zero.miksu.app
+        interval: 60s
+        conditions:
+          - "[CONNECTED] == true"
+          - "[RESPONSE_TIME] < 5000"
+          - "[CERTIFICATE_EXPIRATION] > 168h"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Brawl Draft
+        group: Apps
+        url: https://brawl.miksu.app/api/health
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY].status == ok"
+          - "[RESPONSE_TIME] < 5000"
+          - "[CERTIFICATE_EXPIRATION] > 168h"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Wger
+        group: Apps
+        url: https://wger.miksu.app/api/v2/
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[RESPONSE_TIME] < 5000"
+          - "[CERTIFICATE_EXPIRATION] > 168h"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Wger PowerSync
+        group: Apps
+        url: https://wger.miksu.app/ps/probes/liveness
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[RESPONSE_TIME] < 5000"
+          - "[CERTIFICATE_EXPIRATION] > 168h"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Headscale
+        group: Infrastructure
+        url: https://hs.miksu.app/health
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[RESPONSE_TIME] < 5000"
+          - "[CERTIFICATE_EXPIRATION] > 168h"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Argo CD
+        group: Infrastructure
+        url: http://argocd-server.argocd.svc.cluster.local/healthz
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY] == ok"
+          - "[RESPONSE_TIME] < 5000"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2
+
+      - name: Grafana
+        group: Infrastructure
+        url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local/api/health
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY].database == ok"
+          - "[RESPONSE_TIME] < 5000"
+        alerts:
+          - type: telegram
+            enabled: true
+            failure-threshold: 3
+            success-threshold: 2

@@ -183,7 +183,7 @@ inputs = {
 };
 ```
 
-Usage in `home/packages.nix`:
+Usage in `modules/home/agents/packages.nix`:
 
 ```nix
 home.packages = with pkgs; [
@@ -221,7 +221,7 @@ casks = [
 ];
 ```
 
-**NixOS/Linux**: Installed via nixpkgs (`home/packages.nix`)
+**NixOS/Linux**: Installed via nixpkgs (`modules/home/agents/packages.nix`)
 
 ```nix
 ++ lib.optionals (!isDarwin) [
@@ -237,7 +237,7 @@ The worktree script automatically:
 
 ### Development Installation
 
-The worktree script is installed as a Nix package in `home/scripts.nix`, making it:
+The worktree script is installed as a Nix package in `modules/home/agents/scripts.nix`, making it:
 
 - Available in your PATH automatically
 - Reproducible across machines

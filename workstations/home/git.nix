@@ -28,6 +28,10 @@ in
       core = {
         autocrlf = "input";
         editor = "${pkgs.vim}/bin/vim";
+        # Big repos: skip the full-tree lstat, so a concurrent status can't
+        # write a stale index mid-rebase. Daemon is macOS/Windows only.
+        fsmonitor = pkgs.stdenv.isDarwin;
+        untrackedCache = true;
       };
       branch.sort = "-committerdate";
       merge.conflictstyle = "zdiff3";

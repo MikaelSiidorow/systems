@@ -1,0 +1,193 @@
+name: Workstations
+
+on:
+  # Pull requests run this through ci.yml, which owns the required CI Summary.
+  workflow_call:
+  push:
+    branches: ["main"]
+    paths:
+      - "workstations/**"
+      - "modules/**"
+      - ".github/workflows/workstations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: workstations
+
+# Cancel in-progress runs when a new commit is pushed (except on main). The
+# group is spelled out because github.workflow is the caller's name in a
+# workflow_call.
+concurrency:
+  group: workstations-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  check:
+    name: Check Nix Flake
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Check flake
+        run: nix flake check --show-trace
+
+      - name: Verify flake metadata
+        run: nix flake metadata
+
+  format:
+    name: Check Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Check formatting
+        run: |
+          echo "Running nix fmt..."
+          nix fmt
+          if ! git diff --exit-code; then
+            echo "❌ Code is not formatted. Run 'make fmt' locally."
+            echo ""
+            echo "Files that need formatting:"
+            git diff --name-only
+            echo ""
+            echo "Diff:"
+            git diff
+            exit 1
+          fi
+          echo "✅ All files are properly formatted"
+
+  build-darwin:
+    name: Build macOS Configuration
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # cache-nix-action purges superseded store caches
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+
+      # Restore on every run, save only on main, so pull requests never wait
+      # on an upload. Separate keys from deploy.yml's nix-<os>- caches.
+      - name: Restore and save Nix store
+        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        with:
+          primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix') }}
+          restore-prefixes-first-match: nix-workstations-${{ runner.os }}-
+          save: ${{ github.event_name == 'push' }}
+          gc-max-store-size: 3G
+          purge: ${{ github.event_name == 'push' }}
+          purge-prefixes: nix-workstations-${{ runner.os }}-
+          purge-created: 0
+          purge-primary-key: never
+
+      - name: Build darwin configuration
+        run: |
+          nix build .#darwinConfigurations.Mikael-MacBook-Pro-H7D6Q4TMVY.system \
+            --show-trace \
+            --fallback
+
+  build-linux:
+    name: Build Linux Configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # cache-nix-action purges superseded store caches
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+
+      # Restore on every run, save only on main, so pull requests never wait
+      # on an upload. Separate keys from deploy.yml's nix-<os>- caches.
+      - name: Restore and save Nix store
+        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        with:
+          primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix') }}
+          restore-prefixes-first-match: nix-workstations-${{ runner.os }}-
+          save: ${{ github.event_name == 'push' }}
+          gc-max-store-size: 3G
+          purge: ${{ github.event_name == 'push' }}
+          purge-prefixes: nix-workstations-${{ runner.os }}-
+          purge-created: 0
+          purge-primary-key: never
+
+      - name: Build home-manager configuration
+        run: |
+          nix build .#homeConfigurations.\"mikaelsiidorow@tpad\".activationPackage \
+            --show-trace \
+            --fallback
+
+  report:
+    name: CI report section
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [check, format, build-darwin, build-linux]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Write CI report section
+        env:
+          CHECK: ${{ needs.check.result }}
+          FORMAT: ${{ needs.format.result }}
+          DARWIN: ${{ needs.build-darwin.result }}
+          LINUX: ${{ needs.build-linux.result }}
+        run: |
+          mark() { [ "$1" = success ] && echo ✅ || echo "❌ $1"; }
+          status=success summary="flake check, format, mbp + tpad builds"
+          for result in "$CHECK" "$FORMAT" "$DARWIN" "$LINUX"; do
+            [ "$result" = success ] || { status=failure; summary="a check or build failed"; }
+          done
+          {
+            echo "| Job | Result |"
+            echo "|---|---|"
+            echo "| Flake check | $(mark "$CHECK") |"
+            echo "| Formatting | $(mark "$FORMAT") |"
+            echo "| mbp (darwin) build | $(mark "$DARWIN") |"
+            echo "| tpad (home-manager) build | $(mark "$LINUX") |"
+          } >"$RUNNER_TEMP/details.md"
+          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" workstations 10 Workstations "$status" "$summary" "$RUNNER_TEMP/details.md"
+      - name: Upload CI report section
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-report-workstations
+          path: ${{ runner.temp }}/report/workstations.json

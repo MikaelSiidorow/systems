@@ -1,0 +1,178 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wger-powersync-setup
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: setup
+          image: ghcr.io/mikaelsiidorow/wger:production
+          imagePullPolicy: Always
+          command: [./manage.py, setup-powersync-storage]
+          envFrom:
+            - configMapRef:
+                name: wger-config
+            - secretRef:
+                name: wger-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wger-powersync
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: wger-powersync
+  template:
+    metadata:
+      labels:
+        app: wger-powersync
+    spec:
+      containers:
+        - name: powersync
+          image: docker.io/journeyapps/powersync-service:1.26.1
+          args: [start, -r, unified]
+          env:
+            - name: POWERSYNC_CONFIG_PATH
+              value: /config/powersync.yaml
+            - name: PS_JWKS_URL
+              value: http://wger-backend:8000/api/v2/powersync-keys
+            - name: PS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: wger-config
+                  key: PS_PORT
+            - name: PS_DATABASE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: wger-secrets
+                  key: PS_DATABASE_URI
+            - name: PS_STORAGE_PG_URI
+              valueFrom:
+                secretKeyRef:
+                  name: wger-secrets
+                  key: PS_STORAGE_PG_URI
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          startupProbe:
+            tcpSocket:
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: wger-config
+            items:
+              - key: powersync.yaml
+                path: powersync.yaml
+              - key: sync_rules.yaml
+                path: sync_rules.yaml
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wger-powersync-compact
+  namespace: wger
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  schedule: "0 3 * * *"
+  timeZone: Europe/Helsinki
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: compact
+              image: docker.io/journeyapps/powersync-service:1.26.1
+              args: [compact]
+              env:
+                - name: POWERSYNC_CONFIG_PATH
+                  value: /config/powersync.yaml
+                - name: PS_JWKS_URL
+                  value: http://wger-backend:8000/api/v2/powersync-keys
+                - name: PS_PORT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: wger-config
+                      key: PS_PORT
+                - name: PS_DATABASE_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: wger-secrets
+                      key: PS_DATABASE_URI
+                - name: PS_STORAGE_PG_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: wger-secrets
+                      key: PS_STORAGE_PG_URI
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              volumeMounts:
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+          volumes:
+            - name: config
+              configMap:
+                name: wger-config
+                items:
+                  - key: powersync.yaml
+                    path: powersync.yaml
+                  - key: sync_rules.yaml
+                    path: sync_rules.yaml

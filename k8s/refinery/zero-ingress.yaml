@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: refinery-zero
+  namespace: refinery
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - refinery-zero.miksu.app
+      secretName: refinery-zero-tls
+  rules:
+    - host: refinery-zero.miksu.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: refinery-zero
+                port:
+                  number: 4848

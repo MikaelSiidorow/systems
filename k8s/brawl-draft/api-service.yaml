@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: brawl-draft-api
+  namespace: brawl-draft
+spec:
+  selector:
+    app: brawl-draft-api
+  ports:
+    - port: 80
+      targetPort: 8000

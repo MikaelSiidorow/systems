@@ -1,0 +1,28 @@
+keys:
+  - &mikael age1cg4jmsf6857fk9456uphmmqmjahvfv5hcxf75w7rsjay3p9kj40s0qg5tm
+  - &hestia age1nrzsajt427a8j2qed0c7cqpxw5k30vnhkl85gt54w66yvucm6vzqczrxx0
+  - &router_deploy ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHRoq5iJ3VLK2FH4RlmnxGozwTpD9wHxULtPkMI+hZjM
+
+creation_rules:
+  - path_regex: ^infra/secrets/hestia\.yaml$
+    key_groups:
+      - age:
+          - *mikael
+          - *hestia
+  - path_regex: ^openwrt/secrets/openwrt\.yaml$
+    key_groups:
+      - age:
+          - *mikael
+          - *router_deploy
+  - path_regex: ^workstations/secrets/.*\.yaml$
+    key_groups:
+      - age:
+          - *mikael
+  - path_regex: ^infra/secrets/.*\.yaml$
+    key_groups:
+      - age:
+          - *mikael
+
+stores:
+  yaml:
+    indent: 2

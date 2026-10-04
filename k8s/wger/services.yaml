@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: wger
+  namespace: wger
+spec:
+  selector:
+    app: wger-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wger-backend
+  namespace: wger
+spec:
+  selector:
+    app: wger-web
+  ports:
+    - name: django
+      port: 8000
+      targetPort: django
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache
+  namespace: wger
+spec:
+  selector:
+    app: wger-cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: powersync
+  namespace: wger
+  labels:
+    app: wger-powersync
+spec:
+  selector:
+    app: wger-powersync
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: metrics
+      port: 9090
+      targetPort: metrics
