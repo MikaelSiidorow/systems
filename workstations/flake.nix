@@ -61,6 +61,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Keep client and server together; Renovate updates both revision pins.
+    llm-agents.url = "github:numtide/llm-agents.nix/83984ebbbe5322b261d9fdc24eb15cf44f23abec";
+
     # OpenCode with automatic updates (for NixOS/Linux)
     opencode-nix = {
       url = "github:dan-online/opencode-nix";

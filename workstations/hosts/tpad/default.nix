@@ -1,6 +1,10 @@
 # ThinkPad (Pop!_OS) host configuration for home-manager standalone
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 let
+  t3code = import ../../../modules/t3code.nix {
+    inherit pkgs inputs;
+    codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  };
   tailscale-headscale-setup = pkgs.writeShellApplication {
     name = "tailscale-headscale-setup";
     runtimeInputs = [ pkgs.jq ];
@@ -20,7 +24,10 @@ in
 
   # Pop!_OS owns the privileged tailscaled service. Keep using its matching
   # system CLI and expose an idempotent command for applying our client prefs.
-  home.packages = [ tailscale-headscale-setup ];
+  home.packages = [
+    tailscale-headscale-setup
+    t3code.desktop
+  ];
 
   home.file.".codex/hestia.config.toml".text = ''
     model_provider = "hestia"

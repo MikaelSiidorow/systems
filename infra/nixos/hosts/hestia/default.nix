@@ -7,6 +7,7 @@
 {
   imports = [
     ./cli-proxy-api.nix
+    ./t3code.nix
     ./home.nix
     ./home-assistant.nix
     ./reverse-proxy.nix

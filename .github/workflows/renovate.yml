@@ -1,8 +1,8 @@
 name: Renovate
 
 # Self-hosted Renovate, authenticated as the mikael-systems-bot GitHub App.
-# Configuration lives in renovate.json; flake inputs are left to
-# update-flake-lock.yml.
+# Configuration lives in renovate.json. T3 revision pins are kept together
+# here; other flake inputs are updated by update-flake-lock.yml.
 on:
   schedule:
     - cron: "37 3 * * 1"

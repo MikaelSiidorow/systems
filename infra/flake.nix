@@ -7,6 +7,9 @@
     # Home Assistant moves faster than the stable NixOS release.
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+    # Keep client and server together; Renovate updates both revision pins.
+    llm-agents.url = "github:numtide/llm-agents.nix/83984ebbbe5322b261d9fdc24eb15cf44f23abec";
+
     deploy-rs = {
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";

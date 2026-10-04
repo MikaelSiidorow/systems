@@ -6,7 +6,7 @@
   "labels": ["dependencies"],
   "dependencyDashboard": true,
   "prHourlyLimit": 0,
-  "enabledManagers": ["github-actions", "argocd", "kubernetes", "terraform", "custom.regex"],
+  "enabledManagers": ["github-actions", "argocd", "kubernetes", "terraform", "custom.regex", "nix"],
   "argocd": {
     "managerFilePatterns": ["/^k8s/apps/.+\\.ya?ml$/"]
   },
@@ -42,6 +42,14 @@
       "enabled": false
     },
     {
+      "description": "Update the T3 Code client and server revision pins together",
+      "matchManagers": ["nix"],
+      "matchDepNames": ["llm-agents"],
+      "enabled": true,
+      "groupName": "T3 Code",
+      "automerge": false
+    },
+    {
       "description": "One weekly PR for action updates; auto-merge once CI Summary passes",
       "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions",
@@ -70,5 +78,8 @@
       "matchFileNames": ["infra/**", "k8s/**", "terraform/**"],
       "automerge": false
     }
-  ]
+  ],
+  "nix": {
+    "enabled": true
+  }
 }
