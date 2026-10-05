@@ -11,7 +11,7 @@ spec:
     # Community fork of the Loki chart; grafana/helm-charts stopped at 6.55.
     repoURL: https://grafana-community.github.io/helm-charts
     chart: loki
-    targetRevision: 18.13.7
+    targetRevision: 18.13.8
     helm:
       values: |
         deploymentMode: Monolithic
