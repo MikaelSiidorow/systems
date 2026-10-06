@@ -53,6 +53,8 @@ spec:
               value: json
             - name: ZERO_APP_ID
               value: refinery
+            - name: ZERO_NUM_SYNC_WORKERS
+              value: "1"
             - name: ZERO_UPSTREAM_DB
               valueFrom:
                 secretKeyRef:
