@@ -99,6 +99,16 @@ in
   # Disable nix-darwin's Nix daemon management (using Determinate Systems installer)
   nix.enable = false;
 
+  # Determinate Nix reads custom settings here instead of nix-darwin's nix.conf.
+  environment.etc."nix/nix.custom.conf" = {
+    text = ''
+      extra-substituters = https://cache.numtide.com
+      extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
+    '';
+    # Allow adopting the installer-created file containing only comments.
+    knownSha256Hashes = [ "3bd68ef979a42070a44f8d82c205cfd8e8cca425d91253ec2c10a88179bb34aa" ];
+  };
+
   security.pam.services.sudo_local.touchIdAuth = true;
 
   # Cap per-process file descriptors to prevent login(1) from hanging
