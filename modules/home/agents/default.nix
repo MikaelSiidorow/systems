@@ -27,6 +27,14 @@ let
     lib.unique (map (agent: skillTargets.${agent} name) effectiveAgents);
 
   skills = {
+    babysit = {
+      source = ./skills/babysit;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     humanizer = {
       source = ./skills/humanizer;
       agents = [
