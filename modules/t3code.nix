@@ -2,6 +2,7 @@
   pkgs,
   inputs,
   codex ? inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex,
+  claude ? inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default,
 }:
 let
   upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.t3code;
@@ -64,9 +65,7 @@ let
     '';
   direnvProviders = [
     (direnvWrapper "codex-direnv" "${codexProxy}/bin/codex")
-    (direnvWrapper "claude-direnv" "${
-      inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
-    }/bin/claude")
+    (direnvWrapper "claude-direnv" "${claude}/bin/claude")
   ];
 in
 (upstream.override {
