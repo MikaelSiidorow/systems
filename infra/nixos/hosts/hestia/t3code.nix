@@ -5,7 +5,10 @@
   ...
 }:
 let
-  t3code = import ../../../../modules/t3code.nix { inherit pkgs inputs; };
+  t3code = import ../../../../modules/t3code.nix {
+    inherit pkgs inputs;
+    claude = claudeCode;
+  };
   claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
   pair = pkgs.writeShellApplication {
     name = "t3-hestia-pair";
