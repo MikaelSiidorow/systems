@@ -1,10 +1,19 @@
 # macOS system defaults
 {
   pkgs,
+  inputs,
   username,
   ...
 }:
+let
+  t3code = import ../../../modules/t3code.nix {
+    inherit pkgs inputs;
+    codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  };
+in
 {
+  environment.systemPackages = [ t3code.desktop ];
+
   system.defaults = {
     NSGlobalDomain.AppleICUForce24HourTime = true;
     menuExtraClock.ShowSeconds = true;
@@ -38,6 +47,9 @@
         }
         {
           app = "/Applications/cmux.app";
+        }
+        {
+          app = "${t3code.desktop}/Applications/${t3code.unwrapped.appName}.app";
         }
         {
           app = "${pkgs.zed-editor}/Applications/Zed.app";
