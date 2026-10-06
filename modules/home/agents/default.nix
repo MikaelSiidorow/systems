@@ -75,7 +75,6 @@ in
 {
   imports = [
     ./packages.nix
-    ./scripts.nix
   ];
 
   home.file = skillFiles // {

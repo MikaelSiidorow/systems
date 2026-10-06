@@ -30,7 +30,6 @@ in
     cco = "claude --continue";
     cres = "claude --resume";
     crew = "claude /review";
-    cwt = "claude-worktree";
     codex = "${codex}/bin/codex --ask-for-approval on-request -c 'approvals_reviewer=\"auto_review\"' -c 'default_permissions=\":workspace\"' -c 'plan_mode_reasoning_effort=\"xhigh\"' -c 'web_search=\"live\"'${codexProfile}";
     codex-yolo = "${codex}/bin/codex --ask-for-approval never -c 'default_permissions=\":danger-full-access\"' -c 'plan_mode_reasoning_effort=\"xhigh\"' -c 'web_search=\"live\"'${codexProfile}";
   };
