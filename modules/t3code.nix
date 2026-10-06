@@ -28,8 +28,9 @@ let
       }
       ''
         mkdir -p "$out" "$desktop"
-        cp -r --no-preserve=mode ${upstream.unwrapped}/. "$out/"
-        cp -r --no-preserve=mode ${upstream.unwrapped.desktop}/. "$desktop/"
+        cp -r --preserve=mode ${upstream.unwrapped}/. "$out/"
+        cp -r --preserve=mode ${upstream.unwrapped.desktop}/. "$desktop/"
+        chmod -R u+w "$out" "$desktop"
 
         # Compiled equivalent of AnalyticsService.layer -> AnalyticsService.layerTest.
         # Fail on upstream changes rather than silently retaining analytics.
@@ -55,12 +56,31 @@ let
       -c 'model_providers.hestia={name="Hestia CLIProxyAPI",base_url="https://hestia.vpn.miksu.app:8317/v1",wire_api="responses",requires_openai_auth=false}' \
       "$@"
   '';
+  direnvWrapper =
+    name: executable:
+    pkgs.writeShellScriptBin name ''
+      export DIRENV_LOG_FORMAT=
+      exec ${pkgs.direnv}/bin/direnv exec "$PWD" ${executable} "$@"
+    '';
+  direnvProviders = [
+    (direnvWrapper "codex-direnv" "${codexProxy}/bin/codex")
+    (direnvWrapper "claude-direnv" "${
+      inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
+    }/bin/claude")
+  ];
 in
-upstream.override {
+(upstream.override {
   t3code-unwrapped = patched;
   providerPackages = [
     codexProxy
     pkgs.git
+    pkgs.git-lfs
     pkgs.gh
-  ];
-}
+  ]
+  ++ direnvProviders;
+}).overrideAttrs
+  (previous: {
+    passthru = previous.passthru // {
+      inherit direnvProviders;
+    };
+  })

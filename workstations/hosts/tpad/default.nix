@@ -27,7 +27,8 @@ in
   home.packages = [
     tailscale-headscale-setup
     t3code.desktop
-  ];
+  ]
+  ++ t3code.direnvProviders;
 
   home.file.".codex/hestia.config.toml".text = ''
     model_provider = "hestia"

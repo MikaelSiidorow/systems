@@ -12,7 +12,7 @@ let
   };
 in
 {
-  environment.systemPackages = [ t3code.desktop ];
+  environment.systemPackages = [ t3code.desktop ] ++ t3code.direnvProviders;
 
   system.defaults = {
     NSGlobalDomain.AppleICUForce24HourTime = true;
