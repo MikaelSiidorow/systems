@@ -13,8 +13,8 @@ let
     '';
   });
 
-  # Notify once per new commit when GitHub main has workstation changes the
-  # running system lacks.
+  # Notify once per new commit when GitHub main has workstation or shared module
+  # changes the running system lacks.
   systemsUpdateCheck = pkgs.writeShellApplication {
     name = "systems-update-check";
     runtimeInputs = [
@@ -43,9 +43,9 @@ let
         exit 0
       fi
 
-      # infra/, k8s/ and terraform/ are deployed elsewhere; only workstation
-      # changes need a rebuild here.
-      if git -C "$repo" diff --quiet "$current" "$remote" -- workstations 2>/dev/null; then
+      # Workstation config and its shared modules need a rebuild here;
+      # infra/, k8s/ and terraform/ are deployed elsewhere.
+      if git -C "$repo" diff --quiet "$current" "$remote" -- workstations modules 2>/dev/null; then
         echo "$remote" >"$state"
         exit 0
       fi
