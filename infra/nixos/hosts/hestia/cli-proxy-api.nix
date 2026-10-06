@@ -26,6 +26,13 @@ let
       allow-remote: false
       secret-key: "@MANAGEMENT_KEY@"
       disable-auto-update-panel: true
+    # One Codex account: a cached quota cooldown has no failover target and
+    # outlives manual quota resets (upstream #5639), so let OpenAI answer.
+    routing:
+      retry:
+        request-retry: 0
+      cooldown:
+        disable-cooling: true
     oauth:
       auth-dir: "/var/lib/cli-proxy-api/auth"
     observability:
