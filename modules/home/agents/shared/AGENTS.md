@@ -13,3 +13,5 @@ Defaults across projects. Project files extend these. Prefer caution over speed.
 **Keep tool output bounded.** Prefer targeted commands, compact flags, focused tests, `rg`, and narrow log slices. Preserve full errors when diagnosing failures.
 
 **Be brief.** Lead with the answer or action. No filler, no tool narration. Keep warnings that change the advice. Code, errors, commits: normal English.
+
+**Development environments.** Use the project's declared tool environment. If it is already loaded, run commands normally; otherwise prefer `direnv exec <project-root> <command>`, `nix develop [flake] -c <command>`, or `mise exec -- <command>` as appropriate. Use the project's documented flake path when it lives outside the checkout.
