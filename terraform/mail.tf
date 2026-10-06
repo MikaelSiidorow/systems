@@ -1,7 +1,8 @@
 locals {
   mail_domain = "notify.miksu.app"
+  # Provider 2.84 dropped the priority from mx_config; older ones send "10 host.".
   tem_mx_parts = regex(
-    "^([0-9]+)\\s+(.+)$",
+    "^(?:([0-9]+)\\s+)?(.+)$",
     scaleway_tem_domain.notifications.mx_config,
   )
 }
@@ -46,7 +47,7 @@ resource "cloudflare_dns_record" "notifications_mx" {
   type     = "MX"
   name     = local.mail_domain
   content  = trimsuffix(local.tem_mx_parts[1], ".")
-  priority = tonumber(local.tem_mx_parts[0])
+  priority = tonumber(coalesce(local.tem_mx_parts[0], "10"))
   proxied  = false
   ttl      = 300
   comment  = "Scaleway TEM blackhole MX for transactional notifications"
