@@ -11,8 +11,9 @@ Only merge PRs whose checks are green. Ask the user before merging a major, an `
 
 ## What merges itself
 
-- Workstations and openwrt flake locks, GitHub Actions minor/patch and digest updates (except `deploy.yml` and `k8s-rollout.yml`).
-- `k8s/**` minor/patch chart and image updates (not 0.x), three days after release, except the monitoring stack (alloy, kube-prometheus-stack, loki, tempo).
+- Workstations and openwrt flake locks.
+- The weekly GitHub Actions group (minor/patch/digest), but only when it doesn't touch `deploy.yml` or `k8s-rollout.yml`. A shared action like `actions/checkout` pulls those in, so expect to review it most weeks.
+- `k8s/**` minor/patch chart and image updates (not 0.x), three days after release, except the monitoring stack (alloy, kube-prometheus-stack, loki, tempo). A release without a publish date (images outside Docker Hub) never gets a PR; force it from the Dependency Dashboard.
 - Bot Terraform PRs whose plan shows no changes (`deploy.yml` enables auto-merge).
 - Everything else is left for review: majors, the monitoring stack, `infra/**` (NixOS, k3s HelmCharts), Terraform with a non-empty plan, the T3 Code pins.
 
@@ -34,7 +35,7 @@ Only merge PRs whose checks are green. Ask the user before merging a major, an `
 Order: low-risk first, then `infra/` flake bumps, then majors one at a time, the ingress (traefik) last.
 
 - `gh pr merge <n> --squash`, then wait for its deploy and verify before the next merge. NixOS deploys queue on a lock on k8s-server and deploy `main` as it is, so a run can include later merges.
-- `deploy.yml` only runs for `infra/**`, `terraform/**` and `.sops.yaml` changes: `gh run list -w deploy.yml -c <sha>`, then `gh run watch <id> --exit-status`. A `k8s/**` merge has no run; Argo CD syncs it, so wait for the app to reach the new revision.
+- `deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `terraform/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh` (so an Actions bump to `deploy.yml` redeploys NixOS): `gh run list -w deploy.yml -c <sha>`, then `gh run watch <id> --exit-status`. A `k8s/**` merge has no run; Argo CD syncs it, so wait for the app to reach the new revision.
 - Renovate may open replacement PRs (new majors) while you work; re-list before each merge.
 
 ## Verify after each merge (`ssh root@89.167.124.71`)
