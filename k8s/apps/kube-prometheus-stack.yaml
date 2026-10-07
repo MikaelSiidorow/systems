@@ -153,7 +153,10 @@ spec:
                       description: '{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} has used {{ $value | humanizePercentage }} of its memory limit for 30 minutes.'
                   - alert: ContainerRestartingOften
                     # increase() extrapolates (3 restarts read as ~3.02), so round before comparing.
-                    expr: round(increase(kube_pod_container_status_restarts_total[24h])) > 3
+                    # The 24h window keeps deleted pods' samples; only alert on live containers.
+                    expr: |
+                      round(increase(kube_pod_container_status_restarts_total[24h])) > 3
+                        and on (namespace, pod, container) kube_pod_container_status_restarts_total
                     labels:
                       severity: warning
                     annotations:
