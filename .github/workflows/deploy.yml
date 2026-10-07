@@ -452,6 +452,7 @@ jobs:
           TF_VAR_refinery_github_client_secret: ${{ secrets.REFINERY_GITHUB_CLIENT_SECRET }}
           TF_VAR_refinery_linkedin_client_secret: ${{ secrets.REFINERY_LINKEDIN_CLIENT_SECRET }}
           TF_VAR_refinery_zero_admin_password: ${{ secrets.REFINERY_ZERO_ADMIN_PASSWORD }}
+          TF_VAR_refinery_zero_postgres_password: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
           TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           TF_VAR_brawl_stars_api_key: ${{ secrets.BRAWL_STARS_API_KEY }}
@@ -571,6 +572,7 @@ jobs:
           TF_VAR_refinery_github_client_secret: ${{ secrets.REFINERY_GITHUB_CLIENT_SECRET }}
           TF_VAR_refinery_linkedin_client_secret: ${{ secrets.REFINERY_LINKEDIN_CLIENT_SECRET }}
           TF_VAR_refinery_zero_admin_password: ${{ secrets.REFINERY_ZERO_ADMIN_PASSWORD }}
+          TF_VAR_refinery_zero_postgres_password: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
           TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           TF_VAR_brawl_stars_api_key: ${{ secrets.BRAWL_STARS_API_KEY }}
@@ -580,6 +582,19 @@ jobs:
           TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
           TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
         run: terraform apply -auto-approve tfplan
+      # NixOS creates the zero role without a password; match the one Terraform
+      # just put in refinery-secrets. SQL goes over stdin to keep it out of argv.
+      - name: Set zero database role password
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          ZERO_POSTGRES_PASSWORD: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
+        run: |
+          if [[ ! "$ZERO_POSTGRES_PASSWORD" =~ ^[A-Za-z0-9_-]{32,}$ ]]; then
+            echo "REFINERY_ZERO_POSTGRES_PASSWORD must be at least 32 URL-safe characters." >&2
+            exit 1
+          fi
+          printf "ALTER ROLE zero PASSWORD '%s';\n" "$ZERO_POSTGRES_PASSWORD" |
+            ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} sudo -u postgres psql --set=ON_ERROR_STOP=1
       - name: Reconcile changed wger credentials
         if: |
           github.ref == 'refs/heads/main' &&

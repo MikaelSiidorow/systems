@@ -28,6 +28,16 @@ variable "refinery_zero_admin_password" {
   sensitive = true
 }
 
+variable "refinery_zero_postgres_password" {
+  type      = string
+  sensitive = true
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_-]{32,}$", var.refinery_zero_postgres_password))
+    error_message = "refinery_zero_postgres_password must be at least 32 URL-safe characters."
+  }
+}
+
 variable "telegram_bot_token" {
   type      = string
   sensitive = true

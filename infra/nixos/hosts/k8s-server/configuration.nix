@@ -118,6 +118,16 @@
         name = "powersync_storage";
         ensureClauses.login = true;
       }
+      # zero-cache manages event triggers for schema change tracking, and only
+      # a superuser can create or alter them. The refinery app keeps its own
+      # non-superuser role. CI sets the password.
+      {
+        name = "zero";
+        ensureClauses = {
+          login = true;
+          superuser = true;
+        };
+      }
     ];
     # Runs only on first cluster init (fresh deploy)
     initialScript = pkgs.writeText "pg-init.sql" ''

@@ -59,7 +59,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: refinery-secrets
-                  key: DATABASE_URL
+                  key: ZERO_UPSTREAM_DB
             - name: ZERO_REPLICA_FILE
               value: /data/sync-replica.db
             - name: ZERO_QUERY_URL
