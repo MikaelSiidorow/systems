@@ -42,4 +42,4 @@ jobs:
           RENOVATE_REQUIRE_CONFIG: required
           # The only post-upgrade commands a renovate.json may run; no shell.
           # refinery bumps its package.json version, which every PR there needs.
-          RENOVATE_ALLOWED_COMMANDS: '["^bash \\.github/scripts/traefik-crds\\.sh [0-9]+\\.[0-9]+\\.[0-9]+$", "^node \\.github/scripts/bump-patch-version\\.mjs$"]'
+          RENOVATE_ALLOWED_COMMANDS: '["^bash \\.github/scripts/traefik-crds\\.sh [0-9]+\\.[0-9]+\\.[0-9]+$", "^node scripts/bump-patch-version\\.js$"]'
