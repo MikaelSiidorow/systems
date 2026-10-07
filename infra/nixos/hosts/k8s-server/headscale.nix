@@ -22,6 +22,12 @@ let
             "192.168.67.0/24:*"
           ];
         }
+        {
+          # Hestia ships host metrics and logs to the cluster Alloy (OTLP/HTTP).
+          action = "accept";
+          src = [ "tag:home-subnet-router" ];
+          dst = [ "tag:infra:4318" ];
+        }
       ];
     }
   );
