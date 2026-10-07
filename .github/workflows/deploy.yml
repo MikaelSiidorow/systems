@@ -387,10 +387,12 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
       # Two switches at once fail on a transient systemd unit, so runs queue on a
-      # lock on the host. A push deploys main as it is once the lock is held, so
-      # a run that waited never rolls back a newer one.
+      # lock on the host. Runs on main deploy main as it is once the lock is held,
+      # so a run that waited never rolls back a newer one. The cost: an older run
+      # can deploy a newer commit's NixOS change before that commit's terraform
+      # job has applied; the newer run's own deploy follows once it has.
       - name: Deploy NixOS
-        run: ssh root@${{ env.K3S_HOST }} "flock -w 1800 /run/nixos-deploy.lock nixos-rebuild switch --refresh --flake 'github:MikaelSiidorow/systems/${{ github.event_name == 'push' && 'main' || github.sha }}?dir=infra#k8s-server'"
+        run: ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} "flock -w 1800 /run/nixos-deploy.lock nixos-rebuild switch --refresh --flake 'github:MikaelSiidorow/systems/${{ github.ref == 'refs/heads/main' && 'main' || github.sha }}?dir=infra#k8s-server'"
   k8s-terraform:
     needs: [changes, terraform, nixos]
     if: |
