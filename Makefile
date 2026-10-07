@@ -35,3 +35,13 @@ deploy-hermes:
 .PHONY: build-router-firmware
 build-router-firmware:
 	nix build ./openwrt\#cerberus-firmware ./openwrt\#hermes-firmware --no-link
+
+# Kubernetes manifests (tools come from the infra dev shell; see .envrc)
+.PHONY: k8s-check
+k8s-check:
+	oxfmt --check k8s
+	.github/scripts/k8s-check.sh
+
+.PHONY: k8s-fmt
+k8s-fmt:
+	oxfmt --write k8s

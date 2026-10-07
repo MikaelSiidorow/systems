@@ -116,7 +116,6 @@ streams:
           ON nutrition_meal.plan_id = nutrition_nutritionplan.id
         WHERE CAST(nutrition_nutritionplan.user_id AS TEXT) = auth.user_id()
 
-
   # HOT. Generates  one or more new rows per workout / meal. Compaction has the
   # biggest impact here, so it must stay isolated from the other streams above
   user_activity:
