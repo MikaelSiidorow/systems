@@ -20,6 +20,8 @@
       efi.canTouchEfiVariables = true;
     };
     supportedFilesystems = [ "ntfs" ];
+    # Caddy binds the tailnet address, which can appear after Caddy starts.
+    kernel.sysctl."net.ipv4.ip_nonlocal_bind" = 1;
   };
 
   networking = {
@@ -30,10 +32,15 @@
   time.timeZone = "Europe/Helsinki";
 
   # Hestia builds and deploys the flake-pinned router configurations.
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
-  ];
+  nix.settings = {
+    experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
+    # The defaults (12 jobs x all cores) likely froze Hestia during a remote deploy build.
+    max-jobs = 2;
+    cores = 6;
+  };
 
   services.openssh = {
     enable = true;
