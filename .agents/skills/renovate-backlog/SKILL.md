@@ -31,7 +31,7 @@ Merging deploys, so merge one PR at a time and verify before the next. Report an
 
 Order: low-risk first, then `infra/` flake bumps, then majors one at a time, the ingress (traefik) last.
 
-- `gh pr merge <n> --squash`. Never merge two `infra/` PRs while a NixOS deploy is still running.
+- `gh pr merge <n> --squash`, then wait for its deploy and verify before the next merge. NixOS deploys queue on a lock on k8s-server and deploy `main` as it is, so a run can include later merges.
 - Watch the deploy: `gh run list -w deploy.yml -c <sha>`, then `gh run watch <id> --exit-status`.
 - Renovate may open replacement PRs (new majors) while you work; re-list before each merge.
 
