@@ -101,8 +101,11 @@ Whenever rbw is locked or stale later: `rbw unlock`, `rbw sync`.
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 mkdir -p ~/.config/nix
 echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-# Lets the user-level nix.conf add the numtide cache.
-echo "trusted-users = root $USER" | sudo tee -a /etc/nix/nix.custom.conf
+# Lets the user-level nix.conf enable the numtide cache without trusted-users.
+sudo tee -a /etc/nix/nix.custom.conf <<'EOF'
+extra-trusted-substituters = https://cache.numtide.com
+extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
+EOF
 sudo systemctl restart nix-daemon
 
 git clone https://github.com/MikaelSiidorow/systems.git ~/systems

@@ -14,10 +14,9 @@
     experimental-features = nix-command flakes
   ''
   # llm-agents packages are only cached here; darwin sets it system-wide.
-  # Requires this user in trusted-users (see README).
+  # The daemon must list it in extra-trusted-substituters with its key (see README).
   + lib.optionalString (!isDarwin) ''
     extra-substituters = https://cache.numtide.com
-    extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
   ''
   + ''
     !include ${config.sops.templates."nix-access-tokens.conf".path}
