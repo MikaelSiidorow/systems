@@ -94,8 +94,9 @@ spec:
                   endpoint = "0.0.0.0:4318"
                 }
                 output {
-                  traces = [otelcol.exporter.otlp.tempo.input]
-                  logs   = [otelcol.exporter.loki.default.input]
+                  metrics = [otelcol.exporter.prometheus.default.input]
+                  traces  = [otelcol.exporter.otlp.tempo.input]
+                  logs    = [otelcol.exporter.loki.default.input]
                 }
               }
 
@@ -113,6 +114,17 @@ spec:
               otelcol.exporter.loki "default" {
                 forward_to = [loki.write.default.receiver]
               }
+
+              // Forward OTLP metrics (hestia host metrics) to Prometheus
+              otelcol.exporter.prometheus "default" {
+                forward_to = [prometheus.remote_write.default.receiver]
+              }
+
+              prometheus.remote_write "default" {
+                endpoint {
+                  url = "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+                }
+              }
           extraPorts:
             - name: otlp-http
               port: 4318
@@ -126,6 +138,25 @@ spec:
 
         controller:
           type: daemonset
+
+        # OTLP from hestia, reachable only on k8s-server's tailnet address.
+        extraObjects:
+          - apiVersion: v1
+            kind: Service
+            metadata:
+              name: alloy-tailnet
+              namespace: alloy
+            spec:
+              selector:
+                app.kubernetes.io/instance: alloy
+                app.kubernetes.io/name: alloy
+              externalIPs:
+                - 100.64.0.1
+              ports:
+                - name: otlp-http
+                  port: 4318
+                  targetPort: 4318
+                  protocol: TCP
   destination:
     server: https://kubernetes.default.svc
     namespace: alloy

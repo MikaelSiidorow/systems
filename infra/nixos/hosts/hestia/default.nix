@@ -10,6 +10,7 @@
     ./t3code.nix
     ./home.nix
     ./home-assistant.nix
+    ./monitoring.nix
     ./reverse-proxy.nix
     ./zigbee.nix
   ];
