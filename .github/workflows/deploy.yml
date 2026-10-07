@@ -589,7 +589,10 @@ jobs:
         env:
           ZERO_POSTGRES_PASSWORD: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
         run: |
-          [[ "$ZERO_POSTGRES_PASSWORD" =~ ^[A-Za-z0-9_-]{32,}$ ]]
+          if [[ ! "$ZERO_POSTGRES_PASSWORD" =~ ^[A-Za-z0-9_-]{32,}$ ]]; then
+            echo "REFINERY_ZERO_POSTGRES_PASSWORD must be at least 32 URL-safe characters." >&2
+            exit 1
+          fi
           printf "ALTER ROLE zero PASSWORD '%s';\n" "$ZERO_POSTGRES_PASSWORD" |
             ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} sudo -u postgres psql --set=ON_ERROR_STOP=1
       - name: Reconcile changed wger credentials
