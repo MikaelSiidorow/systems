@@ -74,18 +74,3 @@ spec:
                 secretKeyRef:
                   name: refinery-secrets
                   key: LINKEDIN_CLIENT_SECRET
-            - name: ZERO_UPSTREAM_DB
-              valueFrom:
-                secretKeyRef:
-                  name: refinery-secrets
-                  key: DATABASE_URL
-            - name: ZERO_REPLICA_FILE
-              value: /tmp/sync-replica.db
-            - name: ZERO_MUTATE_URL
-              value: http://refinery-app/api/zero/mutate
-            - name: ZERO_MUTATE_FORWARD_COOKIES
-              value: "true"
-            - name: ZERO_QUERY_URL
-              value: http://refinery-app/api/zero/get_queries
-            - name: ZERO_QUERY_FORWARD_COOKIES
-              value: "true"
