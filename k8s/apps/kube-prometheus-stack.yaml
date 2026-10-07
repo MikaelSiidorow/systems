@@ -31,11 +31,16 @@ spec:
             passwordKey: admin-password
           persistence:
             enabled: false
+          # Grafana 13's default gzip (pgzip) roughly doubles memory and OOMs it
+          # (grafana/grafana#123017).
+          grafana.ini:
+            server:
+              enable_gzip: false
           resources:
             requests:
-              memory: 128Mi
+              memory: 256Mi
             limits:
-              memory: 384Mi
+              memory: 512Mi
           additionalDataSources:
             - name: Loki
               type: loki
