@@ -77,6 +77,13 @@
       "description": "Cluster, infra and cloud changes deploy on merge; never auto-merge",
       "matchFileNames": ["infra/**", "k8s/**", "terraform/**"],
       "automerge": false
+    },
+    {
+      "description": "Argo CD app minor/patch chart and image updates auto-merge once CI Summary passes; the container health alerts catch a bad one. Majors and 0.x stay manual",
+      "matchFileNames": ["k8s/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "automerge": true
     }
   ],
   "nix": {
