@@ -86,6 +86,7 @@
         "com.mitchellh.ghostty.desktop"
         "code.desktop"
         "dev.zed.Zed.desktop"
+        "t3code.desktop"
         "vesktop.desktop"
         "org.telegram.desktop.desktop"
       ];
