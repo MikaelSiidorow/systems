@@ -7,6 +7,11 @@
   environment.etc."alloy/config.alloy".text = ''
     prometheus.exporter.unix "host" {
       enable_collectors = ["systemd"]
+
+      // Restart counts catch a crash loop, which reads as mostly active.
+      systemd {
+        enable_restarts = true
+      }
     }
 
     discovery.relabel "host" {

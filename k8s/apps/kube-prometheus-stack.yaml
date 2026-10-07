@@ -177,13 +177,17 @@ spec:
                       summary: No metrics from hestia.
                       description: Hestia has sent no metrics for 10 minutes. It may be frozen or off the tailnet.
                   - alert: Zigbee2mqttDown
-                    expr: node_systemd_unit_state{instance="hestia", name="zigbee2mqtt.service", state="active"} == 0
+                    # A crash loop restarts every minute or so and reads as active most of
+                    # the time, so also alert on repeated restarts.
+                    expr: |
+                      increase(node_systemd_service_restart_total{instance="hestia", name="zigbee2mqtt.service"}[15m]) > 2
+                        or node_systemd_unit_state{instance="hestia", name="zigbee2mqtt.service", state="active"} == 0
                     for: 10m
                     labels:
                       severity: warning
                     annotations:
                       summary: zigbee2mqtt is not running on hestia.
-                      description: zigbee2mqtt.service on hestia has not been active for 10 minutes.
+                      description: zigbee2mqtt.service on hestia has been stopped or restarting repeatedly for 10 minutes.
 
         prometheusOperator:
           resources:
