@@ -37,6 +37,9 @@
       "nix-command"
       "flakes"
     ];
+    # llm-agents packages (Codex is a heavy Rust build) are only cached here.
+    extra-substituters = [ "https://cache.numtide.com" ];
+    extra-trusted-public-keys = [ "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=" ];
     # The defaults (12 jobs x all cores) likely froze Hestia during a remote deploy build.
     max-jobs = 2;
     cores = 6;
