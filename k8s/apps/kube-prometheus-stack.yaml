@@ -131,6 +131,34 @@ spec:
                   - severity = "warning"
                 equal: ['alertname', 'namespace']
 
+        # Slow failures the default rules miss: a container that sits at its memory
+        # limit thrashes on page faults, and restarts spread over hours never
+        # trip KubePodCrashLooping.
+        additionalPrometheusRulesMap:
+          container-health:
+            groups:
+              - name: container-health
+                rules:
+                  - alert: ContainerMemoryNearLimit
+                    expr: |
+                      max by (namespace, pod, container) (container_memory_working_set_bytes{container!="", image!=""})
+                        / on (namespace, pod, container)
+                      max by (namespace, pod, container) (kube_pod_container_resource_limits{resource="memory"})
+                        > 0.9
+                    for: 30m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: Container is close to its memory limit.
+                      description: '{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} has used {{ $value | humanizePercentage }} of its memory limit for 30 minutes.'
+                  - alert: ContainerRestartingOften
+                    expr: increase(kube_pod_container_status_restarts_total[24h]) > 3
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: Container keeps restarting.
+                      description: '{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} restarted {{ $value | humanize }} times in the last 24 hours.'
+
         prometheusOperator:
           resources:
             requests:

@@ -372,6 +372,11 @@ jobs:
         run: terraform apply -auto-approve tfplan
   nixos:
     needs: [changes, terraform]
+    # Two switches at once fail on the transient systemd unit; queue them.
+    # A queued run deploys its own commit, which includes the earlier merges.
+    concurrency:
+      group: deploy-nixos-k8s-server
+      cancel-in-progress: false
     if: |
       always() &&
       (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
