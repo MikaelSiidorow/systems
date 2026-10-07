@@ -372,11 +372,6 @@ jobs:
         run: terraform apply -auto-approve tfplan
   nixos:
     needs: [changes, terraform]
-    # Two switches at once fail on the transient systemd unit; queue them.
-    # A queued run deploys its own commit, which includes the earlier merges.
-    concurrency:
-      group: deploy-nixos-k8s-server
-      cancel-in-progress: false
     if: |
       always() &&
       (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
@@ -391,8 +386,11 @@ jobs:
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+      # Two switches at once fail on a transient systemd unit, so runs queue on a
+      # lock on the host. A push deploys main as it is once the lock is held, so
+      # a run that waited never rolls back a newer one.
       - name: Deploy NixOS
-        run: ssh root@${{ env.K3S_HOST }} "nixos-rebuild switch --flake 'github:MikaelSiidorow/systems/${{ github.sha }}?dir=infra#k8s-server'"
+        run: ssh root@${{ env.K3S_HOST }} "flock -w 1800 /run/nixos-deploy.lock nixos-rebuild switch --refresh --flake 'github:MikaelSiidorow/systems/${{ github.event_name == 'push' && 'main' || github.sha }}?dir=infra#k8s-server'"
   k8s-terraform:
     needs: [changes, terraform, nixos]
     if: |

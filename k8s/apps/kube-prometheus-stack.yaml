@@ -152,7 +152,8 @@ spec:
                       summary: Container is close to its memory limit.
                       description: '{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} has used {{ $value | humanizePercentage }} of its memory limit for 30 minutes.'
                   - alert: ContainerRestartingOften
-                    expr: increase(kube_pod_container_status_restarts_total[24h]) > 3
+                    # increase() extrapolates (3 restarts read as ~3.02), so round before comparing.
+                    expr: round(increase(kube_pod_container_status_restarts_total[24h])) > 3
                     labels:
                       severity: warning
                     annotations:
