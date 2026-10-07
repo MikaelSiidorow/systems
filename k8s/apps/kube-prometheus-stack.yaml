@@ -199,6 +199,7 @@ spec:
               relabelings:
                 - sourceLabels: [__address__]
                   regex: '89\.167\.124\.71:9100'
+                  action: replace
                   targetLabel: instance
                   replacement: olympus
           resources:
