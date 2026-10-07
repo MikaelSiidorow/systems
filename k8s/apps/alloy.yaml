@@ -132,9 +132,10 @@ spec:
               protocol: TCP
           resources:
             requests:
-              memory: 64Mi
+              memory: 96Mi
             limits:
-              memory: 128Mi
+              # Headroom for the remote_write WAL that hestia metrics go through.
+              memory: 192Mi
 
         controller:
           type: daemonset

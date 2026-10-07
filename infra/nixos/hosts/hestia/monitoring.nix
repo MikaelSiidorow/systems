@@ -12,9 +12,11 @@
     discovery.relabel "host" {
       targets = prometheus.exporter.unix.host.targets
 
+      // Matches the cluster node exporter's job, so the stock node alerts and
+      // dashboards cover hestia too.
       rule {
         target_label = "job"
-        replacement  = "node"
+        replacement  = "node-exporter"
       }
 
       rule {
