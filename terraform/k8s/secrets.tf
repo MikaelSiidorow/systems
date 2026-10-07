@@ -56,6 +56,7 @@ resource "kubernetes_secret_v1" "refinery_secrets" {
     GITHUB_CLIENT_SECRET   = var.refinery_github_client_secret
     LINKEDIN_CLIENT_SECRET = var.refinery_linkedin_client_secret
     ZERO_ADMIN_PASSWORD    = var.refinery_zero_admin_password
+    ZERO_UPSTREAM_DB       = "postgresql://zero:${var.refinery_zero_postgres_password}@refinery-db:5432/refinery"
   }
 }
 
