@@ -193,6 +193,14 @@ spec:
               memory: 128Mi
 
         prometheus-node-exporter:
+          # Names the k8s-server node in dashboards; hestia pushes as "hestia".
+          prometheus:
+            monitor:
+              relabelings:
+                - sourceLabels: [__address__]
+                  regex: '89\.167\.124\.71:9100'
+                  targetLabel: instance
+                  replacement: olympus
           resources:
             requests:
               memory: 32Mi
