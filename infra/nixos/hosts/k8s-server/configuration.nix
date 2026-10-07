@@ -171,7 +171,7 @@
   # PostgreSQL requires a superuser for FOR ALL TABLES publications. Create it
   # here as postgres so the application role does not need superuser access.
   systemd.services.postgresql-grant-replication = {
-    description = "Reconcile PostgreSQL replication and PowerSync prerequisites";
+    description = "Reconcile PostgreSQL replication, PowerSync and zero-cache prerequisites";
     after = [
       "postgresql.service"
       "postgresql-setup.service"
@@ -196,6 +196,19 @@
           SELECT 1 FROM pg_publication WHERE pubname = 'powersync'
         ) THEN
           CREATE PUBLICATION powersync FOR ALL TABLES;
+        END IF;
+      END
+      $$;
+      SQL
+
+      # zero-cache's DDL event triggers run as whoever issues the DDL, so the
+      # refinery app's migrations need the table they update. zero creates it
+      # owned by its own role.
+      ${config.services.postgresql.package}/bin/psql --dbname=refinery --set=ON_ERROR_STOP=1 <<'SQL'
+      DO $$
+      BEGIN
+        IF to_regclass('refinery_0."publishedSchema"') IS NOT NULL THEN
+          GRANT SELECT, UPDATE ON refinery_0."publishedSchema" TO refinery;
         END IF;
       END
       $$;
