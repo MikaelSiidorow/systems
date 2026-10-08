@@ -61,6 +61,11 @@ in
               location = "${config.home.homeDirectory}/Documents";
               writable = true;
             }
+            # T3 Code's git worktrees, so builds can run from them.
+            {
+              location = "${config.home.homeDirectory}/.t3/worktrees";
+              writable = true;
+            }
           ];
         };
       };
