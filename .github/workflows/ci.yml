@@ -67,6 +67,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.k8s == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
       - name: Install Nix
@@ -104,7 +106,7 @@ jobs:
   # upload as pr-report-* artifacts. Not part of CI Summary.
   report:
     name: CI report
-    needs: [report-start, changes, workstations, infra]
+    needs: [report-start, changes, workstations, k8s, infra]
     if: always()
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -121,6 +123,7 @@ jobs:
       - uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
         env:
           WORKSTATIONS_RESULT: ${{ needs.workstations.result }}
+          K8S_RESULT: ${{ needs.k8s.result }}
           INFRA_RESULT: ${{ needs.infra.result }}
         with:
           script: |
@@ -129,6 +132,7 @@ jobs:
               dir: 'report',
               results: {
                 workstations: process.env.WORKSTATIONS_RESULT,
+                k8s: process.env.K8S_RESULT,
                 infra: process.env.INFRA_RESULT,
               },
             });
