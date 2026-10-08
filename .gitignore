@@ -17,3 +17,6 @@ terraform/*.tfvars.json
 
 # K8s secrets (applied manually)
 k8s/**/secrets.yaml
+
+# direnv
+.direnv/

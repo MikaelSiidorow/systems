@@ -48,7 +48,6 @@ replication:
       sslmode: disable # 'verify-full' (default) or 'verify-ca' or 'disable'
       # 'disable' is OK for local/private networks, not for public networks
 
-
 # Connection settings for sync bucket storage
 storage:
   type: postgresql

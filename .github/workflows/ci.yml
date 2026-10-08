@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       workstations: ${{ steps.filter.outputs.workstations }}
+      k8s: ${{ steps.filter.outputs.k8s }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
@@ -47,11 +48,36 @@ jobs:
               - 'modules/**'
               - '.github/workflows/workstations.yml'
               - '.github/workflows/ci.yml'
+            k8s:
+              - 'k8s/**'
+              - '.github/scripts/k8s-check.sh'
+              - '.github/workflows/ci.yml'
+              - 'infra/flake.nix'
+              - 'infra/flake.lock'
+              - 'Makefile'
 
   workstations:
     needs: changes
     if: needs.changes.outputs.workstations == 'true'
     uses: ./.github/workflows/workstations.yml
+
+  # Renders every Argo CD app and validates it against the Kubernetes and CRD
+  # schemas, so k8s/** PRs (including Renovate auto-merges) have a real check.
+  k8s:
+    needs: changes
+    if: needs.changes.outputs.k8s == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+      - name: Check manifests
+        run: nix develop ./infra -c make k8s-check
 
   infra:
     uses: ./.github/workflows/deploy.yml
@@ -59,7 +85,7 @@ jobs:
 
   summary:
     name: CI Summary
-    needs: [changes, workstations, infra]
+    needs: [changes, workstations, k8s, infra]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -80,7 +106,7 @@ jobs:
   # upload as pr-report-* artifacts. Not part of CI Summary.
   report:
     name: CI report
-    needs: [report-start, changes, workstations, infra]
+    needs: [report-start, changes, workstations, k8s, infra]
     if: always()
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -97,6 +123,7 @@ jobs:
       - uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
         env:
           WORKSTATIONS_RESULT: ${{ needs.workstations.result }}
+          K8S_RESULT: ${{ needs.k8s.result }}
           INFRA_RESULT: ${{ needs.infra.result }}
         with:
           script: |
@@ -105,6 +132,7 @@ jobs:
               dir: 'report',
               results: {
                 workstations: process.env.WORKSTATIONS_RESULT,
+                k8s: process.env.K8S_RESULT,
                 infra: process.env.INFRA_RESULT,
               },
             });

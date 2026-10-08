@@ -100,5 +100,25 @@
       };
 
       checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) deploy-rs.lib;
+
+      # Repository tooling; the root .envrc loads it. `make k8s-check` runs the
+      # same checks as CI.
+      devShells =
+        nixpkgs.lib.genAttrs
+          [
+            "x86_64-linux"
+            "aarch64-darwin"
+          ]
+          (system: {
+            default = nixpkgs.legacyPackages.${system}.mkShellNoCC {
+              packages = with nixpkgs.legacyPackages.${system}; [
+                kubeconform
+                kubernetes-helm
+                kustomize
+                oxfmt
+                yq-go
+              ];
+            };
+          });
     };
 }
