@@ -100,7 +100,9 @@ export function render(found: Section[], { sha, runUrl, results = {} }: Meta): s
   for (const s of sections.filter((s) => s.details)) {
     let details = s.details;
     if (details.length > MAX_DETAILS) {
-      details = `${details.slice(0, MAX_DETAILS)}\n…\n\`\`\`\n\n*Truncated; see the run log for the rest.*`;
+      // Close the code block with the fence it was opened with.
+      const fence = details.match(/^`{3,}/m)?.[0] ?? "```";
+      details = `${details.slice(0, MAX_DETAILS)}\n…\n${fence}\n\n*Truncated; see the run log for the rest.*`;
     }
     lines.push(
       `<details><summary>${ICONS[s.status] ?? "❔"} ${s.title}: ${s.summary}</summary>`,

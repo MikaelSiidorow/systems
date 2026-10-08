@@ -126,10 +126,12 @@ jobs:
           details=
           if [ "${n:-0}" != 0 ]; then
             details="$RUNNER_TEMP/details.md"
+            # A fence no rendered manifest line can close early.
+            fence='``````````'
             {
-              echo '```diff'
+              echo "${fence}diff"
               cat "$diff"
-              echo '```'
+              echo "$fence"
             } >"$details"
           fi
           .github/scripts/report-section.sh k8s 15 "k8s manifests" "$status" "$summary" ${details:+"$details"}
