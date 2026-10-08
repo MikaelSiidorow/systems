@@ -10,6 +10,14 @@ let
     runtimeInputs = [ pkgs.jq ];
     text = builtins.readFile ./tailscale-headscale-setup.sh;
   };
+  lights-toggle = pkgs.writeShellApplication {
+    name = "lights-toggle";
+    runtimeInputs = [
+      pkgs.glib
+      pkgs.xrandr
+    ];
+    text = builtins.readFile ./lights-toggle.sh;
+  };
 in
 {
   # This is a minimal configuration for running home-manager standalone on Pop!_OS
@@ -26,6 +34,7 @@ in
   # system CLI and expose an idempotent command for applying our client prefs.
   home.packages = [
     tailscale-headscale-setup
+    lights-toggle
     t3code.desktop
   ]
   ++ t3code.direnvProviders;
