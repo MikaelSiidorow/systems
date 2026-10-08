@@ -38,6 +38,7 @@ const ICONS: Record<Status, string> = {
 // Shown as "not affected" when their check did not run.
 const EXPECTED: Omit<Section, "status" | "summary" | "details">[] = [
   { key: "workstations", order: 10, title: "Workstations" },
+  { key: "k8s", order: 15, title: "k8s manifests" },
   { key: "nixos", order: 20, title: "k8s-server + Hestia" },
   { key: "openwrt", order: 30, title: "OpenWrt routers" },
   { key: "terraform", order: 40, title: "Terraform" },
