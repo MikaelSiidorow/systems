@@ -19,6 +19,10 @@ spec:
             remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
           overrides:
             defaults:
+              # retention below only reaches the backend scheduler; the
+              # worker that deletes blocks would keep its 336h default.
+              compaction:
+                block_retention: 168h
               metrics_generator:
                 processors:
                   - service-graphs
