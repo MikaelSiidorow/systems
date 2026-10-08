@@ -158,9 +158,10 @@ jobs:
             echo "| Evaluate deploy config | $(mark "$CHECK_PR") |"
             echo "| Evaluate Hestia | $(mark "$BUILD_HESTIA") |"
             echo
-            echo '```'
+            # Long enough that no closure diff line can close it early.
+            echo '``````````'
             echo "${DIFF:-No closure diff available.}"
-            echo '```'
+            echo '``````````'
           } >"$RUNNER_TEMP/details.md"
           pr/.github/scripts/report-section.sh nixos 20 "k8s-server + Hestia" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
@@ -330,9 +331,10 @@ jobs:
             echo "| Validate | $(mark "$VALIDATE") |"
             echo "| Plan | $(mark "$PLAN") |"
             echo
-            echo '```terraform'
+            # Long enough that no plan line can close it early.
+            echo '``````````terraform'
             echo "${PLAN_OUTPUT:-No plan output.}"
-            echo '```'
+            echo '``````````'
           } >"$RUNNER_TEMP/details.md"
           "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" terraform 40 "Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
@@ -525,9 +527,10 @@ jobs:
             echo "| Validate | $(mark "$VALIDATE") |"
             echo "| Plan | $(mark "$PLAN") |"
             echo
-            echo '```terraform'
+            # Long enough that no plan line can close it early.
+            echo '``````````terraform'
             echo "${PLAN_OUTPUT:-No plan output.}"
-            echo '```'
+            echo '``````````'
           } >"$RUNNER_TEMP/details.md"
           "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" k8s-terraform 50 "k8s Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
