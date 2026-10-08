@@ -11,19 +11,15 @@ order=$2
 title=$3
 status=$4
 summary=$5
-details_file=${6:-}
-
-details=""
-if [ -n "$details_file" ]; then
-  details=$(cat "$details_file")
-fi
+details_file=${6:-/dev/null}
 
 mkdir -p "$RUNNER_TEMP/report"
+# --rawfile, because details can exceed the size limit of one argument.
 jq -n \
   --arg key "$key" \
   --argjson order "$order" \
   --arg title "$title" \
   --arg status "$status" \
   --arg summary "$summary" \
-  --arg details "$details" \
-  '{$key, $order, $title, $status, $summary, $details}' >"$RUNNER_TEMP/report/$key.json"
+  --rawfile details "$details_file" \
+  '{$key, $order, $title, $status, $summary, details: ($details | rtrimstr("\n"))}' >"$RUNNER_TEMP/report/$key.json"
