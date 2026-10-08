@@ -176,8 +176,9 @@ jobs:
           steps.check-pr.outcome == 'failure' ||
           steps.build-hestia.outcome == 'failure'
         run: exit 1
-  # The committed Traefik CRDs must match the chart version pinned in k3s.nix,
-  # e.g. after a manual chart bump. Renovate regenerates them itself.
+  # The committed Traefik CRDs must match the chart version pinned in
+  # traefik-helmchart.yaml, e.g. after a manual chart bump. Renovate
+  # regenerates them itself.
   traefik-crds:
     needs: changes
     if: github.event_name == 'pull_request' && needs.changes.outputs.nixos == 'true'
@@ -187,7 +188,7 @@ jobs:
       - name: Check the committed Traefik CRDs
         run: |
           file=infra/nixos/hosts/k8s-server/traefik-crds.yaml
-          version=$(awk '/chart: traefik$/ {f=1} f && /version:/ {print $2; exit}' infra/nixos/hosts/k8s-server/k3s.nix)
+          version=$(yq '.spec.version' infra/nixos/hosts/k8s-server/traefik-helmchart.yaml)
           .github/scripts/traefik-crds.sh "$version" "$RUNNER_TEMP/traefik-crds.yaml"
           if ! diff -q "$file" "$RUNNER_TEMP/traefik-crds.yaml" >/dev/null; then
             echo "::error file=$file::Out of date for traefik chart $version. Run: .github/scripts/traefik-crds.sh $version"

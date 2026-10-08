@@ -26,9 +26,9 @@
       "versioningTemplate": "semver"
     },
     {
-      "description": "k3s HelmChart manifests embedded in the k8s-server NixOS config",
+      "description": "k3s HelmCharts that the k8s-server NixOS config installs",
       "customType": "regex",
-      "managerFilePatterns": ["/^infra/nixos/hosts/k8s-server/k3s\\.nix$/"],
+      "managerFilePatterns": ["/^infra/nixos/hosts/k8s-server/[^/]+-helmchart\\.yaml$/"],
       "matchStrings": [
         "chart: (?<depName>\\S+)\\s+repo: (?<registryUrl>\\S+)[\\s\\S]*?version: (?<currentValue>\\S+)"
       ],

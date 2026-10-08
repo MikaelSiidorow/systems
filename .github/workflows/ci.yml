@@ -50,7 +50,8 @@ jobs:
               - '.github/workflows/ci.yml'
             k8s:
               - 'k8s/**'
-              - '.github/scripts/k8s-check.sh'
+              - '.github/scripts/k8s-*.sh'
+              - 'infra/nixos/hosts/k8s-server/*-helmchart.yaml'
               - '.github/workflows/ci.yml'
               - 'infra/flake.nix'
               - 'infra/flake.lock'
@@ -61,8 +62,9 @@ jobs:
     if: needs.changes.outputs.workstations == 'true'
     uses: ./.github/workflows/workstations.yml
 
-  # Renders every Argo CD app and validates it against the Kubernetes and CRD
-  # schemas, so k8s/** PRs (including Renovate auto-merges) have a real check.
+  # Renders every Argo CD app and k3s HelmChart, validates them against the
+  # Kubernetes and CRD schemas, so k8s/** PRs (including Renovate auto-merges)
+  # have a real check, and reports the rendered diff against the base.
   k8s:
     needs: changes
     if: needs.changes.outputs.k8s == 'true'
@@ -71,13 +73,77 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
       - name: Install Nix
         uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
         with:
           nix_conf: |
             experimental-features = nix-command flakes
       - name: Check manifests
+        id: check
         run: nix develop ./infra -c make k8s-check
+        continue-on-error: true
+      - name: Diff rendered manifests
+        id: diff
+        run: |
+          mkdir "$RUNNER_TEMP/base" "$RUNNER_TEMP/pr"
+          nix develop ./infra -c .github/scripts/k8s-render.sh "$RUNNER_TEMP/pr"
+          # The PR's script and tools render the base too, so only the
+          # manifests differ.
+          (cd base && nix develop ../infra -c ../.github/scripts/k8s-render.sh "$RUNNER_TEMP/base")
+          cd "$RUNNER_TEMP"
+          diff -ruN base pr >k8s.diff || [ $? = 1 ]
+          # The report comment truncates long diffs.
+          cat k8s.diff
+        continue-on-error: true
+      - name: Write CI report section
+        if: always()
+        env:
+          CHECK: ${{ steps.check.outcome }}
+          DIFF: ${{ steps.diff.outcome }}
+        run: |
+          diff="$RUNNER_TEMP/k8s.diff"
+          if [ "$DIFF" = success ]; then
+            n=$(grep -c '^diff ' "$diff" || true)
+          fi
+          if [ "$CHECK" != success ]; then
+            status=failure
+            summary="schema or format check failed"
+          elif [ "$DIFF" != success ]; then
+            status=success
+            summary="valid; rendered diff unavailable"
+          elif [ "$n" = 0 ]; then
+            status=success
+            summary="valid; no rendered changes"
+          else
+            status=changes
+            [ "$n" = 1 ] && noun=app || noun=apps
+            summary="valid; $n rendered $noun change"
+          fi
+          details=
+          if [ "${n:-0}" != 0 ]; then
+            details="$RUNNER_TEMP/details.md"
+            # A fence no rendered manifest line can close early.
+            fence='``````````'
+            {
+              echo "${fence}diff"
+              cat "$diff"
+              echo "$fence"
+            } >"$details"
+          fi
+          .github/scripts/report-section.sh k8s 15 "k8s manifests" "$status" "$summary" ${details:+"$details"}
+      - name: Upload CI report section
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-report-k8s
+          path: ${{ runner.temp }}/report/k8s.json
+      - name: Fail on check error
+        if: steps.check.outcome == 'failure'
+        run: exit 1
 
   infra:
     uses: ./.github/workflows/deploy.yml

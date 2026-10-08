@@ -3,63 +3,6 @@
 let
   manifestDir = "/var/lib/rancher/k3s/server/manifests";
 
-  traefikChart = pkgs.writeText "traefik-helmchart.yaml" ''
-    apiVersion: helm.cattle.io/v1
-    kind: HelmChart
-    metadata:
-      name: traefik
-      namespace: kube-system
-    spec:
-      chart: traefik
-      repo: https://traefik.github.io/charts
-      targetNamespace: traefik
-      createNamespace: true
-      version: 41.6.1
-      valuesContent: |-
-        ports:
-          web:
-            http:
-              redirections:
-                entryPoint:
-                  to: websecure
-                  scheme: https
-  '';
-
-  certManagerChart = pkgs.writeText "cert-manager-helmchart.yaml" ''
-    apiVersion: helm.cattle.io/v1
-    kind: HelmChart
-    metadata:
-      name: cert-manager
-      namespace: kube-system
-    spec:
-      chart: cert-manager
-      repo: https://charts.jetstack.io
-      targetNamespace: cert-manager
-      createNamespace: true
-      version: v1.21.2
-      valuesContent: |-
-        crds:
-          enabled: true
-  '';
-
-  argocdChart = pkgs.writeText "argocd-helmchart.yaml" ''
-    apiVersion: helm.cattle.io/v1
-    kind: HelmChart
-    metadata:
-      name: argocd
-      namespace: kube-system
-    spec:
-      chart: argo-cd
-      repo: https://argoproj.github.io/argo-helm
-      targetNamespace: argocd
-      createNamespace: true
-      version: 10.9.6
-      valuesContent: |-
-        configs:
-          params:
-            server.insecure: "true" # TLS terminated by Traefik ingress
-  '';
-
   argocdBootstrap = pkgs.writeText "argocd-bootstrap.yaml" ''
     apiVersion: argoproj.io/v1alpha1
     kind: Application
@@ -272,10 +215,10 @@ in
     # Helm never upgrades a chart's CRDs, so the traefik chart's CRDs are
     # committed (see .github/scripts/traefik-crds.sh) and applied by k3s.
     "L+ ${manifestDir}/traefik-crds.yaml - - - - ${./traefik-crds.yaml}"
-    "L+ ${manifestDir}/traefik-helmchart.yaml - - - - ${traefikChart}"
-    "L+ ${manifestDir}/cert-manager-helmchart.yaml - - - - ${certManagerChart}"
+    "L+ ${manifestDir}/traefik-helmchart.yaml - - - - ${./traefik-helmchart.yaml}"
+    "L+ ${manifestDir}/cert-manager-helmchart.yaml - - - - ${./cert-manager-helmchart.yaml}"
     "L+ ${manifestDir}/cluster-issuer.yaml - - - - ${clusterIssuer}"
-    "L+ ${manifestDir}/argocd-helmchart.yaml - - - - ${argocdChart}"
+    "L+ ${manifestDir}/argocd-helmchart.yaml - - - - ${./argocd-helmchart.yaml}"
     "L+ ${manifestDir}/argocd-bootstrap.yaml - - - - ${argocdBootstrap}"
     "L+ ${manifestDir}/headscale-service.yaml - - - - ${headscaleService}"
     "L+ ${manifestDir}/refinery-db-service.yaml - - - - ${refineryDbService}"
