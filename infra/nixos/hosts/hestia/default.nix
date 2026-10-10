@@ -18,11 +18,11 @@ let
       sudo systemd-run --unit=hestia-switch --quiet sh -c \
         "${config.nix.package}/bin/nix-env -p /nix/var/nix/profiles/system --set $system && $system/bin/switch-to-configuration switch"
       echo "Switching to $system; if T3 disconnects, check: journalctl -u hestia-switch"
-      sudo journalctl -fu hestia-switch --since "@$start" -o cat &
-      trap 'kill $!' EXIT
+      journalctl -fu hestia-switch --since "@$start" -o cat &
+      trap 'kill $! 2>/dev/null || true' EXIT
       while systemctl is-active -q hestia-switch; do sleep 1; done
       sleep 1
-      sudo journalctl -u hestia-switch --since "@$start" -o cat | grep -q "finished switching"
+      journalctl -u hestia-switch --since "@$start" -o cat | grep "finished switching" >/dev/null
     '';
   };
 in
