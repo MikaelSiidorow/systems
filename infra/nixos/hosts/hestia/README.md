@@ -5,6 +5,10 @@ and advertises the home LAN as a Tailscale subnet router. This makes devices
 that cannot run Tailscale themselves, including the OpenWrt routers, reachable
 without exposing management ports to the internet.
 
+T3's Claude and Codex providers use Hestia's CLIProxyAPI. Terminal `claude`
+uses your direct login; `claude-hestia` uses the proxy. Provider changes apply
+to new sessions.
+
 ## Enroll Hestia
 
 The NixOS configuration enables `tailscaled`, IP forwarding, the Tailscale UDP

@@ -8,8 +8,13 @@ let
   t3code = import ../../../../modules/t3code.nix {
     inherit pkgs inputs;
     claude = claudeCode;
+    claudeViaProxy = true;
   };
   claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
+  claudeHestia = import ../../../../modules/claude-proxy.nix {
+    inherit pkgs;
+    claude = claudeCode;
+  };
   pair = pkgs.writeShellApplication {
     name = "t3-hestia-pair";
     runtimeInputs = [
@@ -26,6 +31,7 @@ in
     t3code
     pair
     claudeCode
+    claudeHestia
     pkgs.ghostty.terminfo
   ];
 

@@ -196,8 +196,8 @@ your existing setup. Smoke test:
 claude-hestia --model claude-sonnet-5 -p --tools '' 'Reply with exactly: proxy-ok'
 ```
 
-claude.ai connectors are disabled. ThinkPad use and refresh over days remain
-untested; subscription proxy support is unresolved under
+claude.ai connectors are disabled. Refresh over days remains untested;
+subscription proxy support is unresolved under
 [Anthropic's guidance](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use).
 
 ## Migration checklist
