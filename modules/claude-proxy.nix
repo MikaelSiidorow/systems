@@ -33,6 +33,23 @@ pkgs.writeShellApplication {
     extra_settings='{}'
     while (( $# )); do
       case "$1" in
+        --add-dir|--agent|--agents|--allowedTools|--allowed-tools|\
+        --append-system-prompt|--append-system-prompt-file|--autocompact|\
+        --betas|--debug-file|--disallowedTools|--disallowed-tools|--effort|\
+        --environment|--fallback-model|--file|--input-format|--json-schema|\
+        --max-budget-usd|--max-turns|--mcp-config|--model|-n|--name|\
+        --output-format|--permission-mode|--permission-prompts|--plugin-dir|\
+        --plugin-url|--remote-control-session-name-prefix|--session-id|\
+        --setting-sources|--system-prompt|--system-prompt-file|\
+        --system-prompt-snapshot|--tools)
+          # Required option values may themselves be literal --settings or --.
+          args+=("$1")
+          shift
+          if (( $# )); then
+            args+=("$1")
+            shift
+          fi
+          ;;
         --settings)
           if (( $# < 2 )); then
             echo '--settings requires a file or JSON object' >&2
