@@ -32,6 +32,9 @@
 
   time.timeZone = "Europe/Helsinki";
 
+  # Hestia has hard-frozen without logs; the sp5100_tco watchdog reboots it.
+  systemd.settings.Manager.RuntimeWatchdogSec = "30s";
+
   # Hestia builds and deploys the flake-pinned router configurations.
   nix.settings = {
     experimental-features = [
