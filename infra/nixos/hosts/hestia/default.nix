@@ -4,6 +4,28 @@
   username,
   ...
 }:
+let
+  # Switching from a T3 terminal kills nixos-rebuild when it stops t3code,
+  # which leaves t3code down. Build as the user (the root-run flake eval rejects
+  # the user-owned checkout), then activate in a separate root unit.
+  hestiaSwitch = pkgs.writeShellApplication {
+    name = "hestia-switch";
+    text = ''
+      flake=''${1:-/etc/nixos-repo/infra}
+      system=$(nix build --no-link --print-out-paths "$flake#nixosConfigurations.hestia.config.system.build.toplevel")
+      start=$(date +%s)
+      sudo systemctl reset-failed hestia-switch 2>/dev/null || true
+      sudo systemd-run --unit=hestia-switch --quiet sh -c \
+        "${config.nix.package}/bin/nix-env -p /nix/var/nix/profiles/system --set $system && $system/bin/switch-to-configuration switch"
+      echo "Switching to $system; if T3 disconnects, check: journalctl -u hestia-switch"
+      sudo journalctl -fu hestia-switch --since "@$start" -o cat &
+      trap 'kill $!' EXIT
+      while systemctl is-active -q hestia-switch; do sleep 1; done
+      sleep 1
+      sudo journalctl -u hestia-switch --since "@$start" -o cat | grep -q "finished switching"
+    '';
+  };
+in
 {
   imports = [
     ./cli-proxy-api.nix
@@ -150,6 +172,7 @@
   ];
 
   environment.systemPackages = with pkgs; [
+    hestiaSwitch
     ddrescue
     ntfs3g
     rsync
