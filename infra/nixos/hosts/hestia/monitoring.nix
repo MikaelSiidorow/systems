@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 {
   # Ships host metrics and the journal over OTLP to the cluster Alloy on
   # k8s-server (tailnet only), so a freeze is visible from outside the host.
@@ -87,4 +87,12 @@
 
   # Monitoring must not add to the memory pressure it is there to report.
   systemd.services.alloy.serviceConfig.MemoryMax = "256M";
+
+  # RAPL energy counters are root-only (CVE-2020-8694); let only Alloy read
+  # them, so the rapl collector reports CPU package power.
+  users.groups.rapl = { };
+  systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "rapl" ];
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="powercap", KERNEL=="intel-rapl:*", RUN+="${pkgs.coreutils}/bin/chgrp rapl /sys%p/energy_uj", RUN+="${pkgs.coreutils}/bin/chmod g+r /sys%p/energy_uj"
+  '';
 }
