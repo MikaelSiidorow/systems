@@ -12,6 +12,8 @@ let
   claude = inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
   codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
   codexProfile = lib.optionalString (hostname == "tpad") " --profile hestia";
+  # Keep both the settings overlay and shell exports: --settings overrides
+  # user/project env settings, while exports pass the routing to child processes.
   claudeHestiaSettings = pkgs.writeText "claude-hestia-settings.json" (
     builtins.toJSON {
       env = {
@@ -19,6 +21,7 @@ let
         # Hestia restricts access to the tailnet and has no client API keys.
         # Override local credentials so the proxy owns upstream authentication.
         ANTHROPIC_AUTH_TOKEN = "hestia-tailnet";
+        # unset below only clears the shell; settings could restore a saved key.
         ANTHROPIC_API_KEY = "";
         CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1";
       };

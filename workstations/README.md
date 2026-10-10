@@ -184,6 +184,13 @@ the tailnet proxy. Plain `claude` continues to use your existing configuration.
 The launcher supplies proxy settings for this session and exports them for child
 agents, without changing your saved login or permissions.
 
+This auth mode disables claude.ai connectors. Anthropic's
+[authentication guidance](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+restricts intermediating claude.ai credentials; this personal subscription proxy
+setup is not established as supported. Review that guidance before relying on
+the trial. Token refresh over days and use on the physical ThinkPad still need
+verification.
+
 First authenticate Claude on Hestia, under the proxy's service user:
 
 ```bash
@@ -191,8 +198,14 @@ sudo -u cli-proxy-api cli-proxy-api \
   -config /var/lib/cli-proxy-api/config.yaml -claude-login -no-browser
 ```
 
-Open the printed URL in your browser and follow the login prompts. The proxy
-stores and refreshes this credential; do not copy it into the repository.
+Open the printed URL in your browser and follow the login prompts. When the
+browser runs on the ThinkPad, its localhost redirect cannot reach Hestia's
+callback listener. Copy the full callback URL from the browser address bar and
+paste it into the Hestia terminal when prompted (the prompt appears after about
+15 seconds). A failed localhost page is expected in this flow. Alternatively,
+forward port 54545 from the ThinkPad to Hestia before opening the login URL.
+Keep the callback URL private. The proxy stores and refreshes this credential;
+do not copy it into the repository.
 Check that Claude models are available from the ThinkPad:
 
 ```bash
