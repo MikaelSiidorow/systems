@@ -37,7 +37,7 @@
   # Hestia has hard-frozen without logs; the sp5100_tco watchdog reboots it.
   systemd.settings.Manager.RuntimeWatchdogSec = "30s";
 
-  # Zen+ can freeze in C6; this stands in for the BIOS "Typical Current Idle".
+  # Zen+ can freeze in C6; an alternative to the BIOS "Typical Current Idle".
   systemd.services.disable-c6 = {
     description = "Disable Ryzen C6 state";
     wantedBy = [ "multi-user.target" ];
