@@ -177,6 +177,29 @@ gh ssh-key add ~/.ssh/git_signing_key.pub --type signing --title "Pop!_OS git si
 
 The GitHub signing key is account-level, so a new machine that decrypts the same signing key does not need a second GitHub registration.
 
+### Trial Claude Code through Hestia
+
+On Hestia, log in once:
+
+```bash
+sudo -u cli-proxy-api cli-proxy-api \
+  -config /var/lib/cli-proxy-api/config.yaml -claude-login -no-browser
+```
+
+Open the printed URL. If the localhost redirect fails on the ThinkPad, paste
+the full callback URL into the Hestia terminal when prompted. Keep it private.
+
+After `make switch` on the ThinkPad, run `claude-hestia`. Plain `claude` keeps
+your existing setup. Smoke test:
+
+```bash
+claude-hestia --model claude-sonnet-5 -p --tools '' 'Reply with exactly: proxy-ok'
+```
+
+claude.ai connectors are disabled. ThinkPad use and refresh over days remain
+untested; subscription proxy support is unresolved under
+[Anthropic's guidance](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use).
+
 ## Migration checklist
 
 Not managed by the flake (bring over manually):
