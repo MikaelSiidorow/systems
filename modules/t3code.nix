@@ -3,6 +3,7 @@
   inputs,
   codex ? inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex,
   claude ? inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default,
+  claudeViaProxy ? false,
 }:
 let
   upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.t3code;
@@ -57,6 +58,14 @@ let
       -c 'model_providers.hestia={name="Hestia CLIProxyAPI",base_url="https://hestia.vpn.miksu.app:8317/v1",wire_api="responses",requires_openai_auth=false}' \
       "$@"
   '';
+  claudeProvider =
+    if claudeViaProxy then
+      import ./claude-proxy.nix {
+        inherit pkgs claude;
+        name = "claude";
+      }
+    else
+      claude;
   direnvWrapper =
     name: executable:
     pkgs.writeShellScriptBin name ''
@@ -65,7 +74,7 @@ let
     '';
   direnvProviders = [
     (direnvWrapper "codex-direnv" "${codexProxy}/bin/codex")
-    (direnvWrapper "claude-direnv" "${claude}/bin/claude")
+    (direnvWrapper "claude-direnv" "${claudeProvider}/bin/claude")
   ];
 in
 (upstream.override {
@@ -76,6 +85,7 @@ in
     pkgs.git-lfs
     pkgs.gh
   ]
+  ++ pkgs.lib.optionals claudeViaProxy [ claudeProvider ]
   ++ direnvProviders;
 }).overrideAttrs
   (previous: {
