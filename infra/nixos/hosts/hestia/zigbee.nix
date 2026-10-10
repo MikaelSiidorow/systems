@@ -1,4 +1,9 @@
-{ inputs, ... }:
+{
+  config,
+  inputs,
+  pkgs,
+  ...
+}:
 {
   imports = [ inputs.sops-nix.nixosModules.sops ];
 
@@ -89,8 +94,51 @@
   };
 
   systemd.services.zigbee2mqtt = {
-    after = [ "mosquitto.service" ];
-    requires = [ "mosquitto.service" ];
+    after = [
+      "mosquitto.service"
+      "zigbee-dongle-reset.service"
+    ];
+    requires = [
+      "mosquitto.service"
+      "zigbee-dongle-reset.service"
+    ];
+  };
+
+  # A watchdog reboot keeps USB powered, and the dongle then fails with
+  # HOST_FATAL_ERROR. Pulsing RTS resets its EFR32 before every start.
+  systemd.services.zigbee-dongle-reset = {
+    description = "Reset the Zigbee dongle";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.writers.writePython3 "zigbee-dongle-reset" { } ''
+        import fcntl
+        import os
+        import struct
+        import sys
+        import termios
+        import time
+
+        fd = os.open(sys.argv[1], os.O_RDWR | os.O_NOCTTY)
+
+
+        def set_lines(rts):
+            bits = struct.unpack(
+                "I", fcntl.ioctl(fd, termios.TIOCMGET, struct.pack("I", 0)))[0]
+            bits &= ~termios.TIOCM_DTR
+            if rts:
+                bits |= termios.TIOCM_RTS
+            else:
+                bits &= ~termios.TIOCM_RTS
+            fcntl.ioctl(fd, termios.TIOCMSET, struct.pack("I", bits))
+
+
+        set_lines(True)
+        time.sleep(0.2)
+        set_lines(False)
+        time.sleep(1)
+        os.close(fd)
+      ''} ${config.services.zigbee2mqtt.settings.serial.port}";
+    };
   };
 
   networking.firewall.interfaces.enp31s0.allowedTCPPorts = [ 8080 ];
