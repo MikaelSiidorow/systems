@@ -25,7 +25,10 @@
       isDarwin = false;
     };
     users.${username} = {
-      imports = [ ../../../../modules/home/core ];
+      imports = [
+        ../../../../modules/home/core
+        ../../../../modules/home/agents/config.nix
+      ];
       home.stateVersion = "26.05";
 
       # Persistent sessions for SSH: `tmux new -A -s main` reattaches.
