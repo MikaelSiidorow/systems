@@ -21,6 +21,8 @@
       efi.canTouchEfiVariables = true;
     };
     supportedFilesystems = [ "ntfs" ];
+    # zenstates (disable-c6 below) writes CPU MSRs.
+    kernelModules = [ "msr" ];
     # Caddy binds the tailnet address, which can appear after Caddy starts.
     kernel.sysctl."net.ipv4.ip_nonlocal_bind" = 1;
   };
@@ -34,6 +36,17 @@
 
   # Hestia has hard-frozen without logs; the sp5100_tco watchdog reboots it.
   systemd.settings.Manager.RuntimeWatchdogSec = "30s";
+
+  # Zen+ can freeze in C6; this stands in for the BIOS "Typical Current Idle".
+  systemd.services.disable-c6 = {
+    description = "Disable Ryzen C6 state";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.zenstates}/bin/zenstates --c6-disable";
+    };
+  };
 
   # Hestia builds and deploys the flake-pinned router configurations.
   nix.settings = {
