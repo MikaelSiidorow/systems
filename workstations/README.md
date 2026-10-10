@@ -179,47 +179,26 @@ The GitHub signing key is account-level, so a new machine that decrypts the same
 
 ### Trial Claude Code through Hestia
 
-The ThinkPad configuration installs `claude-hestia`, an executable launcher for
-the tailnet proxy. Plain `claude` continues to use your existing configuration.
-The launcher supplies proxy settings for this session and exports them for child
-agents, without changing your saved login or permissions.
-
-This auth mode disables claude.ai connectors. Anthropic's
-[authentication guidance](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
-restricts intermediating claude.ai credentials; this personal subscription proxy
-setup is not established as supported. Review that guidance before relying on
-the trial. Token refresh over days and use on the physical ThinkPad still need
-verification.
-
-First authenticate Claude on Hestia, under the proxy's service user:
+On Hestia, log in once:
 
 ```bash
 sudo -u cli-proxy-api cli-proxy-api \
   -config /var/lib/cli-proxy-api/config.yaml -claude-login -no-browser
 ```
 
-Open the printed URL in your browser and follow the login prompts. When the
-browser runs on the ThinkPad, its localhost redirect cannot reach Hestia's
-callback listener. Copy the full callback URL from the browser address bar and
-paste it into the Hestia terminal when prompted (the prompt appears after about
-15 seconds). A failed localhost page is expected in this flow. Alternatively,
-forward port 54545 from the ThinkPad to Hestia before opening the login URL.
-Keep the callback URL private. The proxy stores and refreshes this credential;
-do not copy it into the repository.
-Check that Claude models are available from the ThinkPad:
+Open the printed URL. If the localhost redirect fails on the ThinkPad, paste
+the full callback URL into the Hestia terminal when prompted. Keep it private.
+
+After `make switch` on the ThinkPad, run `claude-hestia`. Plain `claude` keeps
+your existing setup. Smoke test:
 
 ```bash
-curl --fail --silent --show-error https://hestia.vpn.miksu.app:8317/v1/models \
-  | jq -r '.data[].id | select(startswith("claude-"))'
+claude-hestia --model claude-sonnet-5 -p --tools '' 'Reply with exactly: proxy-ok'
 ```
 
-After activating Home Manager on the ThinkPad, start `claude-hestia` and choose
-an advertised Claude model with `/model`. For a small smoke test, substitute
-one of those model IDs below:
-
-```bash
-claude-hestia --model <model-id> -p --tools '' 'Reply with exactly: proxy-ok'
-```
+claude.ai connectors are disabled. ThinkPad use and refresh over days remain
+untested; subscription proxy support is unresolved under
+[Anthropic's guidance](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use).
 
 ## Migration checklist
 
