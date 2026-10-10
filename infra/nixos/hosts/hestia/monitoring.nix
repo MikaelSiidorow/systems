@@ -88,8 +88,10 @@
   # Monitoring must not add to the memory pressure it is there to report.
   systemd.services.alloy.serviceConfig.MemoryMax = "256M";
 
-  # RAPL energy counters are root-only (CVE-2020-8694); let only Alloy read
-  # them, so the rapl collector reports CPU package power.
+  # RAPL energy counters are root-only (CVE-2020-8694); let Alloy read them, so
+  # the rapl collector reports CPU package power. Alloy re-serves them on
+  # 127.0.0.1:12345 to any local user, at roughly 60 ms per sample, far coarser
+  # than a Platypus-style attack needs.
   users.groups.rapl = { };
   systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "rapl" ];
   services.udev.extraRules = ''
