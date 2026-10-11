@@ -29,6 +29,7 @@ in
 {
   imports = [
     ./cli-proxy-api.nix
+    ./gpu.nix
     ./t3code.nix
     ./home.nix
     ./home-assistant.nix
