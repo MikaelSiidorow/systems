@@ -105,6 +105,8 @@ in
     enable = true;
     settings = {
       PasswordAuthentication = false;
+      # PermitRootLogin already refuses passwords; this stops offering them.
+      KbdInteractiveAuthentication = false;
       PermitRootLogin = "prohibit-password";
     };
   };

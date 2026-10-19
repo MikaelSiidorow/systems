@@ -79,6 +79,8 @@
     settings = {
       PermitRootLogin = "prohibit-password";
       PasswordAuthentication = false;
+      # PermitRootLogin already refuses passwords; this stops offering them.
+      KbdInteractiveAuthentication = false;
     };
   };
 
