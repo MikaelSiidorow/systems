@@ -58,7 +58,7 @@ wait_for "$host_timeout" "k8s-server to be up" host_ready
 if [ "${NIXOS_DEPLOYED:-}" = true ]; then
   # A later run may already have deployed a newer commit.
   # shellcheck disable=SC2029
-  running=$(ssh "${ssh_options[@]}" "root@$k3s_host" nixos-version --configuration-revision)
+  running=$(ssh "${ssh_options[@]}" "root@$k3s_host" nixos-version --configuration-revision) || running=
   git cat-file -e "$running^{commit}" 2>/dev/null || git fetch -q origin main || true
   if ! git merge-base --is-ancestor "$sha" "$running" 2>/dev/null; then
     echo "::error::k8s-server runs ${running:-an unknown revision}, not $sha or newer."
