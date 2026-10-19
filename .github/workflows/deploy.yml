@@ -41,8 +41,8 @@ jobs:
       terraform: ${{ steps.filter.outputs.terraform }}
       k8s_terraform: ${{ steps.filter.outputs.k8s_terraform }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name != 'workflow_dispatch'
         with:
@@ -76,20 +76,20 @@ jobs:
       needs.changes.outputs.nixos == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: pr
       - name: Install Nix
-        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
         with:
           nix_conf: |
             experimental-features = nix-command flakes
       - name: Restore and save Nix store
-        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
@@ -172,7 +172,7 @@ jobs:
           pr/.github/scripts/report-section.sh nixos 20 "k8s-server + Hestia" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-nixos
           path: ${{ runner.temp }}/report/nixos.json
@@ -192,7 +192,7 @@ jobs:
           github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
           github.head_ref == 'update/infra-all' &&
           steps.diff.outputs.ok == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -233,7 +233,7 @@ jobs:
     if: github.event_name == 'pull_request' && needs.changes.outputs.nixos == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the committed Traefik CRDs
         run: |
           file=infra/nixos/hosts/k8s-server/traefik-crds.yaml
@@ -251,14 +251,14 @@ jobs:
       actions: write
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Nix
-        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
         with:
           nix_conf: |
             experimental-features = nix-command flakes
       - name: Restore and save Nix store
-        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
@@ -276,8 +276,8 @@ jobs:
       needs.changes.outputs.openwrt == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: cachix/install-nix-action@v30
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
       - name: Build router firmware and deployment tools
         id: build
         run: nix build ./openwrt#cerberus-firmware ./openwrt#hermes-firmware ./openwrt#cerberus-deploy ./openwrt#hermes-deploy --no-link
@@ -294,7 +294,7 @@ jobs:
           .github/scripts/report-section.sh openwrt 30 "OpenWrt routers" "$status" "$summary"
       - name: Upload CI report section
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-openwrt
           path: ${{ runner.temp }}/report/openwrt.json
@@ -322,8 +322,8 @@ jobs:
       TF_VAR_scaleway_project_id: ${{ vars.SCW_PROJECT_ID }}
       TF_VAR_scaleway_billing_alert_email: ${{ vars.SCW_BILLING_ALERT_EMAIL }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: hashicorp/setup-terraform@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ~1.12
       - name: Terraform Format Check
@@ -387,7 +387,7 @@ jobs:
           "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" terraform 40 "Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
         if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-terraform
           path: ${{ runner.temp }}/report/terraform.json
@@ -402,7 +402,7 @@ jobs:
           github.event_name == 'pull_request' &&
           github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
           steps.plan-changes.outputs.none == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -480,8 +480,8 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: hashicorp/setup-terraform@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ~1.12
       - name: Setup SSH and K8s access
@@ -601,7 +601,7 @@ jobs:
           "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" k8s-terraform 50 "k8s Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
         if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-k8s-terraform
           path: ${{ runner.temp }}/report/k8s-terraform.json
@@ -616,7 +616,7 @@ jobs:
           github.event_name == 'pull_request' &&
           github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
           steps.plan-changes.outputs.none == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -682,7 +682,7 @@ jobs:
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Argo CD may already be on a newer commit; the script checks ancestry.
           fetch-depth: 0
@@ -704,7 +704,7 @@ jobs:
       - name: Connect to Headscale VPN
         id: tailnet
         if: steps.key.outputs.present == 'true'
-        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4.1.2
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           authkey: ${{ secrets.HEADSCALE_CI_AUTHKEY }}
           version: 1.96.4

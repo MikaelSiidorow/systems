@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "timezone": "Europe/Helsinki",
   "semanticCommits": "enabled",
   "labels": ["dependencies"],
@@ -55,6 +55,13 @@
       "groupName": "GitHub Actions",
       "matchUpdateTypes": ["minor", "patch", "digest", "pinDigest"],
       "automerge": true
+    },
+    {
+      "description": "Major action updates in one PR, left for review",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions (major)",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     },
     {
       "description": "Merging these workflows runs deploys, so review their updates",
