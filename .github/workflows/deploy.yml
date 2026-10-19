@@ -180,6 +180,48 @@ jobs:
           steps.check-pr.outcome == 'failure' ||
           steps.build-hestia.outcome == 'failure'
         run: exit 1
+      # The weekly infra lock update merges itself once CI Summary passes,
+      # unless it changes a version that needs a look at the release notes.
+      # The smoke job checks k8s-server after the deploy; Hestia stays manual.
+      - name: Create GitHub App token
+        id: app-token
+        if: >-
+          github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
+          github.head_ref == 'update/infra-all' &&
+          steps.diff.outcome == 'success'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Enable auto-merge for a routine lock update
+        if: steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DIFF: ${{ steps.diff.outputs.diff }}
+        run: |
+          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvx 'infra/flake.lock'; then
+            echo "The PR changes more than infra/flake.lock; leaving it for review."
+            exit 0
+          fi
+          # Lines look like "linux: 6.18.55 → 6.18.57, +76.1 KiB". Block new
+          # k3s or kernel minors, PostgreSQL or systemd majors, and any of them
+          # appearing or disappearing.
+          blocked=$(printf '%s\n' "$DIFF" | sed 's/\x1b\[[0-9;]*m//g' | awk '
+            function release(s, re) {
+              return match(s, re) ? substr(s, RSTART, RLENGTH) : "none"
+            }
+            /^(k3s|linux|postgresql|systemd): / && / → / {
+              re = /^(k3s|linux):/ ? "[0-9]+\\.[0-9]+" : "[0-9]+"
+              split($0, side, " → ")
+              sub(/^[^:]*: /, "", side[1])
+              if (release(side[1], re) != release(side[2], re)) print
+            }')
+          if [ -n "$blocked" ]; then
+            printf 'Leaving it for review because of:\n%s\n' "$blocked"
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
   # The committed Traefik CRDs must match the chart version pinned in
   # traefik-helmchart.yaml, e.g. after a manual chart bump. Renovate
   # regenerates them itself.
