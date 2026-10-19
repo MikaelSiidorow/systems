@@ -44,7 +44,7 @@ in
       efi.canTouchEfiVariables = true;
     };
     supportedFilesystems = [ "ntfs" ];
-    # zenstates (disable-c6 below) writes CPU MSRs.
+    # zenstates (disable-c6 and stock-pstates below) writes CPU MSRs.
     kernelModules = [ "msr" ];
     # Caddy binds the tailnet address, which can appear after Caddy starts.
     kernel.sysctl."net.ipv4.ip_nonlocal_bind" = 1;
@@ -68,6 +68,21 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
       ExecStart = "${pkgs.zenstates}/bin/zenstates --c6-disable";
+    };
+  };
+
+  # The BIOS overclocks P0/P1 to 3.8 GHz all-core at 1.2 V, which hard-freezes
+  # under sustained load. Restore stock 3.4 GHz until the BIOS is fixed.
+  systemd.services.stock-pstates = {
+    description = "Set Ryzen P0/P1 to stock 3.4 GHz";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = [
+        "${pkgs.zenstates}/bin/zenstates -p 0 -f 88 -d 8 -v 38"
+        "${pkgs.zenstates}/bin/zenstates -p 1 -f 88 -d 8 -v 38"
+      ];
     };
   };
 
