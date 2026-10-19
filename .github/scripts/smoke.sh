@@ -8,6 +8,7 @@ readonly k3s_host="${1:?usage: smoke.sh K3S_HOST SHA}"
 readonly sha="${2:?usage: smoke.sh K3S_HOST SHA}"
 readonly -a ssh_options=(-o ServerAliveInterval=30 -o ServerAliveCountMax=20)
 # Argo CD polls the repository every 120 s.
+readonly host_timeout=300
 readonly sync_timeout=600
 readonly rollout_timeout=600
 # Crash-looping containers restart within this window.
@@ -36,15 +37,24 @@ wait_for() {
   done
 }
 
+# Functions run as `until` conditions, where set -e is off, so they check
+# their queries themselves and retry on failure.
+
+# Another run's switch may be restarting units or k3s.
+host_ready() {
+  local state
+  # shellcheck disable=SC2029
+  state=$(ssh "${ssh_options[@]}" "root@$k3s_host" systemctl is-system-running)
+  if [ "$state" != running ]; then
+    echo "k8s-server is ${state:-unreachable}."
+    ssh "${ssh_options[@]}" "root@$k3s_host" systemctl --failed --no-legend
+    return 1
+  fi
+  kubectl wait --for=condition=Ready node --all --timeout=30s
+}
+
 echo "::group::Host"
-# shellcheck disable=SC2029
-state=$(ssh "${ssh_options[@]}" "root@$k3s_host" systemctl is-system-running) || true
-if [ "$state" != running ]; then
-  ssh "${ssh_options[@]}" "root@$k3s_host" systemctl --failed --no-legend || true
-  echo "::error::k8s-server is $state."
-  exit 1
-fi
-kubectl wait --for=condition=Ready node --all --timeout=60s
+wait_for "$host_timeout" "k8s-server to be up" host_ready
 echo "::endgroup::"
 
 # Apps that track the repository must reach this commit or a newer one. Chart
@@ -52,20 +62,25 @@ echo "::endgroup::"
 argo_synced() {
   local apps bad=0
   apps=$(kubectl -n argocd get applications -o json |
-    jq -r '.items[] | [.metadata.name, .status.sync.status, .status.health.status, (.status.sync.revision // "")] | @tsv')
+    jq -r '.items[] | [.metadata.name, .status.sync.status, .status.health.status, (.status.sync.revision // "")] | @tsv') || return 1
   while IFS=$'\t' read -r name sync health revision; do
     if [ "$sync" != Synced ]; then
       echo "$name: $sync"
       bad=1
-    elif [[ "$revision" =~ ^[0-9a-f]{40}$ ]] && ! git merge-base --is-ancestor "$sha" "$revision" 2>/dev/null; then
-      echo "$name: at ${revision:0:7}"
-      bad=1
+    elif [[ "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+      # Argo CD may have synced a commit pushed after the checkout.
+      git cat-file -e "$revision^{commit}" 2>/dev/null || git fetch -q origin main || true
+      if ! git merge-base --is-ancestor "$sha" "$revision" 2>/dev/null; then
+        echo "$name: at ${revision:0:7}"
+        bad=1
+      fi
     fi
-    # Progressing is left to the rollout check below.
+    # Progressing is left to the rollout check below. Missing and Degraded
+    # can flicker while a sync applies.
     case "$health" in
       Degraded | Missing | Unknown)
-        echo "::error::$name is $health."
-        exit 1
+        echo "$name: $health"
+        bad=1
         ;;
     esac
   done <<<"$apps"
@@ -83,14 +98,15 @@ rolled_out() {
     .items[]
     | select(
         if .kind == "DaemonSet" then
-          .status.updatedNumberScheduled != .status.desiredNumberScheduled or
-          .status.numberAvailable != .status.desiredNumberScheduled
+          (.status.observedGeneration // 0) < .metadata.generation or
+          (.status.updatedNumberScheduled // 0) != .status.desiredNumberScheduled or
+          (.status.numberAvailable // 0) != .status.desiredNumberScheduled
         else
           (.status.observedGeneration // 0) < .metadata.generation or
           (.status.updatedReplicas // 0) != .spec.replicas or
           (.status.availableReplicas // 0) != .spec.replicas
         end)
-    | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"')
+    | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"') || return 1
   [ -z "$pending" ] || {
     echo "Waiting for: $pending" | tr '\n' ' '
     echo
