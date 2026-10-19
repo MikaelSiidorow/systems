@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Post-deploy smoke test for k8s-server: the host is up, Argo CD has synced
+# the deployed commit, every workload has rolled out and stays up, and every
+# Ingress host answers.
+set -euo pipefail
+
+readonly k3s_host="${1:?usage: smoke.sh K3S_HOST SHA}"
+readonly sha="${2:?usage: smoke.sh K3S_HOST SHA}"
+readonly -a ssh_options=(-o ServerAliveInterval=30 -o ServerAliveCountMax=20)
+# Argo CD polls the repository every 120 s.
+readonly sync_timeout=600
+readonly rollout_timeout=600
+# Crash-looping containers restart within this window.
+readonly watch_seconds=120
+
+if [[ ! "$k3s_host" =~ ^[A-Za-z0-9.:-]+$ ]]; then
+  echo "K3S_HOST contains unsupported characters." >&2
+  exit 1
+fi
+
+kubectl() {
+  # shellcheck disable=SC2029
+  ssh "${ssh_options[@]}" "root@$k3s_host" k3s kubectl "$@"
+}
+
+wait_for() {
+  local timeout=$1 what=$2
+  shift 2
+  local deadline=$((SECONDS + timeout))
+  until "$@"; do
+    if ((SECONDS >= deadline)); then
+      echo "::error::Timed out after ${timeout}s waiting for $what."
+      return 1
+    fi
+    sleep 15
+  done
+}
+
+echo "::group::Host"
+# shellcheck disable=SC2029
+state=$(ssh "${ssh_options[@]}" "root@$k3s_host" systemctl is-system-running) || true
+if [ "$state" != running ]; then
+  ssh "${ssh_options[@]}" "root@$k3s_host" systemctl --failed --no-legend || true
+  echo "::error::k8s-server is $state."
+  exit 1
+fi
+kubectl wait --for=condition=Ready node --all --timeout=60s
+echo "::endgroup::"
+
+# Apps that track the repository must reach this commit or a newer one. Chart
+# apps report their chart version; the bootstrap app syncs their pins.
+argo_synced() {
+  local apps bad=0
+  apps=$(kubectl -n argocd get applications -o json |
+    jq -r '.items[] | [.metadata.name, .status.sync.status, .status.health.status, (.status.sync.revision // "")] | @tsv')
+  while IFS=$'\t' read -r name sync health revision; do
+    if [ "$sync" != Synced ]; then
+      echo "$name: $sync"
+      bad=1
+    elif [[ "$revision" =~ ^[0-9a-f]{40}$ ]] && ! git merge-base --is-ancestor "$sha" "$revision" 2>/dev/null; then
+      echo "$name: at ${revision:0:7}"
+      bad=1
+    fi
+    # Progressing is left to the rollout check below.
+    case "$health" in
+      Degraded | Missing | Unknown)
+        echo "::error::$name is $health."
+        exit 1
+        ;;
+    esac
+  done <<<"$apps"
+  return "$bad"
+}
+
+echo "::group::Argo CD"
+wait_for "$sync_timeout" "Argo CD to sync $sha" argo_synced
+kubectl -n argocd get applications
+echo "::endgroup::"
+
+rolled_out() {
+  local pending
+  pending=$(kubectl get deployments,statefulsets,daemonsets -A -o json | jq -r '
+    .items[]
+    | select(
+        if .kind == "DaemonSet" then
+          .status.updatedNumberScheduled != .status.desiredNumberScheduled or
+          .status.numberAvailable != .status.desiredNumberScheduled
+        else
+          (.status.observedGeneration // 0) < .metadata.generation or
+          (.status.updatedReplicas // 0) != .spec.replicas or
+          (.status.availableReplicas // 0) != .spec.replicas
+        end)
+    | "\(.kind)/\(.metadata.namespace)/\(.metadata.name)"')
+  [ -z "$pending" ] || {
+    echo "Waiting for: $pending" | tr '\n' ' '
+    echo
+    return 1
+  }
+}
+
+echo "::group::Rollouts"
+wait_for "$rollout_timeout" "workloads to roll out" rolled_out
+echo "::endgroup::"
+
+restarts() {
+  kubectl get pods -A -o json | jq -r '
+    .items[]
+    | "\(.metadata.namespace)/\(.metadata.name) \([.status.containerStatuses[]?.restartCount] | add // 0)"' |
+    sort
+}
+
+echo "::group::Pods"
+before=$(restarts)
+sleep "$watch_seconds"
+after=$(restarts)
+failed=0
+# Pods present in both snapshots whose restart count went up.
+crashed=$(join <(echo "$before") <(echo "$after") | awk '$3 > $2 { print $1 " restarted " $3 - $2 " times" }')
+if [ -n "$crashed" ]; then
+  echo "$crashed"
+  echo "::error::Containers restarted after the rollout."
+  failed=1
+fi
+stuck=$(kubectl get pods -A -o json | jq -r '
+  .items[]
+  | .metadata as $m
+  | .status.containerStatuses[]?, .status.initContainerStatuses[]?
+  | select(.state.waiting.reason // "" | test("BackOff|Err|Invalid|CreateContainer"))
+  | "\($m.namespace)/\($m.name) \(.name): \(.state.waiting.reason)"')
+if [ -n "$stuck" ]; then
+  echo "$stuck"
+  echo "::error::Containers are stuck."
+  failed=1
+fi
+echo "::endgroup::"
+
+echo "::group::Ingress"
+hosts=$(kubectl get ingress -A -o json | jq -r '[.items[].spec.rules[]?.host // empty] | unique[]')
+for host in $hosts; do
+  https=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$host/") || true
+  http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "http://$host/") || true
+  echo "$host: https $https, http $http"
+  if [ "$https" = 000 ] || ((https >= 500)); then
+    echo "::error::https://$host/ returned $https."
+    failed=1
+  fi
+  if [ "$http" != 301 ] && [ "$http" != 308 ]; then
+    echo "::error::http://$host/ returned $http, not a redirect."
+    failed=1
+  fi
+done
+echo "::endgroup::"
+
+exit "$failed"

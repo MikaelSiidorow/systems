@@ -75,14 +75,17 @@ terraform  →  nixos  →  k8s-terraform
                            ↓
                      ArgoCD auto-syncs
                      (app manifests from git)
+                           ↓
+                         smoke
 ```
 
 1. **`terraform`** — creates/updates cloud resources (server, DNS)
 2. **`nixos`** — deploys NixOS config via deploy-rs (installs K3s, ArgoCD, etc.)
 3. **`k8s-terraform`** — creates namespaces and secrets via SSH tunnel to K3s API
 4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
+5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
 
-K8s manifest changes (`k8s/refinery/`, `k8s/wger/`) are deployed by ArgoCD within ~3 minutes of pushing to `main`. No CI job is needed for these.
+K8s manifest changes (`k8s/refinery/`, `k8s/wger/`) are deployed by ArgoCD within ~3 minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
 
 Hestia is deployed independently from a machine that can resolve and reach
 `hestia.home.arpa`. Deployment uses the normal user and prompts for sudo:

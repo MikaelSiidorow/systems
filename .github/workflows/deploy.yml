@@ -24,6 +24,9 @@ on:
       - "terraform/**"
       - ".github/workflows/deploy.yml"
       - ".github/scripts/reconcile-wger.sh"
+      # Argo CD deploys these; the smoke job checks the result.
+      - "k8s/**"
+      - ".github/scripts/smoke.sh"
 permissions:
   contents: read
   pull-requests: write
@@ -607,3 +610,25 @@ jobs:
         env:
           WGER_POSTGRES_PASSWORD: ${{ secrets.WGER_POSTGRES_PASSWORD }}
         run: ../../.github/scripts/reconcile-wger.sh "${{ env.K3S_HOST }}"
+  smoke:
+    needs: [terraform, nixos, k8s-terraform]
+    # Failed or cancelled deploy jobs already fail the run.
+    if: |
+      always() && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Argo CD may already be on a newer commit; the script checks ancestry.
+          fetch-depth: 0
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+      - name: Smoke test k8s-server
+        run: .github/scripts/smoke.sh "${{ env.K3S_HOST }}" "${{ github.sha }}"
