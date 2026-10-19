@@ -8,6 +8,7 @@ let
         "tag:infra" = [ "mikael@" ];
         "tag:home-subnet-router" = [ "mikael@" ];
         "tag:ci" = [ "mikael@" ];
+        "tag:ci-deploy" = [ "mikael@" ];
       };
 
       autoApprovers.routes."192.168.67.0/24" = [ "tag:home-subnet-router" ];
@@ -34,6 +35,12 @@ let
           action = "accept";
           src = [ "tag:ci" ];
           dst = [ "tag:infra:443" ];
+        }
+        {
+          # k8s-rollout.yml restarts app deployments through the k3s API.
+          action = "accept";
+          src = [ "tag:ci-deploy" ];
+          dst = [ "tag:infra:6443" ];
         }
       ];
     }
