@@ -131,7 +131,7 @@ flowchart TD
 
 ## Client-to-ArgoCD Access Flow
 
-ArgoCD is only reachable through the Tailscale VPN (no public DNS record).
+ArgoCD and Grafana are only reachable through the Tailscale VPN: they have no public DNS record, and a Traefik `tailnet-only` middleware refuses clients outside 100.64.0.0/10 (k8s-server disables Tailscale subnet SNAT and gives Traefik the tailnet address as an external IP, so Traefik sees real client addresses).
 
 ```mermaid
 flowchart LR

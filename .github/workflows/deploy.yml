@@ -663,6 +663,8 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
+    env:
+      HEADSCALE_CI_AUTHKEY: ${{ secrets.HEADSCALE_CI_AUTHKEY }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -675,5 +677,20 @@ jobs:
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+      # A tag:ci node, which the Headscale ACL only lets reach k8s-server:443,
+      # checks the tailnet-only hosts. Without the key they are only checked
+      # to refuse the public address.
+      - name: Connect to Headscale VPN
+        id: tailnet
+        if: env.HEADSCALE_CI_AUTHKEY != ''
+        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4.1.2
+        with:
+          authkey: ${{ env.HEADSCALE_CI_AUTHKEY }}
+          version: 1.96.4
+          sha256sum: a1cba18826b1f91cb25ef7f5b8259b5258339b42db7867af9269e21829ea78cc
+          use-cache: "false"
+          args: --login-server=https://hs.miksu.app --accept-dns=false
       - name: Smoke test k8s-server
+        env:
+          TAILNET_IP: ${{ steps.tailnet.outcome == 'success' && '100.64.0.1' || '' }}
         run: .github/scripts/smoke.sh "${{ env.K3S_HOST }}" "${{ github.sha }}"

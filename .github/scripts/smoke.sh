@@ -150,22 +150,54 @@ if [ -n "$stuck" ]; then
 fi
 echo "::endgroup::"
 
+status() {
+  curl -s -o /dev/null -w '%{http_code}' --max-time 20 --resolve "$2:$3:$1" "$4://$2/" || true
+}
+
+up() {
+  [ "$1" != 000 ] && (($1 < 500))
+}
+
 echo "::group::Ingress"
 # Some hosts resolve to the tailnet only, so connect to k8s-server directly.
-hosts=$(kubectl get ingress -A -o json | jq -r '[.items[].spec.rules[]?.host // empty] | unique[]')
-for host in $hosts; do
-  https=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --resolve "$host:443:$k3s_host" "https://$host/") || true
-  http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --resolve "$host:80:$k3s_host" "http://$host/") || true
-  echo "$host: https $https, http $http"
-  if [ "$https" = 000 ] || ((https >= 500)); then
-    echo "::error::https://$host/ returned $https."
-    failed=1
+# Hosts behind the tailnet-only middleware must refuse the public address;
+# with TAILNET_IP set (the runner joined the tailnet) they must answer there.
+hosts=$(kubectl get ingress -A -o json | jq -r '
+  [.items[]
+    | (.metadata.annotations["traefik.ingress.kubernetes.io/router.middlewares"] // "" | test("tailnet-only")) as $tailnet
+    | .spec.rules[]?.host // empty
+    | "\(.) \($tailnet)"]
+  | unique[]')
+while read -r host tailnet_only; do
+  https=$(status "$k3s_host" "$host" 443 https)
+  http=$(status "$k3s_host" "$host" 80 http)
+  if [ "$tailnet_only" = true ]; then
+    if [ -n "${TAILNET_IP:-}" ]; then
+      tailnet=$(status "$TAILNET_IP" "$host" 443 https)
+    else
+      tailnet=skipped
+    fi
+    echo "$host: public https $https, http $http, tailnet https $tailnet"
+    if [ "$https" != 403 ]; then
+      echo "::error::https://$host/ returned $https on the public address, not 403."
+      failed=1
+    fi
+    if [ "$tailnet" != skipped ] && { [ "$tailnet" = 403 ] || ! up "$tailnet"; }; then
+      echo "::error::https://$host/ returned $tailnet over the tailnet."
+      failed=1
+    fi
+  else
+    echo "$host: https $https, http $http"
+    if ! up "$https"; then
+      echo "::error::https://$host/ returned $https."
+      failed=1
+    fi
   fi
   if [ "$http" != 301 ] && [ "$http" != 308 ]; then
     echo "::error::http://$host/ returned $http, not a redirect."
     failed=1
   fi
-done
+done <<<"$hosts"
 echo "::endgroup::"
 
 exit "$failed"
