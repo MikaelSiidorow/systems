@@ -25,7 +25,7 @@ jobs:
       # ephemeral tag:ci-deploy key, which the ACL only lets reach the k3s API.
       # Pin both the action revision and the client artifact for reproducibility.
       - name: Connect to Headscale VPN
-        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4.1.2
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           authkey: ${{ secrets.HEADSCALE_PREAUTH_KEY }}
           version: 1.96.4
@@ -33,7 +33,7 @@ jobs:
           use-cache: "false"
           args: --login-server=${{ inputs.headscale-login-server }}
       - name: Setup kubectl
-        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
       - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube

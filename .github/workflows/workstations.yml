@@ -89,7 +89,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Nix
-        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
         with:
           nix_conf: |
             experimental-features = nix-command flakes
@@ -97,7 +97,7 @@ jobs:
       # Restore on every run, save only on main, so pull requests never wait
       # on an upload. Separate keys from deploy.yml's nix-<os>- caches.
       - name: Restore and save Nix store
-        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
           primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix') }}
           restore-prefixes-first-match: nix-workstations-${{ runner.os }}-
@@ -129,7 +129,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Nix
-        uses: nixbuild/nix-quick-install-action@ef2850366b5ded57dc77cad10392197c5ce70343
+        uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
         with:
           nix_conf: |
             experimental-features = nix-command flakes
@@ -137,7 +137,7 @@ jobs:
       # Restore on every run, save only on main, so pull requests never wait
       # on an upload. Separate keys from deploy.yml's nix-<os>- caches.
       - name: Restore and save Nix store
-        uses: nix-community/cache-nix-action@42506e270a07908a6cb6f5ab7ba9b2e60056d6be
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
           primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix') }}
           restore-prefixes-first-match: nix-workstations-${{ runner.os }}-
@@ -187,7 +187,7 @@ jobs:
           } >"$RUNNER_TEMP/details.md"
           "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" workstations 10 Workstations "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-report-workstations
           path: ${{ runner.temp }}/report/workstations.json
