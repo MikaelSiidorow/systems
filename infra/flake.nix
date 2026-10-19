@@ -59,6 +59,8 @@
             disko.nixosModules.disko
             sops-nix.nixosModules.sops
             ./nixos/hosts/k8s-server/configuration.nix
+            # The deploy smoke test checks k8s-server runs the deployed commit.
+            { system.configurationRevision = self.rev or self.dirtyRev or null; }
           ];
         };
 

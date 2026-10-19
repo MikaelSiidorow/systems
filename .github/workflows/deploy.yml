@@ -442,8 +442,26 @@ jobs:
       # so a run that waited never rolls back a newer one. The cost: an older run
       # can deploy a newer commit's NixOS change before that commit's terraform
       # job has applied; the newer run's own deploy follows once it has.
+      # Resolve main to a commit with git: when the GitHub API fails, Nix falls
+      # back to its cached resolution of github:...main and redeploys an
+      # older commit without failing.
       - name: Deploy NixOS
-        run: ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} "flock -w 1800 /run/nixos-deploy.lock nixos-rebuild switch --refresh --flake 'github:MikaelSiidorow/systems/${{ github.ref == 'refs/heads/main' && 'main' || github.sha }}?dir=infra#k8s-server'"
+        env:
+          REF: ${{ github.ref == 'refs/heads/main' && 'main' || github.sha }}
+        run: |
+          ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} flock -w 1800 /run/nixos-deploy.lock bash -s -- "$REF" <<'EOF'
+          set -euo pipefail
+          rev=$1
+          if [ "$rev" = main ]; then
+            rev=$(git ls-remote https://github.com/MikaelSiidorow/systems refs/heads/main | cut -f1)
+          fi
+          if [[ ! "$rev" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve main: $rev" >&2
+            exit 1
+          fi
+          echo "Deploying $rev"
+          nixos-rebuild switch --flake "github:MikaelSiidorow/systems/$rev?dir=infra#k8s-server"
+          EOF
   k8s-terraform:
     needs: [changes, terraform, nixos]
     if: |
@@ -696,4 +714,5 @@ jobs:
       - name: Smoke test k8s-server
         env:
           TAILNET_IP: ${{ steps.tailnet.outcome == 'success' && '100.64.0.1' || '' }}
+          NIXOS_DEPLOYED: ${{ needs.nixos.result == 'success' }}
         run: .github/scripts/smoke.sh "${{ env.K3S_HOST }}" "${{ github.sha }}"
