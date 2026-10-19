@@ -4,7 +4,8 @@
   # under gamescope, which needs a Vulkan driver; nouveau without Mesa has none.
   # The 590+ branches dropped Pascal, so pin the 580 legacy branch.
   nixpkgs.config.allowUnfreePredicate =
-    pkg: builtins.elem (lib.getName pkg) [
+    pkg:
+    builtins.elem (lib.getName pkg) [
       "nvidia-x11"
       "nvidia-kernel-modules"
       "nvidia-settings"
