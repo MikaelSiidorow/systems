@@ -151,10 +151,11 @@ fi
 echo "::endgroup::"
 
 echo "::group::Ingress"
+# Some hosts resolve to the tailnet only, so connect to k8s-server directly.
 hosts=$(kubectl get ingress -A -o json | jq -r '[.items[].spec.rules[]?.host // empty] | unique[]')
 for host in $hosts; do
-  https=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$host/") || true
-  http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "http://$host/") || true
+  https=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --resolve "$host:443:$k3s_host" "https://$host/") || true
+  http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --resolve "$host:80:$k3s_host" "http://$host/") || true
   echo "$host: https $https, http $http"
   if [ "$https" = 000 ] || ((https >= 500)); then
     echo "::error::https://$host/ returned $https."
