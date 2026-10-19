@@ -24,6 +24,9 @@ on:
       - "terraform/**"
       - ".github/workflows/deploy.yml"
       - ".github/scripts/reconcile-wger.sh"
+      # Argo CD deploys these; the smoke job checks the result.
+      - "k8s/**"
+      - ".github/scripts/smoke.sh"
 permissions:
   contents: read
   pull-requests: write
@@ -116,7 +119,10 @@ jobs:
         id: diff
         if: steps.build-base.outcome == 'success' && steps.build-pr.outcome == 'success'
         run: |
-          output=$(nix store diff-closures ./result-base ./result-pr 2>&1) || true
+          # The auto-merge below trusts the diff only when it succeeded.
+          if output=$(nix store diff-closures ./result-base ./result-pr 2>&1); then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
           if [ -z "$output" ]; then
             output="No changes detected."
           fi
@@ -177,6 +183,48 @@ jobs:
           steps.check-pr.outcome == 'failure' ||
           steps.build-hestia.outcome == 'failure'
         run: exit 1
+      # The weekly infra lock update merges itself once CI Summary passes,
+      # unless it changes a version that needs a look at the release notes.
+      # The smoke job checks k8s-server after the deploy; Hestia stays manual.
+      - name: Create GitHub App token
+        id: app-token
+        if: >-
+          github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
+          github.head_ref == 'update/infra-all' &&
+          steps.diff.outputs.ok == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Enable auto-merge for a routine lock update
+        if: steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DIFF: ${{ steps.diff.outputs.diff }}
+        run: |
+          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvx 'infra/flake.lock'; then
+            echo "The PR changes more than infra/flake.lock; leaving it for review."
+            exit 0
+          fi
+          # Lines look like "linux: 6.18.55 → 6.18.57, +76.1 KiB". Block new
+          # k3s or kernel minors, PostgreSQL or systemd majors, and any of them
+          # appearing or disappearing.
+          blocked=$(printf '%s\n' "$DIFF" | sed 's/\x1b\[[0-9;]*m//g' | awk '
+            function release(s, re) {
+              return match(s, re) ? substr(s, RSTART, RLENGTH) : "none"
+            }
+            /^(k3s|linux|postgresql|systemd): / && / → / {
+              re = /^(k3s|linux):/ ? "[0-9]+\\.[0-9]+" : "[0-9]+"
+              split($0, side, " → ")
+              sub(/^[^:]*: /, "", side[1])
+              if (release(side[1], re) != release(side[2], re)) print
+            }')
+          if [ -n "$blocked" ]; then
+            printf 'Leaving it for review because of:\n%s\n' "$blocked"
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
   # The committed Traefik CRDs must match the chart version pinned in
   # traefik-helmchart.yaml, e.g. after a manual chart bump. Renovate
   # regenerates them itself.
@@ -607,3 +655,25 @@ jobs:
         env:
           WGER_POSTGRES_PASSWORD: ${{ secrets.WGER_POSTGRES_PASSWORD }}
         run: ../../.github/scripts/reconcile-wger.sh "${{ env.K3S_HOST }}"
+  smoke:
+    needs: [terraform, nixos, k8s-terraform]
+    # Failed or cancelled deploy jobs already fail the run.
+    if: |
+      always() && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Argo CD may already be on a newer commit; the script checks ancestry.
+          fetch-depth: 0
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+      - name: Smoke test k8s-server
+        run: .github/scripts/smoke.sh "${{ env.K3S_HOST }}" "${{ github.sha }}"

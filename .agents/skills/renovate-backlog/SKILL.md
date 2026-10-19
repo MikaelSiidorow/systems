@@ -12,10 +12,11 @@ Only merge PRs whose checks are green. Ask the user before merging a major, an `
 ## What merges itself
 
 - Workstations and openwrt flake locks.
+- The weekly infra flake lock, unless its k8s-server closure brings a new k3s or kernel minor, or a PostgreSQL or systemd major (`deploy.yml` enables auto-merge). Hestia still needs a manual deploy, and a kernel bump a reboot.
 - The weekly GitHub Actions group (minor/patch/digest), but only when it doesn't touch `deploy.yml` or `k8s-rollout.yml`. A shared action like `actions/checkout` pulls those in, so expect to review it most weeks.
 - `k8s/**` minor/patch chart and image updates (not 0.x), three days after release, except the monitoring stack (alloy, kube-prometheus-stack, loki, tempo). A release without a publish date (images outside Docker Hub) never gets a PR; force it from the Dependency Dashboard.
 - Bot Terraform PRs whose plan shows no changes (`deploy.yml` enables auto-merge).
-- Everything else is left for review: majors, the monitoring stack, `infra/**` (NixOS, k3s HelmCharts), Terraform with a non-empty plan, the T3 Code pins.
+- Everything else is left for review: majors, the monitoring stack, other `infra/**` changes (NixOS, k3s HelmCharts), Terraform with a non-empty plan, the T3 Code pins.
 
 ## Triage
 

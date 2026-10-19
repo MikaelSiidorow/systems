@@ -3,7 +3,9 @@ name: Update flake.lock
 # Each flake keeps its own lock and gets its own pull request.
 # - workstations: fast-moving inputs daily, all inputs on Mondays; auto-merged
 #   once the required CI Summary passes.
-# - infra: all inputs on Mondays; merged by hand because merging deploys.
+# - infra: all inputs on Mondays; deploy.yml enables auto-merge unless the
+#   k8s-server closure brings a new k3s or kernel minor, or a PostgreSQL or
+#   systemd major. The smoke job checks k8s-server after the deploy.
 # - openwrt: all inputs daily, since OpenWrt republishes package indexes and
 #   the pinned hashes drift; auto-merged once the firmware builds. Merging
 #   deploys nothing, router deploys stay manual.
