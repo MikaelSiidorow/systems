@@ -36,8 +36,8 @@ let
 
         # Compiled equivalent of AnalyticsService.layer -> AnalyticsService.layerTest.
         # Fail on upstream changes rather than silently retaining analytics.
-        substituteInPlace "$out/libexec/t3code/apps/server/dist/bin.mjs" \
-          --replace-fail 'effect(AnalyticsService, make$99)' 'AnalyticsService.layerTest'
+        substituteInPlace "$out"/libexec/t3code/apps/server/dist/binCli-*.mjs \
+          --replace-fail 'effect(AnalyticsService, make$148)' 'AnalyticsService.layerTest'
 
         rm "$out/bin/t3" "$desktop/bin/t3code-desktop" \
           "$desktop/libexec/t3code/apps/server"
