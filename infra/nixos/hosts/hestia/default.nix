@@ -29,6 +29,7 @@ in
 {
   imports = [
     ./cli-proxy-api.nix
+    ./dev.nix
     ./gpu.nix
     ./t3code.nix
     ./home.nix
