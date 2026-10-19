@@ -10,6 +10,14 @@ spec:
   createNamespace: true
   version: 41.7.0
   valuesContent: |-
+    # Keep client addresses for the tailnet-only allowlists. ServiceLB
+    # masquerades what it forwards, so kube-proxy has to take the tailnet
+    # address too, as it does the public one.
+    service:
+      spec:
+        externalTrafficPolicy: Local
+        externalIPs:
+          - 100.64.0.1
     ports:
       web:
         http:

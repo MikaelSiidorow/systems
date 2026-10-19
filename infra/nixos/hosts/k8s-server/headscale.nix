@@ -7,6 +7,7 @@ let
       tagOwners = {
         "tag:infra" = [ "mikael@" ];
         "tag:home-subnet-router" = [ "mikael@" ];
+        "tag:ci" = [ "mikael@" ];
       };
 
       autoApprovers.routes."192.168.67.0/24" = [ "tag:home-subnet-router" ];
@@ -27,6 +28,12 @@ let
           action = "accept";
           src = [ "tag:home-subnet-router" ];
           dst = [ "tag:infra:4318" ];
+        }
+        {
+          # The deploy smoke test checks the tailnet-only Ingress hosts.
+          action = "accept";
+          src = [ "tag:ci" ];
+          dst = [ "tag:infra:443" ];
         }
       ];
     }
@@ -85,7 +92,11 @@ in
     };
   };
 
-  services.tailscale.enable = true;
+  services.tailscale = {
+    enable = true;
+    # Pods behind the tailnet-only allowlists must see tailnet addresses.
+    extraSetFlags = [ "--snat-subnet-routes=false" ];
+  };
 
   # NixOS rollbacks do not roll back Headscale's database migrations. Keep a
   # stopped, version-specific snapshot before the newly selected binary starts.
