@@ -7,8 +7,10 @@ name: Update flake.lock
 #   k8s-server closure brings a new k3s or kernel minor, or a PostgreSQL or
 #   systemd major. The smoke job checks k8s-server after the deploy.
 # - openwrt: all inputs daily, since OpenWrt republishes package indexes and
-#   the pinned hashes drift; auto-merged once the firmware builds. Merging
-#   deploys nothing, router deploys stay manual.
+#   the pinned hashes drift; auto-merged once the firmware builds. When the
+#   ImageBuilder drops a pinned release, update.sh moves to the next patch
+#   release and the PR waits for review. Merging deploys nothing, router
+#   deploys stay manual.
 on:
   schedule:
     - cron: "17 0 * * 0,2-6"
@@ -46,7 +48,7 @@ jobs:
           ws_fast='{"flake":"workstations","target":"fast","command":"make -s update-fast","title":"chore(workstations): update fast inputs","automerge":true}'
           ws_all='{"flake":"workstations","target":"all","command":"make -s update","title":"chore(workstations): update inputs","automerge":true}'
           infra_all='{"flake":"infra","target":"all","command":"nix flake update","title":"chore(infra): update inputs","automerge":false}'
-          openwrt_all='{"flake":"openwrt","target":"all","command":"nix flake update","title":"chore(openwrt): update inputs","automerge":true}'
+          openwrt_all='{"flake":"openwrt","target":"all","command":"./update.sh","paths":"openwrt/flake.lock,openwrt/*/firmware.nix","title":"chore(openwrt): update inputs","automerge":true}'
           if [ "$EVENT" = "workflow_dispatch" ]; then
             case "$INPUT_FLAKE/$INPUT_TARGET" in
               workstations/fast) include="$ws_fast" ;;
@@ -88,6 +90,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
 
       - name: Update inputs
+        id: update
         working-directory: ${{ matrix.flake }}
         env:
           COMMAND: ${{ matrix.command }}
@@ -97,6 +100,14 @@ jobs:
             $COMMAND 2>&1 | grep -v -E '^(warning:|unpacking )'
             echo '```'
           } > "$RUNNER_TEMP/body.md"
+          # openwrt/update.sh moves stale release pins; a new OpenWrt release
+          # needs its release notes read before merging.
+          if git diff --quiet -- '*/firmware.nix'; then
+            echo "release-bumped=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release-bumped=true" >> "$GITHUB_OUTPUT"
+            printf '\nNew OpenWrt release: review its release notes, auto-merge is off.\n' >> "$RUNNER_TEMP/body.md"
+          fi
 
       - name: Create pull request
         id: pr
@@ -105,15 +116,24 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           branch: update/${{ matrix.flake }}-${{ matrix.target }}
           delete-branch: true
-          add-paths: ${{ matrix.flake }}/flake.lock
+          add-paths: ${{ matrix.paths || format('{0}/flake.lock', matrix.flake) }}
           commit-message: ${{ matrix.title }}
           title: ${{ matrix.title }}
           body-path: ${{ runner.temp }}/body.md
           labels: dependencies
 
       - name: Enable auto-merge
-        if: matrix.automerge && steps.pr.outputs.pull-request-number
+        if: matrix.automerge && steps.update.outputs.release-bumped != 'true' && steps.pr.outputs.pull-request-number
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
         run: gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+
+      # The branch is rewritten in place, so auto-merge from an earlier run
+      # would otherwise carry over to the release bump.
+      - name: Disable auto-merge for release bumps
+        if: steps.update.outputs.release-bumped == 'true' && steps.pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
+        run: gh pr merge --disable-auto "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" || true
