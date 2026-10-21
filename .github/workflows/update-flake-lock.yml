@@ -95,9 +95,11 @@ jobs:
         env:
           COMMAND: ${{ matrix.command }}
         run: |
+          # Fail on a failing $COMMAND, not on grep filtering out every line.
+          set -o pipefail
           {
             echo '```'
-            $COMMAND 2>&1 | grep -v -E '^(warning:|unpacking )'
+            $COMMAND 2>&1 | { grep -v -E '^(warning:|unpacking )' || true; }
             echo '```'
           } > "$RUNNER_TEMP/body.md"
           # openwrt/update.sh moves stale release pins; a new OpenWrt release
@@ -136,4 +138,8 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
-        run: gh pr merge --disable-auto "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" || true
+        run: |
+          enabled=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json autoMergeRequest --jq '.autoMergeRequest != null')
+          if [ "$enabled" = true ]; then
+            gh pr merge --disable-auto "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+          fi
