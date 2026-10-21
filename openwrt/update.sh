@@ -25,6 +25,10 @@ for firmware in */firmware.nix; do
     echo "$firmware: OpenWrt $current is no longer cached and no $series.x release is" >&2
     exit 1
   fi
+  if [ "$(printf '%s\n' "$current" "$latest" | sort -V | tail -n 1)" != "$latest" ]; then
+    echo "$firmware: refusing to move OpenWrt $current back to $latest" >&2
+    exit 1
+  fi
 
   sed -i "s/^  release = \"$current\";$/  release = \"$latest\";/" "$firmware"
   echo "• $firmware: OpenWrt $current → $latest"

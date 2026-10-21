@@ -108,7 +108,9 @@ jobs:
             echo "release-bumped=false" >> "$GITHUB_OUTPUT"
           else
             echo "release-bumped=true" >> "$GITHUB_OUTPUT"
-            printf '\nNew OpenWrt release: review its release notes, auto-merge is off.\n' >> "$RUNNER_TEMP/body.md"
+            # Repeat the links outside the code fence so GitHub renders them.
+            notes=$(grep -oE 'https://openwrt\.org/releases/[^ ]+' "$RUNNER_TEMP/body.md" | sort -u | sed 's/^/- /' || true)
+            printf '\nNew OpenWrt release: review its release notes, auto-merge is off.\n\n%s\n' "$notes" >> "$RUNNER_TEMP/body.md"
           fi
 
       - name: Create pull request
