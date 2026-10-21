@@ -2,7 +2,7 @@
 
 This directory has two deliberately separate pieces:
 
-- `firmware.nix` builds an OpenWrt 25.12.6 image for the
+- `firmware.nix` builds an OpenWrt 25.12 image for the
   `netgear_r6220` profile. It owns the OpenWrt release and package set.
 - `config.nix` owns the captured network topology, firewall with hardware flow
   offloading, and disabled-radio state. DHCP, LuCI, SSH, and other untouched
@@ -50,9 +50,10 @@ tested.
 
 ## 2. Install official OpenWrt
 
-Download these files from the OpenWrt 25.12.6 `ramips/mt7621` release:
+Download these files from the OpenWrt `ramips/mt7621` release pinned in
+`firmware.nix`:
 
-- `openwrt-25.12.6-ramips-mt7621-netgear_r6220-squashfs-factory.img`
+- `openwrt-<release>-ramips-mt7621-netgear_r6220-squashfs-factory.img`
 - `sha256sums`
 
 Verify the image against `sha256sums`. From the NETGEAR interface, open
@@ -148,9 +149,10 @@ If validation succeeds, flash while connected over Ethernet:
 ssh root@192.168.1.1 'sysupgrade /tmp/r6220-sysupgrade.bin'
 ```
 
-This transition stays within OpenWrt 25.12.6 and preserves the initial
-configuration. For a future major OpenWrt upgrade, review the release notes and
-expect to use `sysupgrade -n` followed by a fresh declarative deployment.
+This transition stays within the pinned OpenWrt release and preserves the
+initial configuration. For a future major OpenWrt upgrade, review the release
+notes and expect to use `sysupgrade -n` followed by a fresh declarative
+deployment.
 
 ## 6. Review and deploy the Dewclaw configuration
 
@@ -198,8 +200,10 @@ construction.
 
 ## Updating
 
-1. Change the explicit `release` in `firmware.nix` only after the corresponding
-   release exists in the pinned ImageBuilder input.
+1. The daily update PR moves `release` in `firmware.nix` to the next patch
+   release once the ImageBuilder input drops the pinned one (`./update.sh`),
+   and leaves auto-merge off so the release notes get read. Change the series
+   by hand, and only after it exists in the pinned ImageBuilder input.
 2. Update the input with `nix flake update openwrt-imagebuilder`.
 3. Build and inspect `.#cerberus-firmware`.
 4. Back up the router and validate the image with `sysupgrade -T`.
