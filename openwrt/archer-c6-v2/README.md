@@ -1,7 +1,7 @@
 # TP-Link Archer C6 v2 access point
 
 This directory describes the EU hardware revision 2.0 currently running
-official OpenWrt 25.12.5 as a wired access point:
+official OpenWrt 25.12.6 as a wired access point:
 
 - management address `192.168.67.2/24`
 - hostname `hermes` and local name `hermes.home.arpa`
