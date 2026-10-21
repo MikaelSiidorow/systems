@@ -28,4 +28,5 @@ for firmware in */firmware.nix; do
 
   sed -i "s/^  release = \"$current\";$/  release = \"$latest\";/" "$firmware"
   echo "• $firmware: OpenWrt $current → $latest"
+  echo "  https://openwrt.org/releases/$series/notes-$latest"
 done
