@@ -3,7 +3,7 @@
   pkgs,
 }:
 let
-  release = "25.12.5";
+  release = "25.12.6";
   profiles = openwrt-imagebuilder.lib.profiles {
     inherit pkgs release;
   };

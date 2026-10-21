@@ -7,8 +7,16 @@
 let
   t3code = import ../../../../modules/t3code.nix {
     inherit pkgs inputs;
-    claude = claudeCode;
-    claudeViaProxy = true;
+    # T3 runs both providers through this host's CLIProxyAPI.
+    codex = import ../../../../modules/codex-proxy.nix {
+      inherit pkgs;
+      codex = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex;
+    };
+    claude = import ../../../../modules/claude-proxy.nix {
+      inherit pkgs;
+      claude = claudeCode;
+      name = "claude";
+    };
   };
   claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
   claudeHestia = import ../../../../modules/claude-proxy.nix {
