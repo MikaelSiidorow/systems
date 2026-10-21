@@ -2,7 +2,7 @@
 
 This directory has two deliberately separate pieces:
 
-- `firmware.nix` builds an OpenWrt 25.12.5 image for the
+- `firmware.nix` builds an OpenWrt 25.12.6 image for the
   `netgear_r6220` profile. It owns the OpenWrt release and package set.
 - `config.nix` owns the captured network topology, firewall with hardware flow
   offloading, and disabled-radio state. DHCP, LuCI, SSH, and other untouched
@@ -50,9 +50,9 @@ tested.
 
 ## 2. Install official OpenWrt
 
-Download these files from the OpenWrt 25.12.5 `ramips/mt7621` release:
+Download these files from the OpenWrt 25.12.6 `ramips/mt7621` release:
 
-- `openwrt-25.12.5-ramips-mt7621-netgear_r6220-squashfs-factory.img`
+- `openwrt-25.12.6-ramips-mt7621-netgear_r6220-squashfs-factory.img`
 - `sha256sums`
 
 Verify the image against `sha256sums`. From the NETGEAR interface, open
@@ -148,7 +148,7 @@ If validation succeeds, flash while connected over Ethernet:
 ssh root@192.168.1.1 'sysupgrade /tmp/r6220-sysupgrade.bin'
 ```
 
-This transition stays within OpenWrt 25.12.5 and preserves the initial
+This transition stays within OpenWrt 25.12.6 and preserves the initial
 configuration. For a future major OpenWrt upgrade, review the release notes and
 expect to use `sysupgrade -n` followed by a fresh declarative deployment.
 
