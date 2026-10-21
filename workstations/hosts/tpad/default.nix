@@ -3,7 +3,16 @@
 let
   t3code = import ../../../modules/t3code.nix {
     inherit pkgs inputs;
-    codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+    # T3 runs both providers through Hestia's CLIProxyAPI.
+    codex = import ../../../modules/codex-proxy.nix {
+      inherit pkgs;
+      codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+    };
+    claude = import ../../../modules/claude-proxy.nix {
+      inherit pkgs;
+      claude = inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      name = "claude";
+    };
   };
   tailscale-headscale-setup = pkgs.writeShellApplication {
     name = "tailscale-headscale-setup";
