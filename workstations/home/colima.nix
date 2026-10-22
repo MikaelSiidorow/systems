@@ -75,4 +75,28 @@ in
   # Colima checks Rosetta's on-demand daemon with the system pgrep. Activate it
   # and make the macOS system tools visible before Colima starts.
   launchd.agents."colima-default".config.ProgramArguments = lib.mkForce [ "${startColima}" ];
+
+  # Weekly, drop build cache unused for a week so it doesn't fill the VM disk.
+  # The VM's own weekly fstrim then returns the freed space to macOS.
+  launchd.agents.docker-builder-prune = {
+    enable = true;
+    config = {
+      ProgramArguments = [
+        (lib.getExe pkgs.docker)
+        "builder"
+        "prune"
+        "--force"
+        "--filter"
+        "until=168h"
+      ];
+      EnvironmentVariables.DOCKER_HOST = "unix://${config.home.homeDirectory}/.colima/default/docker.sock";
+      StartCalendarInterval = [
+        {
+          Weekday = 1;
+          Hour = 10;
+          Minute = 0;
+        }
+      ];
+    };
+  };
 }
