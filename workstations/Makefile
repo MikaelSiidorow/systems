@@ -23,6 +23,8 @@ ifeq ($(UNAME),Darwin)
 	FLAKE_TARGET := .
 	DISPLAY_TARGET := darwinConfigurations.$(HOSTNAME)
 	SWITCH_FLAGS :=
+	# Only activation needs root; building goes through the Nix daemon.
+	BUILD_ONLY_CMD := nix build .\#$(DISPLAY_TARGET).system
 else
 	HOME_MANAGER := $(shell command -v home-manager 2>/dev/null || true)
 	ifeq ($(HOME_MANAGER),)
@@ -33,6 +35,7 @@ else
 	FLAKE_TARGET := .\#mikaelsiidorow@tpad
 	DISPLAY_TARGET := $(FLAKE_TARGET)
 	SWITCH_FLAGS := -b backup
+	BUILD_ONLY_CMD := $(BUILD_CMD) build --flake $(FLAKE_TARGET)
 endif
 
 # Default target - show help
@@ -72,7 +75,7 @@ switch:
 .PHONY: build
 build:
 	@echo "Building $(DISPLAY_TARGET)..."
-	$(BUILD_CMD) build --flake $(FLAKE_TARGET)
+	$(BUILD_ONLY_CMD)
 
 # Check formatting in treefmt's CI mode
 .PHONY: format-check
