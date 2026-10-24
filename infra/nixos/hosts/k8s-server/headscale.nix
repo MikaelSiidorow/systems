@@ -25,6 +25,12 @@ let
           ];
         }
         {
+          # Elsa's phone only needs Home Assistant (ha.miksu.app via Hestia).
+          action = "accept";
+          src = [ "elsa@" ];
+          dst = [ "192.168.67.170:443" ];
+        }
+        {
           # Hestia ships host metrics and logs to the cluster Alloy (OTLP/HTTP).
           action = "accept";
           src = [ "tag:home-subnet-router" ];
