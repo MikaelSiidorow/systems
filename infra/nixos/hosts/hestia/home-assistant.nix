@@ -42,9 +42,26 @@ in
 
   services.home-assistant = {
     enable = true;
-    package = unstablePkgs.home-assistant.overrideAttrs (_: {
-      doInstallCheck = false;
-    });
+    package =
+      (unstablePkgs.home-assistant.override {
+        packageOverrides = _: super: {
+          # The vacuum (roborock.vacuum.ss07) always reports dpAreaUnit as -1,
+          # which logs a traceback on every update. Map it like the library's
+          # other enums do. Drop once upstream handles it; --replace-fail
+          # breaks the build when the line changes.
+          python-roborock = super.python-roborock.overridePythonAttrs (old: {
+            postPatch = (old.postPatch or "") + ''
+              substituteInPlace roborock/data/b01_q10/b01_q10_code_mappings.py \
+                --replace-fail '    SQUARE_FEET = "square_feet", 1' \
+                  '    SQUARE_FEET = "square_feet", 1
+                  UNKNOWN = "unknown", -1'
+            '';
+          });
+        };
+      }).overrideAttrs
+        (_: {
+          doInstallCheck = false;
+        });
 
     # Integrations added through the UI still need their Python dependencies
     # declared here.
