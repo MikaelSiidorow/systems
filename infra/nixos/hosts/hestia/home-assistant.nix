@@ -1,6 +1,7 @@
 {
   config,
   inputs,
+  lib,
   pkgs,
   ...
 }:
@@ -283,9 +284,17 @@ in
     services = {
       # Restart Home Assistant when the encrypted source changes. This replaces
       # sops-nix's deprecated activation-script restartUnits mechanism.
-      home-assistant.restartTriggers = [
-        config.sops.secrets.digitransit-api-key.sopsFileHash
-      ];
+      home-assistant = {
+        restartTriggers = [
+          config.sops.secrets.digitransit-api-key.sopsFileHash
+          (builtins.toJSON config.services.home-assistant.config)
+          (builtins.toJSON config.services.home-assistant.lovelaceConfig)
+        ];
+        # A reload makes Home Assistant exit and come back through Restart=,
+        # which switch-to-configuration reports as a failed unit. Restart on
+        # config changes instead.
+        reloadTriggers = lib.mkForce [ ];
+      };
 
       # Generate the Wi-Fi QR code from its runtime secret. The QR payload and
       # resulting image never enter the Nix store.
