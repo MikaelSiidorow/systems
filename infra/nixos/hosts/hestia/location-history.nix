@@ -33,11 +33,17 @@ in
         triggers = map (person: {
           trigger = "state";
           entity_id = "person.${person}";
-          attribute = "latitude";
           variables = { inherit person; };
         }) people;
+        # Fires on any state or attribute change, so only log when the
+        # coordinates themselves moved.
         conditions = [
-          "{{ trigger.to_state.attributes.latitude is number and trigger.to_state.attributes.longitude is number }}"
+          ''
+            {% set new = trigger.to_state.attributes if trigger.to_state else {} %}
+            {% set old = trigger.from_state.attributes if trigger.from_state else {} %}
+            {{ new.latitude is number and new.longitude is number
+               and (new.latitude, new.longitude) != (old.latitude, old.longitude) }}
+          ''
         ];
         actions = [
           {
