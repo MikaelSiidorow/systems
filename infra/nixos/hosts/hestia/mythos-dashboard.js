@@ -145,6 +145,12 @@ class MythosDashboard extends HTMLElement {
         </main>
       </div>
     `;
+    // Kiosk mode hides the sidebar, so tapping the clock is the way back to
+    // the Overview dashboard on phones.
+    shadowRoot.querySelector('[data-value="time"]')?.addEventListener("click", () => {
+      window.history.pushState(null, "", "/lovelace");
+      window.dispatchEvent(new CustomEvent("location-changed"));
+    });
     /** @type {HomeAssistant | null} */
     this._hass = null;
     /** @type {Map<string, string>} */
