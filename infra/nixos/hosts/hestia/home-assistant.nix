@@ -135,10 +135,12 @@ in
               unique_id = "washing_machine_running";
               default_entity_id = "binary_sensor.washing_machine_running";
               device_class = "running";
-              state = "{{ states('sensor.washing_machine_plug_power') | float(0) > 3 }}";
+              # Idle with the display on draws ~3 W. Over five logged cycles,
+              # mid-cycle dips to 10 W or below lasted at most 50 s.
+              state = "{{ states('sensor.washing_machine_plug_power') | float(0) > 10 }}";
               # A plug dropping off Zigbee mid-cycle must not read as finished.
               availability = "{{ has_value('sensor.washing_machine_plug_power') }}";
-              delay_off.minutes = 5;
+              delay_off.minutes = 2;
             }
             {
               name = "PC running";
