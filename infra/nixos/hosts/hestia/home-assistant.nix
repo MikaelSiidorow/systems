@@ -38,6 +38,7 @@ in
   imports = [
     "${inputs.nixpkgs-unstable}/nixos/modules/services/home-automation/home-assistant.nix"
     ./information-display.nix
+    ./location-history.nix
     ./notifications.nix
   ];
 
