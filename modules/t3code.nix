@@ -34,9 +34,15 @@ let
         chmod -R u+w "$out" "$desktop"
 
         # Compiled equivalent of AnalyticsService.layer -> AnalyticsService.layerTest.
-        # Fail on upstream changes rather than silently retaining analytics.
-        substituteInPlace "$out"/libexec/t3code/apps/server/dist/binCli-*.mjs \
-          --replace-fail 'effect(AnalyticsService, make$148)' 'AnalyticsService.layerTest'
+        # The make$N suffix is a bundler-assigned name that shifts between releases.
+        # Fail on other upstream changes rather than silently retaining analytics.
+        analytics='effect\(AnalyticsService, make\$[0-9]+\)'
+        cli=$(echo "$out"/libexec/t3code/apps/server/dist/binCli-*.mjs)
+        [ "$(grep -oE "$analytics" "$cli" | wc -l)" = 1 ] || {
+          echo "t3code: expected one '$analytics' in $cli" >&2
+          exit 1
+        }
+        sed -Ei "s/$analytics/AnalyticsService.layerTest/" "$cli"
 
         rm "$out/bin/t3" "$desktop/bin/t3code-desktop" \
           "$desktop/libexec/t3code/apps/server"
