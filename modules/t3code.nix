@@ -38,7 +38,7 @@ let
         # Fail on other upstream changes rather than silently retaining analytics.
         analytics='effect\(AnalyticsService, make\$[0-9]+\)'
         cli=$(echo "$out"/libexec/t3code/apps/server/dist/binCli-*.mjs)
-        [ "$(grep -cE "$analytics" "$cli")" = 1 ] || {
+        [ "$(grep -oE "$analytics" "$cli" | wc -l)" = 1 ] || {
           echo "t3code: expected one '$analytics' in $cli" >&2
           exit 1
         }
