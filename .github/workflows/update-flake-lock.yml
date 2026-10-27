@@ -7,7 +7,9 @@ name: Update flake.lock
 #   k8s-server closure brings a new k3s or kernel minor, or a PostgreSQL or
 #   systemd major. The smoke job checks k8s-server after the deploy.
 # - openwrt: all inputs daily, since OpenWrt republishes package indexes and
-#   the pinned hashes drift; auto-merged once the firmware builds. When the
+#   the pinned hashes drift; auto-merged once the firmware builds. It runs late
+#   in the UTC day: OpenWrt republishes around 02:30 and the ImageBuilder flake
+#   commits the matching hashes some time after, usually by 15:00. When the
 #   ImageBuilder drops a pinned release, update.sh moves to the next patch
 #   release and the PR waits for review. Merging deploys nothing, router
 #   deploys stay manual.
@@ -15,6 +17,7 @@ on:
   schedule:
     - cron: "17 0 * * 0,2-6"
     - cron: "17 0 * * 1"
+    - cron: "17 22 * * *"
   workflow_dispatch:
     inputs:
       flake:
@@ -56,10 +59,12 @@ jobs:
               infra/*) include="$infra_all" ;;
               openwrt/*) include="$openwrt_all" ;;
             esac
+          elif [ "$SCHEDULE" = "17 22 * * *" ]; then
+            include="$openwrt_all"
           elif [ "$SCHEDULE" = "17 0 * * 1" ]; then
-            include="$ws_all,$infra_all,$openwrt_all"
+            include="$ws_all,$infra_all"
           else
-            include="$ws_fast,$openwrt_all"
+            include="$ws_fast"
           fi
           echo "matrix={\"include\":[$include]}" >> "$GITHUB_OUTPUT"
 
