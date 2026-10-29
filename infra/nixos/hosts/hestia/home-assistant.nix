@@ -11,6 +11,8 @@ let
     query = ''
       {
         stop(id: "HSL:2215221") {
+          lat
+          lon
           stoptimesWithoutPatterns(numberOfDepartures: 12) {
             serviceDay
             scheduledDeparture
@@ -20,9 +22,19 @@ let
             realtimeState
             headsign
             trip {
+              gtfsId
               route {
                 gtfsId
                 shortName
+              }
+              pattern {
+                vehiclePositions {
+                  lat
+                  lon
+                  trip {
+                    gtfsId
+                  }
+                }
               }
             }
           }
@@ -238,7 +250,11 @@ in
                    | list | count }}
               '';
               json_attributes_path = "$.data.stop";
-              json_attributes = [ "stoptimesWithoutPatterns" ];
+              json_attributes = [
+                "lat"
+                "lon"
+                "stoptimesWithoutPatterns"
+              ];
             }
           ];
         }
