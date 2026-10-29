@@ -41,6 +41,8 @@ let
           "git lfs *"
           "git -C * fetch *"
           "git -C * pull *"
+          # Codex needs to write ~/.codex and applies its own sandbox.
+          "codex *"
         ];
       };
     }

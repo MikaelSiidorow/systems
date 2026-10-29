@@ -16,6 +16,7 @@ Coordinate the work in the main chat. Make routine decisions and fixes autonomou
 ## Review and fix
 
 - Run independent Codex and Claude code reviews using their built-in review skills or commands, with subagents or CLI processes as appropriate. Reviewers review; the coordinator applies fixes.
+- From Claude Code, run `codex review` as a standalone command, with no pipes, redirects or `&&`, and capture output with background execution. Otherwise it runs inside Claude's sandbox and cannot start.
 - Verify findings, fix real issues, run relevant checks, and commit fixes before reviewing again. Choose amend, fixup/autosquash, or new commits as appropriate. Preserve other authors' work; rewrite published history only when authorized, using force-with-lease.
 - Stop early when clean. Allow at most **three regular review-and-fix rounds**, including fixes prompted by CI or Bugbot. Waiting consumes no rounds. If the last round produces fixes, report that they have not been re-reviewed.
 - Run **one Claude security review** of the final candidate. If it finds real issues, fix and commit them, then run **one focused confirmation**. Use any remaining regular rounds for code affected by security fixes.
