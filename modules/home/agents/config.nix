@@ -59,6 +59,41 @@ let
     merge(.[0]; .[1])
   '';
 
+  # Merged into ~/.codex/config.toml on switch: these keys win, the rest of
+  # the file keeps its layout. Codex defaults to auto mode.
+  codexSettings = (pkgs.formats.toml { }).generate "codex-config-baseline.toml" {
+    approval_policy = "on-request";
+    default_permissions = ":workspace";
+    approvals_reviewer = "auto_review";
+    model_reasoning_effort = "medium";
+    plan_mode_reasoning_effort = "xhigh";
+    web_search = "live";
+  };
+
+  codexPython = pkgs.python3.withPackages (ps: [ ps.tomlkit ]);
+
+  codexSettingsMerge = pkgs.writeText "codex-config-merge.py" ''
+    import sys
+
+    import tomlkit
+
+
+    def merge(dst, src):
+        for key, value in src.items():
+            if isinstance(value, dict) and isinstance(dst.get(key), dict):
+                merge(dst[key], value)
+            else:
+                dst[key] = value
+
+
+    config, baseline = sys.argv[1:]
+    with open(config) as f:
+        doc = tomlkit.parse(f.read())
+    with open(baseline) as f:
+        merge(doc, tomlkit.parse(f.read()))
+    sys.stdout.write(tomlkit.dumps(doc))
+  '';
+
   skillTargets = {
     codex = name: ".codex/skills/${name}";
     claude-code = name: ".claude/skills/${name}";
@@ -163,5 +198,21 @@ in
       fi
       rm -f "$claude_merged"
     fi
+  '';
+
+  home.activation.codexSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    codex_config="$HOME/.codex/config.toml"
+    codex_merged="$(mktemp)"
+    if [ -L "$codex_config" ]; then
+      warnEcho "Skipping Codex config merge: $codex_config is a symlink"
+    elif [ ! -e "$codex_config" ]; then
+      run mkdir -p "$HOME/.codex"
+      run install -m 600 ${codexSettings} "$codex_config"
+    elif ! ${codexPython.interpreter} ${codexSettingsMerge} "$codex_config" ${codexSettings} >"$codex_merged"; then
+      warnEcho "Skipping Codex config merge: $codex_config is not valid TOML"
+    elif ! cmp -s "$codex_merged" "$codex_config"; then
+      run install -m 600 "$codex_merged" "$codex_config"
+    fi
+    rm -f "$codex_merged"
   '';
 }
