@@ -16,4 +16,6 @@ Defaults across projects. Project files extend these. Prefer caution over speed.
 
 **Commits.** Conventional commits, all lowercase with an optional scope (e.g. `feat: add parser`, `fix(hestia): ...`), body included.
 
+**Force pushes.** Force-pushing with `--force-with-lease` to my own feature branches and PRs after a rebase, restack or fixup is pre-approved. Never default, release, or other people's branches.
+
 **Development environments.** Use the project's declared tool environment. If it is already loaded, run commands normally; otherwise prefer `direnv exec <project-root> <command>`, `nix develop [flake] -c <command>`, or `mise exec -- <command>` as appropriate. Use the project's documented flake path when it lives outside the checkout.
