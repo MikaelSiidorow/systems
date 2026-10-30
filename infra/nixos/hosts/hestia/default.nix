@@ -11,6 +11,9 @@ let
   hestiaSwitch = pkgs.writeShellApplication {
     name = "hestia-switch";
     text = ''
+      if [ $# -eq 0 ]; then
+        git -C /etc/nixos-repo pull --ff-only
+      fi
       flake=''${1:-/etc/nixos-repo/infra}
       system=$(nix build --no-link --print-out-paths "$flake#nixosConfigurations.hestia.config.system.build.toplevel")
       start=$(date +%s)
