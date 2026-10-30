@@ -13,7 +13,7 @@ let
         stop(id: "HSL:2215221") {
           lat
           lon
-          stoptimesWithoutPatterns(numberOfDepartures: 12) {
+          stoptimesWithoutPatterns(numberOfDepartures: 6) {
             serviceDay
             scheduledDeparture
             realtimeDeparture
@@ -27,10 +27,18 @@ let
                 gtfsId
                 shortName
               }
+              # HSL leaves coordinates out here; the bus's GPS comes from MQTT.
               pattern {
+                stops {
+                  gtfsId
+                }
                 vehiclePositions {
-                  lat
-                  lon
+                  vehicleId
+                  stopRelationship {
+                    stop {
+                      gtfsId
+                    }
+                  }
                   trip {
                     gtfsId
                   }
@@ -226,7 +234,53 @@ in
             }
           ];
         }
+        {
+          # GPS of the bus serving the next departure, from HSL's feed bridged
+          # into the local broker below. Updates about once a second.
+          triggers = [
+            {
+              trigger = "mqtt";
+              topic = "/hfp/v2/journey/ongoing/vp/bus/#";
+            }
+          ];
+          variables.next_vehicle = ''
+            {% set next = (state_attr('sensor.pohjantori_departures', 'stoptimesWithoutPatterns') or [])
+               | selectattr('trip.route.shortName', 'in', ['111', '113']) | first | default(none) %}
+            {{ next.trip.pattern.vehiclePositions | selectattr('trip.gtfsId', 'eq', next.trip.gtfsId)
+               | map(attribute='vehicleId') | first | default(none) if next else none }}
+          '';
+          conditions = [
+            {
+              condition = "template";
+              value_template = ''
+                {{ trigger.payload_json.VP.lat is number
+                   and next_vehicle == 'HSL:%d/%d' % (trigger.payload_json.VP.oper, trigger.payload_json.VP.veh) }}
+              '';
+            }
+          ];
+          sensor = [
+            {
+              name = "Next bus distance";
+              unique_id = "next_bus_distance";
+              default_entity_id = "sensor.next_bus_distance";
+              icon = "mdi:bus-marker";
+              unit_of_measurement = "km";
+              state = ''
+                {{ distance(trigger.payload_json.VP.lat, trigger.payload_json.VP.long,
+                            state_attr('sensor.pohjantori_departures', 'lat'),
+                            state_attr('sensor.pohjantori_departures', 'lon')) | round(2) }}
+              '';
+              attributes = {
+                vehicle = "{{ next_vehicle }}";
+                updated = "{{ trigger.payload_json.VP.tsi }}";
+              };
+            }
+          ];
+        }
       ];
+
+      # Next bus distance changes every second while a bus is near.
+      recorder.exclude.entities = [ "sensor.next_bus_distance" ];
 
       rest = [
         {
@@ -261,6 +315,29 @@ in
       ];
     };
 
+  };
+
+  # HSL's live vehicle positions, limited to the directions of 111 and 113
+  # that serve Pohjantori.
+  services.mosquitto.bridges.hsl = {
+    addresses = [
+      {
+        address = "mqtt.hsl.fi";
+        port = 8883;
+      }
+    ];
+    topics = [
+      "/hfp/v2/journey/ongoing/vp/bus/+/+/2111/1/# in 0"
+      "/hfp/v2/journey/ongoing/vp/bus/+/+/2113/2/# in 0"
+    ];
+    settings = {
+      bridge_cafile = "/etc/ssl/certs/ca-certificates.crt";
+      # mqtt.hsl.fi rejects MQTT 5 connections.
+      bridge_protocol_version = "mqttv311";
+      try_private = false;
+      cleansession = true;
+      notifications = false;
+    };
   };
 
   # Home Assistant resolves !secret values from secrets.yaml next to its
