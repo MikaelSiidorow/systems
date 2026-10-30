@@ -401,7 +401,7 @@
           fi
         ''
       ]
-      # Darwin lacks systemd-user cgroups, so cmux pty close leaves orphaned
+      # Darwin lacks systemd-user cgroups, so terminal pty close leaves orphaned
       # dev-server children. Trap EXIT to SIGTERM our pgroup. Daemons
       # (docker -d, brew services) live in their own pgroup, safe.
       ++ (lib.optionals isDarwin [

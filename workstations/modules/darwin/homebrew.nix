@@ -24,7 +24,6 @@
     # Chrome, 1Password, Teams and drata-agent come from the enterprise MDM.
     casks = [
       # "ghostty" # Now installed and updated by the enterprise MDM.
-      "cmux"
       "postico"
       # "raycast" # Now installed and updated by the enterprise MDM.
     ];

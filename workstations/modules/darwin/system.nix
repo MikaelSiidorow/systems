@@ -46,9 +46,6 @@ in
           app = "/Applications/Ghostty.app";
         }
         {
-          app = "/Applications/cmux.app";
-        }
-        {
           app = "${t3code.desktop}/Applications/${t3code.unwrapped.appName}.app";
         }
         {
