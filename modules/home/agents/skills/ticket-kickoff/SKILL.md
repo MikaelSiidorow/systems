@@ -1,6 +1,6 @@
 ---
 name: ticket-kickoff
-description: Start work from a Linear or GitHub ticket. Use when the user says "work on ENG-123", "pick up #45" or gives a ticket link to implement.
+description: 'Start work from a Linear or GitHub ticket. Use when the user says "work on ENG-123", "pick up #45" or gives a ticket link to implement.'
 ---
 
 # Ticket kickoff

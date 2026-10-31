@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review someone else's PR for me: is it safe to merge, does it do what it claims, what needs my eyes. Use when the user says "review this PR" or "review #123".
+description: 'Review someone else''s PR for me: is it safe to merge, does it do what it claims, what needs my eyes. Use when the user says "review this PR" or "review #123".'
 ---
 
 # Review PR
