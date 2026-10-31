@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
         - name: powersync
-          image: docker.io/journeyapps/powersync-service:1.26.1
+          image: docker.io/journeyapps/powersync-service:1.27.2
           args: [start, -r, unified]
           env:
             - name: POWERSYNC_CONFIG_PATH
@@ -134,7 +134,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: compact
-              image: docker.io/journeyapps/powersync-service:1.26.1
+              image: docker.io/journeyapps/powersync-service:1.27.2
               args: [compact]
               env:
                 - name: POWERSYNC_CONFIG_PATH
