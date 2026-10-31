@@ -131,22 +131,6 @@ let
         "claude-code"
       ];
     };
-
-    ponytail = {
-      source = ./skills/ponytail;
-      agents = [
-        "codex"
-        "claude-code"
-        "opencode"
-      ];
-    };
-
-    # cursor-agent reads ~/.claude/skills, so the claude-code target covers it.
-    # Disabled while Cursor CLI is unused (see packages.nix).
-    # cursor-agent = {
-    #   source = ./skills/cursor-agent;
-    #   agents = [ "claude-code" ];
-    # };
   };
 
   mkSkillFiles =
@@ -174,12 +158,6 @@ in
         # must be executable; nix store copies are read-only without this.
         executable = true;
       };
-      # Disabled while Cursor CLI is unused (see packages.nix).
-      # ".cursor/statusline.sh" = {
-      #   source = ./cursor/statusline.sh;
-      #   # Cursor CLI spawns this without a shell, so it must be executable.
-      #   executable = true;
-      # };
     };
 
     activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

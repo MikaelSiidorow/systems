@@ -25,10 +25,6 @@ in
   ++ lib.optionals (!isDarwin) [
     inputs.opencode-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
-  # Cursor CLI (not in claude-code-nix-style flake; from unstable). Disabled
-  # while unused; restore together with the cursor-agent skill and statusline
-  # in config.nix, and re-add pkgs-unstable to the args above.
-  # ++ lib.optionals isDarwin [ pkgs-unstable.cursor-cli ];
 
   programs.zsh.shellAliases = {
     c = "claude";
