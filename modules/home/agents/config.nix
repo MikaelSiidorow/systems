@@ -124,6 +124,14 @@ let
       ];
     };
 
+    file-pr = {
+      source = ./skills/file-pr;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     grilling = {
       source = ./skills/grilling;
       agents = [
