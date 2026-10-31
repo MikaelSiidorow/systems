@@ -163,58 +163,60 @@ let
   skillFiles = lib.foldl' (acc: fileSet: acc // fileSet) { } (lib.mapAttrsToList mkSkillFiles skills);
 in
 {
-  home.file = skillFiles // {
-    ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
-    ".codex/AGENTS.md".source = ./shared/AGENTS.md;
-    ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
-    ".claude/statusline-command.sh" = {
-      source = ./claude-code/statusline-command.sh;
-      # Claude Code runs the statusLine command through a shell, so the file
-      # must be executable; nix store copies are read-only without this.
-      executable = true;
+  home = {
+    file = skillFiles // {
+      ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
+      ".codex/AGENTS.md".source = ./shared/AGENTS.md;
+      ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
+      ".claude/statusline-command.sh" = {
+        source = ./claude-code/statusline-command.sh;
+        # Claude Code runs the statusLine command through a shell, so the file
+        # must be executable; nix store copies are read-only without this.
+        executable = true;
+      };
+      # Disabled while Cursor CLI is unused (see packages.nix).
+      # ".cursor/statusline.sh" = {
+      #   source = ./cursor/statusline.sh;
+      #   # Cursor CLI spawns this without a shell, so it must be executable.
+      #   executable = true;
+      # };
     };
-    # Disabled while Cursor CLI is unused (see packages.nix).
-    # ".cursor/statusline.sh" = {
-    #   source = ./cursor/statusline.sh;
-    #   # Cursor CLI spawns this without a shell, so it must be executable.
-    #   executable = true;
-    # };
-  };
 
-  home.activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    claude_settings="$HOME/.claude/settings.json"
-    if [ -L "$claude_settings" ]; then
-      warnEcho "Skipping Claude settings merge: $claude_settings is a symlink"
-    elif [ -e "$claude_settings" ] && ! ${lib.getExe pkgs.jq} -e . "$claude_settings" >/dev/null 2>&1; then
-      warnEcho "Skipping Claude settings merge: $claude_settings is not valid JSON"
-    else
-      claude_merged="$(mktemp)"
-      if [ -e "$claude_settings" ]; then
-        ${lib.getExe pkgs.jq} -s -f ${claudeSettingsMerge} "$claude_settings" ${claudeSettings} >"$claude_merged"
+    activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      claude_settings="$HOME/.claude/settings.json"
+      if [ -L "$claude_settings" ]; then
+        warnEcho "Skipping Claude settings merge: $claude_settings is a symlink"
+      elif [ -e "$claude_settings" ] && ! ${lib.getExe pkgs.jq} -e . "$claude_settings" >/dev/null 2>&1; then
+        warnEcho "Skipping Claude settings merge: $claude_settings is not valid JSON"
       else
-        ${lib.getExe pkgs.jq} . ${claudeSettings} >"$claude_merged"
+        claude_merged="$(mktemp)"
+        if [ -e "$claude_settings" ]; then
+          ${lib.getExe pkgs.jq} -s -f ${claudeSettingsMerge} "$claude_settings" ${claudeSettings} >"$claude_merged"
+        else
+          ${lib.getExe pkgs.jq} . ${claudeSettings} >"$claude_merged"
+        fi
+        if ! cmp -s "$claude_merged" "$claude_settings"; then
+          run mkdir -p "$HOME/.claude"
+          run install -m 600 "$claude_merged" "$claude_settings"
+        fi
+        rm -f "$claude_merged"
       fi
-      if ! cmp -s "$claude_merged" "$claude_settings"; then
-        run mkdir -p "$HOME/.claude"
-        run install -m 600 "$claude_merged" "$claude_settings"
-      fi
-      rm -f "$claude_merged"
-    fi
-  '';
+    '';
 
-  home.activation.codexSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    codex_config="$HOME/.codex/config.toml"
-    codex_merged="$(mktemp)"
-    if [ -L "$codex_config" ]; then
-      warnEcho "Skipping Codex config merge: $codex_config is a symlink"
-    elif [ ! -e "$codex_config" ]; then
-      run mkdir -p "$HOME/.codex"
-      run install -m 600 ${codexSettings} "$codex_config"
-    elif ! ${codexPython.interpreter} ${codexSettingsMerge} "$codex_config" ${codexSettings} >"$codex_merged"; then
-      warnEcho "Skipping Codex config merge: $codex_config is not valid TOML"
-    elif ! cmp -s "$codex_merged" "$codex_config"; then
-      run install -m 600 "$codex_merged" "$codex_config"
-    fi
-    rm -f "$codex_merged"
-  '';
+    activation.codexSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      codex_config="$HOME/.codex/config.toml"
+      codex_merged="$(mktemp)"
+      if [ -L "$codex_config" ]; then
+        warnEcho "Skipping Codex config merge: $codex_config is a symlink"
+      elif [ ! -e "$codex_config" ]; then
+        run mkdir -p "$HOME/.codex"
+        run install -m 600 ${codexSettings} "$codex_config"
+      elif ! ${codexPython.interpreter} ${codexSettingsMerge} "$codex_config" ${codexSettings} >"$codex_merged"; then
+        warnEcho "Skipping Codex config merge: $codex_config is not valid TOML"
+      elif ! cmp -s "$codex_merged" "$codex_config"; then
+        run install -m 600 "$codex_merged" "$codex_config"
+      fi
+      rm -f "$codex_merged"
+    '';
+  };
 }
