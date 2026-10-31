@@ -148,6 +148,14 @@ let
       ];
     };
 
+    file-ticket = {
+      source = ./skills/file-ticket;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     full-send = {
       source = ./skills/full-send;
       agents = [
@@ -198,6 +206,14 @@ let
 
     review-rounds = {
       source = ./skills/review-rounds;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    ticket-kickoff = {
+      source = ./skills/ticket-kickoff;
       agents = [
         "codex"
         "claude-code"
