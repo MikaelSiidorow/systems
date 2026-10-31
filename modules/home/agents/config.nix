@@ -116,8 +116,16 @@ let
     lib.unique (map (agent: skillTargets.${agent} name) effectiveAgents);
 
   skills = {
-    babysit = {
-      source = ./skills/babysit;
+    address-review = {
+      source = ./skills/address-review;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    babysit-pr = {
+      source = ./skills/babysit-pr;
       agents = [
         "codex"
         "claude-code"
@@ -132,8 +140,40 @@ let
       ];
     };
 
+    full-send = {
+      source = ./skills/full-send;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    full-stop = {
+      source = ./skills/full-stop;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     grilling = {
       source = ./skills/grilling;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    rebase = {
+      source = ./skills/rebase;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    review-rounds = {
+      source = ./skills/review-rounds;
       agents = [
         "codex"
         "claude-code"
