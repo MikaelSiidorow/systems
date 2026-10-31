@@ -58,4 +58,13 @@ in
     requires_openai_auth = false
   '';
   programs.zsh.shellAliases.codex-hestia = "codex";
+
+  # The nixpkgs Ghostty GApps wrapper exports GIO_EXTRA_MODULES (Nix dconf) and
+  # its shells inherit it, so Pop's glib programs (flatpak, fwupdmgr) fail to
+  # load the module. Ghostty's `env` option cannot unset inherited variables.
+  programs.zsh.envExtra = ''
+    if [[ -n $GHOSTTY_RESOURCES_DIR && $SHLVL -eq 1 ]]; then
+      unset GIO_EXTRA_MODULES
+    fi
+  '';
 }
