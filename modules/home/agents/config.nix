@@ -180,6 +180,14 @@ let
       ];
     };
 
+    modernize = {
+      source = ./skills/modernize;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     morning-prs = {
       source = ./skills/morning-prs;
       agents = [
@@ -206,6 +214,14 @@ let
 
     review-rounds = {
       source = ./skills/review-rounds;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    takeover = {
+      source = ./skills/takeover;
       agents = [
         "codex"
         "claude-code"
