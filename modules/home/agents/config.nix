@@ -132,6 +132,14 @@ let
       ];
     };
 
+    dependency-prs = {
+      source = ./skills/dependency-prs;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     file-pr = {
       source = ./skills/file-pr;
       agents = [
