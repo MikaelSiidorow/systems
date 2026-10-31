@@ -164,8 +164,24 @@ let
       ];
     };
 
+    morning-prs = {
+      source = ./skills/morning-prs;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     rebase = {
       source = ./skills/rebase;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    review-pr = {
+      source = ./skills/review-pr;
       agents = [
         "codex"
         "claude-code"
