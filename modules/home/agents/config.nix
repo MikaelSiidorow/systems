@@ -132,8 +132,8 @@ let
       ];
     };
 
-    humanizer = {
-      source = ./skills/humanizer;
+    unslop = {
+      source = ./skills/unslop;
       agents = [
         "codex"
         "claude-code"
