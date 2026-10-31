@@ -124,8 +124,24 @@ let
       ];
     };
 
+    grilling = {
+      source = ./skills/grilling;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     humanizer = {
       source = ./skills/humanizer;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
+    writing-for-agents = {
+      source = ./skills/writing-for-agents;
       agents = [
         "codex"
         "claude-code"
