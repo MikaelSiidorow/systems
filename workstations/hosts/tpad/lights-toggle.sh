@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+
 # Toggle a dark mode: minimum backlight, software dimming and no mute/mic-mute/
 # power LEDs. Mute state itself is untouched. Everything resets on reboot, so
 # the saved backlight lives in the runtime dir.
