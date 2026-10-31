@@ -21,6 +21,10 @@ Open the description with the problem, from the user's original ask, then the fi
 >
 > ✅ My "new worktree" default was ignored when starting threads on existing worktrees. Now the preference always applies.
 
+Include concrete verification evidence: the checks run and their results, with before/after output or screenshots when available. Use a small diagram, tree or diff sketch when it makes the change easier to understand.
+
+Assess reversibility and blast radius. Explain material deployment risks, affected consumers and rollback limits in the repo's format; a separate risk section is optional. Scale the detail to the change.
+
 Run the title and body through `unslop`, then check them for secrets and private details.
 
 Open it as a draft: `gh pr create --draft`. If GraphQL is rate-limited, use `gh api repos/<owner>/<repo>/pulls -f title=… -f head=… -f base=… -F draft=true -F body=@<file>`. Report the URL and any template section only the user can fill.

@@ -204,6 +204,14 @@ let
       ];
     };
 
+    retro = {
+      source = ./skills/retro;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     review-pr = {
       source = ./skills/review-pr;
       agents = [
