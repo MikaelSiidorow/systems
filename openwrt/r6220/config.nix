@@ -46,6 +46,8 @@ in
       "uhttpd"
     ];
 
+    imports = [ ../drop-tcp-ip-options.nix ];
+
     uci.settings = {
       # dnsmasq remains the LAN resolver but sends every upstream query to the
       # local Mullvad DoH proxy. The canary domains discourage automatic

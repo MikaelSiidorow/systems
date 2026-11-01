@@ -27,6 +27,8 @@
       "uhttpd"
     ];
 
+    imports = [ ../drop-tcp-ip-options.nix ];
+
     uci.settings = {
       # Captured after configuring the Archer as a LAN-to-LAN access point.
       network = {
