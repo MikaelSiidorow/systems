@@ -27,6 +27,9 @@
       "uhttpd"
     ];
 
+    # firewall4 includes /etc/nftables.d/*.nft inside its inet fw4 table.
+    etc."nftables.d/20-drop-tcp-ip-options.nft".text = builtins.readFile ../drop-tcp-ip-options.nft;
+
     uci.settings = {
       # Captured after configuring the Archer as a LAN-to-LAN access point.
       network = {

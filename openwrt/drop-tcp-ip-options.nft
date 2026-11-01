@@ -1,0 +1,9 @@
+# CVE-2026-98432: the IPv4 TCP SYN path frees IP options while a child socket
+# still uses them. OpenWrt 25.12.6 ships kernel 6.12.112; the fix is 6.12.113.
+# Legitimate TCP does not carry IP options, so drop them before conntrack and
+# routing (Red Hat's RHSB-2026-016 mitigation). Remove once the routers run a
+# fixed kernel.
+chain drop_tcp_ip_options {
+	type filter hook prerouting priority -310; policy accept;
+	ip protocol tcp ip hdrlength > 5 counter drop
+}

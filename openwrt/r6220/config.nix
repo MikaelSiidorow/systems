@@ -46,6 +46,9 @@ in
       "uhttpd"
     ];
 
+    # firewall4 includes /etc/nftables.d/*.nft inside its inet fw4 table.
+    etc."nftables.d/20-drop-tcp-ip-options.nft".text = builtins.readFile ../drop-tcp-ip-options.nft;
+
     uci.settings = {
       # dnsmasq remains the LAN resolver but sends every upstream query to the
       # local Mullvad DoH proxy. The canary domains discourage automatic
