@@ -23,7 +23,7 @@ Start from what the author says they verified. List the gaps as tests you can ru
 
 ## Draft
 
-A handful of inline comments at most, blockers and shoulds with file:line, each starting with 🤖. Post them as a **pending** review: `gh api repos/{owner}/{repo}/pulls/<n>/reviews` with `commit_id` (head SHA) and `comments`, but no `body` and no `event`. If the user already has a pending review there, keep the comments in chat.
+A handful of inline comments at most, blockers and shoulds with file:line, each starting with 🤖. Run them through `unslop`. Post them as a **pending** review: `gh api repos/{owner}/{repo}/pulls/<n>/reviews` with `commit_id` (head SHA) and `comments`, but no `body` and no `event`. If the user already has a pending review there, keep the comments in chat.
 
 ## Report in chat
 
