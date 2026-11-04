@@ -38,8 +38,8 @@ Metrics, logs, and traces for the K3s cluster, deployed as ArgoCD Applications w
 
 Claude Code and Codex on Hestia send traces, events and metrics to Hestia's local Alloy queue at `127.0.0.1:4318`, which forwards them to the cluster Alloy like the host's own data. A host opts in by setting `agents.telemetry` (`modules/home/agents/config.nix`), which adds the OTel settings to both agents' config baselines. Other hosts leave it unset; on the Mac that keeps work sessions off the cluster.
 
-- **Claude Code**: spans per prompt (`claude_code.interaction`), LLM request and tool call, with Bash commands, MCP and skill names, and branch and SHA on commits. Events carry `session.id` and `prompt.id`; everything carries `host.name` and the repository (`vcs.repository.name`). Prompt text and tool output are not exported.
-- **Codex**: `codex.*` log events and traces, tagged with the host as `environment`. Tool results include up to 2 KiB of output.
+- **Claude Code**: spans per prompt (`claude_code.interaction`), LLM request and tool call, with file paths and branch and SHA on commits. Tool events carry each tool's input (`OTEL_LOG_TOOL_DETAILS`): Bash commands, MCP arguments, Write contents and Edit strings, each cut at 512 characters, plus the error text when a tool fails. Events carry `session.id` and `prompt.id`; everything carries `host.name` and the repository (`vcs.repository.name`). Prompt text and successful tool output are not exported.
+- **Codex**: `codex.*` log events, traces and metrics, tagged with the host as `environment`. Tool events carry the tool call, including shell commands, and a snippet of its output. Prompt text is not exported.
 
 Find a session in Tempo with TraceQL, e.g. `{ resource.host.name = "hestia" && name = "claude_code.tool" }`, or in Loki by `session_id`.
 
