@@ -253,8 +253,9 @@ spec:
                   - 100.64.0.0/10
                   - fd7a:115c:a1e0::/48
           # Viewers, anonymous ones included, can send the datasource proxy any
-          # GET (Loki's /ingester/shutdown stops Loki) and any Tempo write.
-          # Only GETs to the query APIs get through.
+          # GET (Loki's /ingester/shutdown stops Loki) and any Tempo write, and
+          # the resource route any Prometheus POST (/-/quit stops Prometheus).
+          # Only reads get through.
           - apiVersion: traefik.io/v1alpha1
             kind: IngressRoute
             metadata:
@@ -270,6 +271,18 @@ spec:
                     PathPrefix(`/api/datasources/proxy/`) &&
                     !(Method(`GET`) &&
                     PathRegexp(`^/api/datasources/proxy/uid/(tempo/api|loki/loki/api/v1|prometheus/api/v1)/`))
+                  middlewares:
+                    - name: deny-all
+                  services:
+                    - name: kube-prometheus-stack-grafana
+                      port: 80
+                - kind: Rule
+                  # The Prometheus datasource POSTs its queries (httpMethod).
+                  match: >-
+                    Host(`grafana.miksu.app`) &&
+                    PathRegexp(`^/api/datasources/uid/[^/]+/resources/`) &&
+                    !Method(`GET`) &&
+                    !PathRegexp(`^/api/datasources/uid/prometheus/resources/api/v1/(query|query_range|query_exemplars|series|labels|label/[^/]+/values|metadata)$`)
                   middlewares:
                     - name: deny-all
                   services:
