@@ -2,7 +2,11 @@
 {
   # Ships host metrics and the journal over OTLP to the cluster Alloy on
   # k8s-server (tailnet only), so a freeze is visible from outside the host.
+  # Local agents send OTLP to 127.0.0.1:4318 and share the same disk queue.
   services.alloy.enable = true;
+
+  # otelcol.storage.file is public preview.
+  services.alloy.extraFlags = [ "--stability.level=public-preview" ];
 
   environment.etc."alloy/config.alloy".text = ''
     prometheus.exporter.unix "host" {
@@ -70,17 +74,50 @@
       }
     }
 
+    otelcol.receiver.otlp "agents" {
+      http {
+        endpoint = "127.0.0.1:4318"
+      }
+
+      output {
+        metrics = [otelcol.processor.batch.default.input]
+        logs    = [otelcol.processor.batch.default.input]
+        traces  = [otelcol.processor.batch.default.input]
+      }
+    }
+
     otelcol.processor.batch "default" {
       output {
         metrics = [otelcol.exporter.otlphttp.cluster.input]
         logs    = [otelcol.exporter.otlphttp.cluster.input]
+        traces  = [otelcol.exporter.otlphttp.cluster.input]
       }
     }
 
-    // WireGuard encrypts the tailnet hop.
+    // Lives under /var/lib/alloy/data-alloy; compaction gives the disk back
+    // once a backlog drains.
+    otelcol.storage.file "queue" {
+      compaction {
+        on_start   = true
+        on_rebound = true
+      }
+    }
+
+    // WireGuard encrypts the tailnet hop. During a cluster or tailnet outage
+    // batches wait on disk and retry for a day instead of being dropped after
+    // the default 5 minutes. A day of 15 s scrapes alone is ~5800 batches.
     otelcol.exporter.otlphttp "cluster" {
       client {
         endpoint = "http://100.64.0.1:4318"
+      }
+
+      sending_queue {
+        queue_size = 20000
+        storage    = otelcol.storage.file.queue.handler
+      }
+
+      retry_on_failure {
+        max_elapsed_time = "24h"
       }
     }
   '';
