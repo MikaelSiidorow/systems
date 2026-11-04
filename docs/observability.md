@@ -32,15 +32,16 @@ Metrics, logs, and traces for the K3s cluster, deployed as ArgoCD Applications w
 - **Logs**: Alloy DaemonSet tails pod stdout/stderr, parses JSON, and pushes to Loki
 - **Traces**: Refinery app sends OTLP to Alloy, which forwards to Tempo
 - **OTLP logs**: Refinery app sends OTLP logs to Alloy, which converts and pushes to Loki
+- **Hestia**: the host's Alloy (`infra/nixos/hosts/hestia/monitoring.nix`) ships host metrics and the journal, and accepts OTLP from local agents on `127.0.0.1:4318`. It forwards everything over the tailnet to the cluster Alloy (`100.64.0.1:4318`) through an on-disk queue that retries for 24h, so a cluster or tailnet outage delays data instead of dropping it
 
 ## Components
 
 | Component             | Namespace    | Chart                                        | Version | Purpose                                                                        |
 | --------------------- | ------------ | -------------------------------------------- | ------- | ------------------------------------------------------------------------------ |
-| kube-prometheus-stack | `monitoring` | `prometheus-community/kube-prometheus-stack` | 82.4.3  | Prometheus, Grafana, Alertmanager, node-exporter, kube-state-metrics, operator |
-| Loki                  | `loki`       | `grafana/loki`                               | 6.53.0  | Log aggregation (single-binary, filesystem storage)                            |
-| Tempo                 | `tempo`      | `grafana/tempo`                              | 1.24.4  | Distributed tracing (single-binary, filesystem storage)                        |
-| Alloy                 | `alloy`      | `grafana/alloy`                              | 1.6.0   | DaemonSet log collector + OTLP receiver/forwarder                              |
+| kube-prometheus-stack | `monitoring` | `prometheus-community/kube-prometheus-stack` | 92.0.0  | Prometheus, Grafana, Alertmanager, node-exporter, kube-state-metrics, operator |
+| Loki                  | `loki`       | `grafana-community/loki`                     | 18.13.8 | Log aggregation (single-binary, filesystem storage)                            |
+| Tempo                 | `tempo`      | `grafana-community/tempo`                    | 3.1.0   | Distributed tracing (single-binary, filesystem storage)                        |
+| Alloy                 | `alloy`      | `grafana/alloy`                              | 1.13.0  | DaemonSet log collector + OTLP receiver/forwarder                              |
 
 ## Access
 
