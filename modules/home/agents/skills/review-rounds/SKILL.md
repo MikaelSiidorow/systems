@@ -1,6 +1,6 @@
 ---
 name: review-rounds
-description: Codex and Claude review loop on a branch, fixing until clean. Use when the user says "review rounds" or "review this branch".
+description: Codex review loop on a branch, fixing until clean. Use when the user says "review rounds" or "review this branch".
 ---
 
 # Review rounds
@@ -17,9 +17,11 @@ Done when base, HEAD, intent and check results are written down.
 
 ## 2. Reviewers
 
-- Each round runs an independent Codex review and an independent Claude review, using their built-in review commands or skills. In T3, start each round with a fresh `delegate_task` (`role: "review"`, new `clientRequestId`), with models picked through `orchestrator_capabilities`.
+- Each round runs one Codex review, using its built-in review command. In T3, start each round with a fresh `delegate_task` (`role: "review"`, new `clientRequestId`), with the model picked through `orchestrator_capabilities`.
+- A change is **high-risk** when it touches security, auth, secrets, data loss or concurrency.
+- Escalate to a Claude review only when a blocker or should stays open on a high-risk change, or Codex cannot run (quota, outage) in an early round of one. Record why in the ledger. Otherwise, when Codex cannot run, stop and report the blocker.
 - From Claude Code, run `codex review` as a standalone command, with no pipes, redirects or `&&`, in the background; otherwise it runs inside Claude's sandbox and cannot start.
-- The native commands own their review prompt and output format. Pass what each accepts: `codex review --base <merge-base>` with intent, out of scope and, from round 2, the open ledger ids as its custom instructions; Claude's review command with the PR or branch as its target. When a delegated child runs a review, tell it to stay review-only and return the command's findings unedited.
+- The native commands own their review prompt and output format. Pass what each accepts: `codex review --base <merge-base>` with intent, out of scope and, from round 2, the open ledger ids as its custom instructions; an escalated Claude review gets the PR or branch as its target. When a delegated child runs a review, tell it to stay review-only and return the command's findings unedited.
 - Translate every reviewer's findings into the ledger and grade them yourself. **blocker** = the intended case is wrong. **should** = a real bug callers will hit, within the intent. **nit** = everything else, including other paths, rare cases, small perf and extra compatibility. A reviewer approves when its run reports no blocker or should under your grading.
 - A timeout, error or missing reply is a failed reviewer, not an approval: rerun it or report it.
 
@@ -35,19 +37,19 @@ Keep a **ledger**: id, severity (your grade), outcome (`fixed` / `disagree` / `d
 
 ## 4. Rounds
 
-- Budget: **3 rounds**, or what the user sets. Up to **5** only while a blocker or should stays open on security, auth, data loss or concurrency.
+- Budget: **3 rounds**, or what the user sets. Up to **5** only while a blocker or should stays open on a high-risk change.
 - Every round reviews the current candidate from the same merge-base. Match each new finding to an existing ledger id where it is the same issue; mark an old id `resolved` when no reviewer raises it again and your fix covers it.
 - Start another round only while budget remains and a blocker or should is open, or behaviour code changed since the last approval. A round that returns only nits ends the loop.
-- Last, run **one Claude security review** of the final candidate. If it finds real issues, fix them and run one focused confirmation.
+- Run **one Claude security review** of the final candidate only when the change touches security, auth, secrets or data loss. If it finds real issues, fix them and run one focused confirmation.
 
-Done when both reviewers approve the current behaviour diff with no open blocker or should, or the budget runs out (that is not approval). An item disputed twice goes to the user with both sides in two lines each.
+Done when every reviewer that ran approves the current behaviour diff with no open blocker or should, or the budget runs out (that is not approval). An item disputed twice goes to the user with both sides in two lines each.
 
 ## 5. Report
 
 Leave pushing to the caller. Report:
 
 - each reviewer that actually ran, with its model, and any that failed or were skipped
-- rounds used, security pass result
+- rounds used, any Claude escalation and why, security pass result or skipped
 - fixed and declined findings with one-line reasons
 - diff size before and after
 - fixes made after the last review, marked unreviewed

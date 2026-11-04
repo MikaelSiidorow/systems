@@ -19,7 +19,7 @@ Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex. 
 | [ticket-kickoff](skills/ticket-kickoff/SKILL.md) | Start work from a Linear or GitHub ticket |
 | [file-pr](skills/file-pr/SKILL.md) | Open a draft PR in the repo's format |
 | [file-ticket](skills/file-ticket/SKILL.md) | File a ticket in the right team, project and queue |
-| [review-rounds](skills/review-rounds/SKILL.md) | Codex and Claude review a branch in a loop, fixing until clean |
+| [review-rounds](skills/review-rounds/SKILL.md) | Codex reviews a branch in a loop, fixing until clean; Claude only on escalation |
 | [review-pr](skills/review-pr/SKILL.md) | Review someone else's PR: is it safe to merge, what needs my eyes |
 | [address-review](skills/address-review/SKILL.md) | Fix, reply to and resolve review comments and failing checks |
 | [babysit-pr](skills/babysit-pr/SKILL.md) | Watch a PR through review bots and CI, fixing until green |
