@@ -12,6 +12,8 @@ Defaults across projects. Project files, templates and repo skills extend these 
 
 **Define done, then verify.** Turn vague asks into checks you can run. Multi-step work: plan up front, then step → verify → step → verify.
 
+**Keep secrets off command lines.** Read them from files or env vars, or pipe them in; never pass them as arguments. Commands are exported to telemetry as written, with no masking.
+
 **Keep tool output bounded.** Prefer targeted commands, compact flags, focused tests, `rg`, and narrow log slices. Preserve full errors when diagnosing failures.
 
 **Be brief.** Lead with the answer or action; report results, not the tool calls behind them. Keep warnings that change the advice. Code, errors, commits: normal English. When I ask for your opinion, lead with your pick and why; if alternatives are genuinely close, compare them briefly. PR descriptions, review replies and tickets: lead with the why, skip the change inventory.

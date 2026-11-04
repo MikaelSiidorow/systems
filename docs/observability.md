@@ -34,6 +34,19 @@ Metrics, logs, and traces for the K3s cluster, deployed as ArgoCD Applications w
 - **OTLP logs**: Refinery app sends OTLP logs to Alloy, which converts and pushes to Loki
 - **Hestia**: the host's Alloy (`infra/nixos/hosts/hestia/monitoring.nix`) ships host metrics and the journal, and accepts OTLP from local agents on `127.0.0.1:4318`. It forwards everything over the tailnet to the cluster Alloy (`100.64.0.1:4318`) through an on-disk queue that retries for 24h, so a cluster or tailnet outage delays data instead of dropping it
 
+## Agent telemetry
+
+Claude Code and Codex on Hestia send traces, events and metrics to Hestia's local Alloy queue at `127.0.0.1:4318`, which forwards them to the cluster Alloy like the host's own data. A host opts in by setting `agents.telemetry` (`modules/home/agents/config.nix`), which adds the OTel settings to both agents' config baselines. Other hosts leave it unset; on the Mac that keeps work sessions off the cluster.
+
+- **Claude Code**: spans per prompt (`claude_code.interaction`), LLM request and tool call, with Bash commands, MCP and skill names, and branch and SHA on commits. Events carry `session.id` and `prompt.id`; everything carries `host.name` and the repository (`vcs.repository.name`). Prompt text and tool output are not exported.
+- **Codex**: `codex.*` log events and traces, tagged with the host as `environment`. Tool results include up to 2 KiB of output.
+
+Find a session in Tempo with TraceQL, e.g. `{ resource.host.name = "hestia" && name = "claude_code.tool" }`, or in Loki by `session_id`.
+
+To turn telemetry off on a host, unset the option and delete the `OTEL_*` and `CLAUDE_CODE_*TELEMETRY*` keys from `~/.claude/settings.json` and the `[otel]` table from `~/.codex/config.toml`. The settings merge only adds keys.
+
+For the Mac, the plan is a local collector (a launchd OTLP receiver writing to disk or a local store) with `agents.telemetry.endpoint` pointed at `http://127.0.0.1:4318`.
+
 ## Components
 
 | Component             | Namespace    | Chart                                        | Version | Purpose                                                                        |
