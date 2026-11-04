@@ -105,15 +105,18 @@
 
     // WireGuard encrypts the tailnet hop. During a cluster or tailnet outage
     // batches wait on disk and retry for a day instead of being dropped after
-    // the default 5 minutes. A day of 15 s scrapes alone is ~5800 batches.
+    // the default 5 minutes. Host data alone is ~45k batches (~800 MB) a day,
+    // so the queue holds about two. One consumer drains in order, since
+    // Prometheus rejects out-of-order samples.
     otelcol.exporter.otlphttp "cluster" {
       client {
         endpoint = "http://100.64.0.1:4318"
       }
 
       sending_queue {
-        queue_size = 20000
-        storage    = otelcol.storage.file.queue.handler
+        queue_size    = 100000
+        num_consumers = 1
+        storage       = otelcol.storage.file.queue.handler
       }
 
       retry_on_failure {
