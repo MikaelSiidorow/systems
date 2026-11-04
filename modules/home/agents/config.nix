@@ -11,6 +11,7 @@
 }:
 let
   inherit (config.agents) telemetry;
+  grafanaHost = "grafana.miksu.app";
 
   # Merged into ~/.claude/settings.json on switch: these keys win, lists are
   # unioned, removals need a manual edit. Public repo: keep work settings local.
@@ -61,6 +62,10 @@ let
           # Codex needs to write ~/.codex and applies its own sandbox.
           "codex *"
         ];
+      }
+      // lib.optionalAttrs (telemetry != null) {
+        # Agents read their own telemetry through Grafana's datasource proxy.
+        network.allowedDomains = [ grafanaHost ];
       };
     }
   );
@@ -90,6 +95,20 @@ let
       web_search = "live";
     }
     // lib.optionalAttrs (telemetry != null) {
+      # :workspace blocks the network; this profile only adds Grafana. Domain
+      # allowlists need the network proxy feature.
+      default_permissions = "workspace-grafana";
+      permissions.workspace-grafana = {
+        extends = ":workspace";
+        network = {
+          enabled = true;
+          domains.${grafanaHost} = "allow";
+          # Grafana resolves to a tailnet IP, which the proxy refuses without
+          # this; other private hosts stay blocked.
+          allow_local_binding = true;
+        };
+      };
+      features.network_proxy = true;
       otel =
         let
           otlp = path: {
