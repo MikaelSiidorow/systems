@@ -5,7 +5,7 @@ Home-manager module that installs Claude Code, Codex and (on Linux) OpenCode, an
 ## What gets installed
 
 - [`shared/AGENTS.md`](shared/AGENTS.md): my global instructions, linked to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`.
-- [`config.nix`](config.nix): settings baselines merged into `~/.claude/settings.json` and `~/.codex/config.toml` on every switch. Baseline keys win and the rest of each file is kept, so local and work-only settings survive. It also registers each skill and the agents it targets.
+- [`config.nix`](config.nix): settings baselines merged into `~/.claude/settings.json` and `~/.codex/config.toml` on every switch. Baseline keys win and the rest of each file is kept, so local and work-only settings survive. It also registers each skill and the agents it targets, and adds OTel export on hosts that set `agents.telemetry` (see [docs/observability.md](../../../docs/observability.md#agent-telemetry)).
 - [`codex/rules/`](codex/rules/): Codex command rules, such as pre-approved read-only `gh` calls.
 - [`claude-code/statusline-command.sh`](claude-code/statusline-command.sh): the Claude Code status line.
 - [`packages.nix`](packages.nix): the CLIs themselves (from the `claude-code-nix`, `codex-cli-nix` and `opencode-nix` flake inputs) and shell aliases such as `c`, `cco` and `crew`.

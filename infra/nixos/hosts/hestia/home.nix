@@ -31,6 +31,13 @@
       ];
       home.stateVersion = "26.05";
 
+      # Agent traces and events go to the local Alloy queue, which forwards
+      # them to the cluster with the host metrics.
+      agents.telemetry = {
+        endpoint = "http://127.0.0.1:4318";
+        host = "hestia";
+      };
+
       # Persistent sessions for SSH: `tmux new -A -s main` reattaches.
       programs.tmux = {
         enable = true;

@@ -4,11 +4,14 @@
 # Nix. This module only links files we intentionally author in this repo,
 # plus a Claude settings baseline.
 {
+  config,
   lib,
   pkgs,
   ...
 }:
 let
+  inherit (config.agents) telemetry;
+
   # Merged into ~/.claude/settings.json on switch: these keys win, lists are
   # unioned, removals need a manual edit. Public repo: keep work settings local.
   claudeSettings = pkgs.writeText "claude-settings-baseline.json" (
@@ -30,6 +33,20 @@ let
         GIT_CONFIG_COUNT = "1";
         GIT_CONFIG_KEY_0 = "core.fsmonitor";
         GIT_CONFIG_VALUE_0 = "false";
+      }
+      // lib.optionalAttrs (telemetry != null) {
+        CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+        # Spans per prompt, LLM request and tool call; Bash children get TRACEPARENT.
+        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
+        OTEL_TRACES_EXPORTER = "otlp";
+        OTEL_LOGS_EXPORTER = "otlp";
+        OTEL_METRICS_EXPORTER = "otlp";
+        OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
+        OTEL_EXPORTER_OTLP_ENDPOINT = telemetry.endpoint;
+        # Bash commands, MCP and skill names, and branch and SHA on commits.
+        OTEL_LOG_TOOL_DETAILS = "1";
+        OTEL_METRICS_INCLUDE_REPOSITORY = "true";
+        OTEL_RESOURCE_ATTRIBUTES = "host.name=${telemetry.host}";
       };
       sandbox = {
         # Go CLIs (gh, terraform, kubectl) need trustd to verify TLS on macOS.
@@ -63,14 +80,33 @@ let
 
   # Merged into ~/.codex/config.toml on switch: these keys win, the rest of
   # the file keeps its layout. Codex defaults to auto mode.
-  codexSettings = (pkgs.formats.toml { }).generate "codex-config-baseline.toml" {
-    approval_policy = "on-request";
-    default_permissions = ":workspace";
-    approvals_reviewer = "auto_review";
-    model_reasoning_effort = "medium";
-    plan_mode_reasoning_effort = "xhigh";
-    web_search = "live";
-  };
+  codexSettings = (pkgs.formats.toml { }).generate "codex-config-baseline.toml" (
+    {
+      approval_policy = "on-request";
+      default_permissions = ":workspace";
+      approvals_reviewer = "auto_review";
+      model_reasoning_effort = "medium";
+      plan_mode_reasoning_effort = "xhigh";
+      web_search = "live";
+    }
+    // lib.optionalAttrs (telemetry != null) {
+      otel =
+        let
+          otlp = path: {
+            otlp-http = {
+              endpoint = "${telemetry.endpoint}${path}";
+              protocol = "binary";
+            };
+          };
+        in
+        {
+          environment = telemetry.host;
+          exporter = otlp "/v1/logs";
+          trace_exporter = otlp "/v1/traces";
+          metrics_exporter = otlp "/v1/metrics";
+        };
+    }
+  );
 
   codexPython = pkgs.python3.withPackages (ps: [ ps.tomlkit ]);
 
@@ -275,7 +311,27 @@ let
   skillFiles = lib.foldl' (acc: fileSet: acc // fileSet) { } (lib.mapAttrsToList mkSkillFiles skills);
 in
 {
-  home = {
+  # Off when unset. The settings merge never removes keys, so turning it off
+  # later needs a manual edit of both files.
+  options.agents.telemetry = lib.mkOption {
+    type = lib.types.nullOr (
+      lib.types.submodule {
+        options = {
+          endpoint = lib.mkOption {
+            type = lib.types.str;
+            description = "OTLP/HTTP base URL, without the /v1/<signal> path.";
+          };
+          host = lib.mkOption {
+            type = lib.types.str;
+            description = "Machine name tagged on every signal.";
+          };
+        };
+      }
+    );
+    default = null;
+  };
+
+  config.home = {
     file = skillFiles // {
       ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
       ".codex/AGENTS.md".source = ./shared/AGENTS.md;
