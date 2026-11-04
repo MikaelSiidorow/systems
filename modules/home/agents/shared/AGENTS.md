@@ -12,7 +12,7 @@ Defaults across projects. Project files, templates and repo skills extend these 
 
 **Define done, then verify.** Turn vague asks into checks you can run. Multi-step work: plan up front, then step → verify → step → verify.
 
-**Keep secrets out of tool calls.** Read them from files or env vars, or pipe them in; never pass them as arguments, write them into files, or put them in tool or MCP inputs. Tool inputs are exported to telemetry as written, with no masking.
+**Keep secrets out of tool calls.** Pass them by reference (an env var, a file path or a pipe), so commands, file writes and MCP inputs carry only the reference. Tool inputs reach telemetry unmasked.
 
 **Keep tool output bounded.** Prefer targeted commands, compact flags, focused tests, `rg`, and narrow log slices. Preserve full errors when diagnosing failures.
 
