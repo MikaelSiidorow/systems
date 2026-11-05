@@ -63,6 +63,32 @@ let
         }
         sed -Ei "s/$analytics/AnalyticsService.layerTest/" "$cli"
 
+        # Link the Claude and Codex sessions T3 starts to its turn spans; proposed
+        # upstream in https://github.com/pingdotgg/t3code/discussions/31694.
+        # Without otlpTracesUrl nothing is exported, so these apply everywhere.
+        # map$9, orElseSucceed, currentSpan and annotateCurrentSpan are bundler
+        # names too; the guard fails the build when an anchor moves.
+        patchOnce() {
+          [ "$(grep -oE "$1" "$cli" | wc -l)" = 1 ] || {
+            echo "t3code: expected one '$1' in $cli" >&2
+            exit 1
+          }
+          sed -Ei "s|$1|$2|" "$cli"
+        }
+        traceparent='`00-''${span.traceId}-''${span.spanId}-''${span.sampled ? "01" : "00"}`'
+        # One trace per provider turn instead of one per server lifetime.
+        patchOnce 'start: fn\("ProviderTurnStartService\.start"\)\(function\* \(input\) \{' \
+          'start: fn("ProviderTurnStartService.start", { root: true })(function* (input) { yield* annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId, "orchestration_v2.run_id": input.runId });'
+        # Claude keeps an explicit TRACEPARENT in its env. T3 reuses one Claude
+        # process per thread, which reads it once, so later turns in a thread
+        # stay under the first turn's span.
+        patchOnce 'const \{ mcpServers, \.\.\.queryOptions \} = input\.options;' \
+          'const { mcpServers, ...untracedQueryOptions } = input.options; const queryOptions = yield* currentSpan.pipe(map$9((span) => ({ ...untracedQueryOptions, env: { ...(untracedQueryOptions.env ?? process.env), TRACEPARENT: '"$traceparent"' } })), orElseSucceed(() => untracedQueryOptions));'
+        # Codex app-server parents a request to the JSON-RPC envelope's trace.
+        patchOnce 'const request = fn\("CodexAppServerProtocol\.request"\)\(function\* \(method, payload\) \{' \
+          'const offerOutgoingUntraced = offerOutgoing; const request = fn("CodexAppServerProtocol.request")(function* (method, payload) { const trace = method === "turn/start" \|\| method === "turn/steer" ? yield* currentSpan.pipe(map$9((span) => ({ traceparent: '"$traceparent"' })), orElseSucceed(() => void 0)) : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });'
+        ${pkgs.lib.getExe runtimePkgs.nodejs_24} --check "$cli"
+
         rm "$out/bin/t3" "$desktop/bin/t3code-desktop" \
           "$desktop/libexec/t3code/apps/server"
         ln -s "$out/libexec/t3code/apps/server" "$desktop/libexec/t3code/apps/server"
