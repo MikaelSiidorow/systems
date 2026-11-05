@@ -1,11 +1,11 @@
 ---
 name: agent-traces
-description: Query Claude Code and Codex telemetry from Hestia in Tempo, Loki and Prometheus. Use when asked what a past or current agent session ran, which tool calls failed or were slow, or what sessions cost.
+description: Query Claude Code and Codex telemetry from Hestia and tpad in Tempo, Loki and Prometheus. Use when asked what a past or current agent session ran, which tool calls failed or were slow, or what sessions cost.
 ---
 
 # Agent traces
 
-Claude Code and Codex on Hestia export telemetry to the cluster. Read it with `q`, the script beside this file, which goes through Grafana's read-only datasource proxy. Shell state does not carry between commands, so start every command with the PATH line:
+Claude Code and Codex on Hestia and tpad export telemetry to the cluster; tpad's arrives late when it has been offline. Every signal carries its host: `resources_host_name` in Loki after `| json`, `resource.host.name` in Tempo, `host_name` on Claude metrics. Read it with `q`, the script beside this file, which goes through Grafana's read-only datasource proxy. Shell state does not carry between commands, so start every command with the PATH line:
 
 ```sh
 export PATH="$HOME/.claude/skills/agent-traces:$HOME/.codex/skills/agent-traces:$PATH"
