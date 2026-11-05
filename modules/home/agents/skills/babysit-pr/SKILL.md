@@ -17,7 +17,7 @@ Own the PR until it is green. Make routine calls yourself; bring the user only a
 
 One watcher per PR, picked by your tools:
 
-- **`watch_pull_request` is in your tool list** (T3 Code; it may be deferred, so load it first): handle the current checks and comments with `address-review`, call `watch_pull_request`, and end the turn. The watch is your only wait. It wakes you when a check fails, required checks pass, someone comments or reviews, or the branch conflicts, so a rerun or a single workflow is waited on the same way: end the turn.
+- **`watch_pull_request` is in your tool list** (T3 Code; it may be deferred, so load it first): handle the current checks and comments with `address-review`, call `watch_pull_request`, and end the turn with no message. The watch is your only wait. It wakes you when a check fails, required checks pass, someone comments or reviews, or the branch conflicts, so a rerun or a single workflow is waited on the same way: end the turn.
 - **No `watch_pull_request`**: `gh pr checks --watch` waits for checks only. Once it returns, poll `gh pr view --json reviews,comments,mergeStateStatus` every 2 minutes until the expected review bots have posted on the current HEAD. Stop with an honest status after 30 minutes unless the user set another deadline.
 
 Only the thread that owns the PR watches it; a delegated child task hands the PR back to its parent instead.
