@@ -12,7 +12,7 @@ Home-manager module that installs Claude Code, Codex and (on Linux) OpenCode, an
 
 ## Skills
 
-Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex. Most cover my PR workflow end to end, from picking up a ticket to merging.
+Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex; `agent-traces` only on Linux (Hestia, tpad). Most cover my PR workflow end to end, from picking up a ticket to merging.
 
 | Skill | What it does |
 | --- | --- |
@@ -34,6 +34,7 @@ Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex. 
 | [retro](skills/retro/SKILL.md) | Find improvements to the agent setup from a session or review |
 | [unslop](skills/unslop/SKILL.md) | Cut AI tells and padding from prose |
 | [writing-for-agents](skills/writing-for-agents/SKILL.md) | Guidance for writing skills and AGENTS.md files |
+| [agent-traces](skills/agent-traces/SKILL.md) | Query my agents' own traces, events and cost from Grafana (Linux hosts only) |
 
 Some skills are adapted from other people's work under MIT: `file-pr`, `full-send`, `full-stop`, `modernize` and `takeover` from Theo Browne; `grilling`, `retro` and `writing-for-agents` from Matt Pocock; `unslop` from Siqi Chen. Each one keeps its `LICENSE`. The rest are mine.
 
