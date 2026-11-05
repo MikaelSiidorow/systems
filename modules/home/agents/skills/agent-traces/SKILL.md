@@ -1,6 +1,6 @@
 ---
 name: agent-traces
-description: Query Claude Code and Codex telemetry from Hestia in Tempo and Loki. Use when asked what a past or current agent session ran, which tool calls failed or were slow, or what sessions cost.
+description: Query Claude Code and Codex telemetry from Hestia in Tempo, Loki and Prometheus. Use when asked what a past or current agent session ran, which tool calls failed or were slow, or what sessions cost.
 ---
 
 # Agent traces
@@ -22,7 +22,7 @@ Pipe the output through `jq` and print only the fields the question needs. If `q
 - **Claude Code events** in Loki: `{job="claude-code"}`, one JSON line per event. Parse with `| json`; attributes become `attributes_<name>` with dots as underscores (`attributes_session_id`, `attributes_event_name`, `attributes_vcs_repository_name`). `q events` strips the prefix. Events: `user_prompt` (prompt text redacted), `tool_result` (`tool_name`, `tool_input`, `success`, `duration_ms`, `error`), `api_request` (`model`, `cost_usd`, `*_tokens`), `api_error`.
 - **Claude Code spans** in Tempo: one trace per prompt, rooted at `claude_code.interaction`. `claude_code.tool` carries `tool_name` and, for Bash, `full_command`; its child `claude_code.tool.execution` carries `success` and `error`. Span status stays unset on failure. Every span has `span.session.id` and, in a repo, `span.vcs.repository.name`.
 - **Codex events** in Loki: `{job=~"codex.*"}`, same JSON shape. Only `codex exec` (`job="codex_exec"`) sends the full set: `codex.user_prompt`, `codex.tool_result` (`tool_name`, `arguments`, `output`, `duration_ms`), `codex.sse_event`. Interactive Codex (`codex-app-server`) sends only `codex.api_request`. A command that runs and fails still reports `success=true` (only failures before launch set `success=false`); the exit code is in `output` (`Process exited with code N`), which `q events` parses into `exit`. Codex spans are internal plumbing; use the events.
-- **Metrics**: no agent series reach Prometheus yet. Take tokens and cost from Loki.
+- **Metrics** in Prometheus: `claude_code_{token_usage_tokens,cost_usage_USD,session_count,active_time_seconds}_total`, labelled `host_name`, `model`, `session_id`, `type` (token kind) and `vcs_repository_name`; `codex_*` carry `model` but no host or session. Agents export about once a minute and only while a value changes, and a series idle over 5 minutes restarts from zero, so instant queries and short windows return little: use `max_over_time` over a window. That sums each session's peak counter, so it is approximate: it includes usage from before the window and, across a restart, keeps only the larger segment. For exact or per-session totals, use Loki.
 - **Lag and retention**: data lands seconds after the fact, and an `interaction` span only when its prompt ends, so use Loki for the prompt in flight. Retention is 7 days.
 
 ## Recipes
@@ -63,6 +63,15 @@ q loki /loki/api/v1/query query='sum by (attributes_model) (sum_over_time({job="
   | jq -r '.data.result[] | [.metric.attributes_model, .value[1]] | @tsv'
 q loki /loki/api/v1/query query='topk(10, sum by (attributes_session_id, attributes_vcs_repository_name) (sum_over_time({job="claude-code"} |= "api_request" | json | attributes_event_name="api_request" | unwrap attributes_cost_usd [7d])))' \
   | jq -r '.data.result[] | [.metric.attributes_session_id, .metric.attributes_vcs_repository_name, .value[1]] | @tsv'
+```
+
+Approximate tokens and cost of sessions active in a window, by model or host (Codex: `sum by (model, token_type) (max_over_time(codex_turn_token_usage_sum[7d]))`):
+
+```sh
+q prometheus /api/v1/query query='sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total[1d]))' \
+  | jq -r '.data.result[] | [.metric.model, .metric.type, .value[1]] | @tsv'
+q prometheus /api/v1/query query='sum by (host_name, model) (max_over_time(claude_code_cost_usage_USD_total[7d]))' \
+  | jq -r '.data.result[] | [.metric.host_name, .metric.model, .value[1]] | @tsv'
 ```
 
 Codex sessions, then one session's timeline (`q events` adds `exit`, the command's exit code):
