@@ -3,10 +3,29 @@
   inputs,
   codex ? inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex,
   claude ? inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default,
+  # Local OTLP/HTTP endpoint for T3's own spans. Unset keeps T3's OTel SDK off.
+  # Metrics and logs stay off either way, and the relay's tracing stays off
+  # while T3CODE_TELEMETRY_ENABLED is false. Never set it on the work Mac.
+  otlpTracesUrl ? null,
 }:
 let
   upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.t3code;
   runtimePkgs = inputs.llm-agents.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+  telemetryFlags = pkgs.lib.escapeShellArgs (
+    [
+      "--set"
+      "T3CODE_TELEMETRY_ENABLED"
+      "false"
+      "--set"
+      "T3CODE_OTEL_SDK_DISABLED"
+      (if otlpTracesUrl == null then "true" else "false")
+    ]
+    ++ pkgs.lib.optionals (otlpTracesUrl != null) [
+      "--set"
+      "T3CODE_OTLP_TRACES_URL"
+      otlpTracesUrl
+    ]
+  );
   # Patch cached build outputs so Electron and the web/server bundle need no rebuild.
   patched =
     pkgs.runCommand "t3code-${upstream.version}"
@@ -49,12 +68,10 @@ let
         ln -s "$out/libexec/t3code/apps/server" "$desktop/libexec/t3code/apps/server"
         makeWrapper ${pkgs.lib.getExe runtimePkgs.nodejs_24} "$out/bin/t3" \
           --add-flags "$out/libexec/t3code/apps/server/dist/bin.mjs" \
-          --set T3CODE_TELEMETRY_ENABLED false \
-          --set T3CODE_OTEL_SDK_DISABLED true
+          ${telemetryFlags}
         makeWrapper ${pkgs.lib.getExe runtimePkgs.electron_44} "$desktop/bin/t3code-desktop" \
           --add-flags "$desktop/libexec/t3code/apps/desktop" \
-          --set T3CODE_TELEMETRY_ENABLED false \
-          --set T3CODE_OTEL_SDK_DISABLED true \
+          ${telemetryFlags} \
           --inherit-argv0
       '';
   direnvWrapper =

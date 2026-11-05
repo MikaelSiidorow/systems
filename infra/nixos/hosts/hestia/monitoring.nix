@@ -82,7 +82,24 @@
       output {
         metrics = [otelcol.processor.batch.default.input]
         logs    = [otelcol.processor.batch.default.input]
-        traces  = [otelcol.processor.batch.default.input]
+        traces  = [otelcol.processor.filter.t3code.input]
+      }
+    }
+
+    // T3 traces everything (~88k spans/h, mostly sqlite, git and housekeeping;
+    // upstream t3code#28196). Keep only its turn spans, which Claude and Codex
+    // spans parent to. Other services pass untouched.
+    otelcol.processor.filter "t3code" {
+      error_mode = "ignore"
+
+      traces {
+        span = [
+          `resource.attributes["service.name"] == "t3code-server" and not IsMatch(name, "^((ProviderTurnStartService|RunExecutionService|ClaudeAdapterV2|ClaudeAgentSdkQueryRunner|CodexAdapterV2|orchestrationV2\\.dispatch)\\.|CodexAppServer)")`,
+        ]
+      }
+
+      output {
+        traces = [otelcol.processor.batch.default.input]
       }
     }
 

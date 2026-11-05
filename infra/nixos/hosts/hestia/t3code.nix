@@ -7,6 +7,8 @@
 let
   t3code = import ../../../../modules/t3code.nix {
     inherit pkgs inputs;
+    # Alloy keeps only the turn spans; see monitoring.nix.
+    otlpTracesUrl = "http://127.0.0.1:4318/v1/traces";
     # T3 runs both providers through this host's CLIProxyAPI.
     codex = import ../../../../modules/codex-proxy.nix {
       inherit pkgs;
