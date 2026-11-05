@@ -41,6 +41,8 @@ Claude Code and Codex on Hestia send traces, events and metrics to Hestia's loca
 - **Claude Code**: spans per prompt (`claude_code.interaction`), LLM request and tool call, with file paths and branch and SHA on commits. Tool events carry each tool's input (`OTEL_LOG_TOOL_DETAILS`): Bash commands, MCP arguments, Write contents and Edit strings, each cut at 512 characters, plus the error text when a tool fails. Events carry `session.id` and `prompt.id`; everything carries `host.name` and the repository (`vcs.repository.name`). Prompt text and successful tool output are not exported.
 - **Codex**: `codex.*` log events, traces and metrics, tagged with the host as `environment`. Tool events carry the tool call, including shell commands, and a snippet of its output. Prompt text is not exported.
 
+Both agents send delta metrics, which Prometheus cannot store. The cluster Alloy turns them cumulative with `otelcol.processor.deltatocumulative` before remote write, so it runs with `stabilityLevel: experimental`. A stream idle for 5 minutes is dropped and restarts from zero, which `rate()` and `increase()` treat as a counter reset.
+
 Find a session in Tempo with TraceQL, e.g. `{ resource.host.name = "hestia" && name = "claude_code.tool" }`, or in Loki by `session_id`.
 
 To turn telemetry off on a host, unset the option and delete the `OTEL_*` and `CLAUDE_CODE_*TELEMETRY*` keys from `~/.claude/settings.json` and the `[otel]` table from `~/.codex/config.toml`. The settings merge only adds keys.

@@ -14,6 +14,8 @@ spec:
     helm:
       values: |
         alloy:
+          # otelcol.processor.deltatocumulative is experimental in Alloy.
+          stabilityLevel: experimental
           configMap:
             content: |
               // Discover Kubernetes pods
@@ -94,7 +96,7 @@ spec:
                   endpoint = "0.0.0.0:4318"
                 }
                 output {
-                  metrics = [otelcol.exporter.prometheus.default.input]
+                  metrics = [otelcol.processor.deltatocumulative.default.input]
                   traces  = [otelcol.exporter.otlp.tempo.input]
                   logs    = [otelcol.exporter.loki.default.input]
                 }
@@ -115,7 +117,17 @@ spec:
                 forward_to = [loki.write.default.receiver]
               }
 
-              // Forward OTLP metrics (hestia host metrics) to Prometheus
+              // Claude Code and Codex send delta sums and histograms, which the
+              // Prometheus exporter drops. Cumulative metrics pass through as is.
+              otelcol.processor.deltatocumulative "default" {
+                // Bounds memory; idle streams also expire after 5m (max_stale).
+                max_streams = 10000
+                output {
+                  metrics = [otelcol.exporter.prometheus.default.input]
+                }
+              }
+
+              // Forward OTLP metrics (hestia host and agent metrics) to Prometheus
               otelcol.exporter.prometheus "default" {
                 forward_to = [prometheus.remote_write.default.receiver]
               }
