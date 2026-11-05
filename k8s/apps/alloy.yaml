@@ -96,9 +96,25 @@ spec:
                   endpoint = "0.0.0.0:4318"
                 }
                 output {
-                  metrics = [otelcol.processor.deltatocumulative.default.input]
+                  metrics = [otelcol.processor.transform.codex_host.input]
                   traces  = [otelcol.exporter.otlp.tempo.input]
                   logs    = [otelcol.exporter.loki.default.input]
+                }
+              }
+
+              // Codex puts the host only on the resource, which the Prometheus
+              // exporter drops, so Hestia's and tpad's series would collide.
+              // Claude Code already sets host.name on each point.
+              otelcol.processor.transform "codex_host" {
+                error_mode = "ignore"
+                metric_statements {
+                  context    = "datapoint"
+                  statements = [
+                    `set(attributes["host.name"], resource.attributes["host.name"]) where IsMatch(resource.attributes["service.name"], "^codex")`,
+                  ]
+                }
+                output {
+                  metrics = [otelcol.processor.deltatocumulative.default.input]
                 }
               }
 
