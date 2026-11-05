@@ -1,9 +1,51 @@
 #!/usr/bin/env bash
-# q <tempo|loki|prometheus> <api-path> [name=value ...]
-# GET a datasource API through Grafana's read-only proxy; each name=value is URL-encoded.
+# Read agent telemetry through Grafana's read-only datasource proxy.
+#   q spans '<traceql>' [since=24h] [limit=50]   one JSON line per matched span
+#   q events '<logql>' [since=24h] [limit=500]   one JSON line per Loki event, oldest first
+#   q <tempo|loki|prometheus> <api-path> [name=value ...]   raw GET, values URL-encoded
+# String values are cut at 300 characters.
 set -euo pipefail
-ds=$1 path=$2
-shift 2
-args=()
-for kv in "$@"; do args+=(--data-urlencode "$kv"); done
-exec curl -sSfG --max-time 30 "${GRAFANA_URL:-https://grafana.miksu.app}/api/datasources/proxy/uid/$ds$path" "${args[@]}"
+
+raw() {
+  local ds=$1 path=$2
+  shift 2
+  local args=()
+  for kv in "$@"; do args+=(--data-urlencode "$kv"); done
+  curl -sSfG --max-time 30 "${GRAFANA_URL:-https://grafana.miksu.app}/api/datasources/proxy/uid/$ds$path" "${args[@]}"
+}
+
+seconds() {
+  case $1 in
+    *d) echo $((${1%d} * 86400)) ;;
+    *h) echo $((${1%h} * 3600)) ;;
+    *m) echo $((${1%m} * 60)) ;;
+    *) echo "$1" ;;
+  esac
+}
+
+cut_strings='with_entries(.value |= if type == "string" and length > 300 then .[0:300] + "…" else . end)'
+
+case ${1:-} in
+  spans)
+    now=$(date +%s)
+    raw tempo /api/search q="$2" start=$((now - $(seconds "${3:-24h}"))) end="$now" limit="${4:-50}" spss=100 |
+      jq -c ".traces[] | .traceID as \$t | .spanSets[].spans[] | {
+          trace: \$t,
+          start: (.startTimeUnixNano | tonumber / 1e9 | todate),
+          dur_s: ((.durationNanos | tonumber) / 1e7 | round / 100),
+          name
+        } + ((.attributes // []) | map({(.key): (.value | to_entries[0].value)}) | add // {}) | $cut_strings"
+    ;;
+  events)
+    raw loki /loki/api/v1/query_range query="$2" since="${3:-24h}" limit="${4:-500}" direction=forward |
+      jq -c "[.data.result[] | .stream as \$s | .values[] | {ts: .[0]} + \$s] | sort_by(.ts)[] |
+          with_entries(select(.key | test(\"^(attributes_|traceid\$|service_name\$)\")) | .key |= sub(\"^attributes_\"; \"\"))
+          | del(.prompt, .prompt_text, .tool_parameters, .tool_input_size_bytes, .tool_result_size_bytes, .user_id, .user_account_id, .user_email, .terminal_type, .host_name, .vcs_owner_name, .vcs_provider_name, .vcs_repository_url_full)
+          | $cut_strings"
+    ;;
+  tempo | loki | prometheus) raw "$@" ;;
+  *)
+    sed -n '2,6p' "$0" >&2
+    exit 2
+    ;;
+esac
