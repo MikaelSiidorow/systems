@@ -30,7 +30,7 @@ case ${1:-} in
     now=$(date +%s)
     limit=${4:-50}
     raw tempo /api/search q="$2" start=$((now - $(seconds "${3:-24h}"))) end="$now" limit="$limit" spss=100 |
-      jq -c --argjson limit "$limit" "(if (.traces | length) >= \$limit then \"q: hit limit=\\(\$limit) traces; results are partial\\n\" | stderr else null end) as \$_ |
+      jq -c --argjson limit "$limit" "(if (.traces | length) >= \$limit or any(.traces[].spanSets[]?; .matched > (.spans | length)) then \"q: hit limit=\\(\$limit) traces or spss=100 spans per trace; results are partial\\n\" | stderr else null end) as \$_ |
         .traces[] | .traceID as \$t | .spanSets[].spans[] | {
           trace: \$t,
           start: (.startTimeUnixNano | tonumber / 1e9 | todate),
