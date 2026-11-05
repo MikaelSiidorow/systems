@@ -22,6 +22,7 @@
   ]
   ++ lib.optionals isDarwin [
     ./colima.nix
+    ./claude-proxy.nix
   ]
   ++ lib.optionals (!isDarwin) [
     ./applications-linux.nix

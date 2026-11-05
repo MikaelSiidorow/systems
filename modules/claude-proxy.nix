@@ -2,15 +2,18 @@
   pkgs,
   claude,
   name ? "claude-hestia",
+  baseUrl ? "https://hestia.vpn.miksu.app:8317",
+  # A local client key uses a custom header, preserving the claude.ai login.
+  clientKeyFile ? null,
 }:
 let
   # --settings overrides user/project env; exports carry routing to children.
-  settings = pkgs.writeText "claude-hestia-settings.json" (
+  settings = pkgs.writeText "${name}-settings.json" (
     builtins.toJSON {
       env = {
-        ANTHROPIC_BASE_URL = "https://hestia.vpn.miksu.app:8317";
-        # Access is restricted to the tailnet; the proxy has no client API keys.
-        ANTHROPIC_AUTH_TOKEN = "hestia-tailnet";
+        ANTHROPIC_BASE_URL = baseUrl;
+        # Hestia uses tailnet access; the local proxy uses a custom header.
+        ANTHROPIC_AUTH_TOKEN = if clientKeyFile == null then "hestia-tailnet" else "";
         # unset only clears the shell; settings could restore a saved key.
         ANTHROPIC_API_KEY = "";
         CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1";
@@ -25,8 +28,21 @@ pkgs.writeShellApplication {
     pkgs.coreutils
   ];
   text = ''
-    export ANTHROPIC_BASE_URL=https://hestia.vpn.miksu.app:8317
-    export ANTHROPIC_AUTH_TOKEN=hestia-tailnet
+    export ANTHROPIC_BASE_URL=${pkgs.lib.escapeShellArg baseUrl}
+    ${
+      if clientKeyFile == null then
+        "export ANTHROPIC_AUTH_TOKEN=hestia-tailnet"
+      else
+        ''
+          unset ANTHROPIC_AUTH_TOKEN
+          if [[ ! -s ${pkgs.lib.escapeShellArg clientKeyFile} ]]; then
+            echo 'Local proxy key missing; start cli-proxy-api-local first.' >&2
+            exit 1
+          fi
+          ANTHROPIC_CUSTOM_HEADERS="X-Api-Key: $(cat ${pkgs.lib.escapeShellArg clientKeyFile})"
+          export ANTHROPIC_CUSTOM_HEADERS
+        ''
+    }
     unset ANTHROPIC_API_KEY
     export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
     args=()
@@ -83,6 +99,15 @@ pkgs.writeShellApplication {
     else
       printf '%s' "$extra_settings" | jq --slurpfile proxy ${settings} '. * $proxy[0]' > "$merged_settings"
     fi
+    ${pkgs.lib.optionalString (clientKeyFile != null) ''
+      # Keep the client key out of the Nix store and override project routing.
+      local_settings=$(mktemp)
+      trap 'rm -f -- "$merged_settings" "$local_settings"' EXIT
+      jq --rawfile key ${pkgs.lib.escapeShellArg clientKeyFile} \
+        '.env.ANTHROPIC_CUSTOM_HEADERS = ("X-Api-Key: " + ($key | rtrimstr("\n")))' \
+        "$merged_settings" > "$local_settings"
+      mv "$local_settings" "$merged_settings"
+    ''}
 
     ${claude}/bin/claude --settings "$merged_settings" "''${args[@]}" <&0 &
     claude_pid=$!

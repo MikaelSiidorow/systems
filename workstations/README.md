@@ -177,7 +177,74 @@ gh ssh-key add ~/.ssh/git_signing_key.pub --type signing --title "Pop!_OS git si
 
 The GitHub signing key is account-level, so a new machine that decrypts the same signing key does not need a second GitHub registration.
 
-### Trial Claude Code through Hestia
+### Work Claude seats on the Mac
+
+[`home/claude-proxy.nix`](home/claude-proxy.nix) installs CLIProxyAPI from the
+pinned unstable package set and runs it as a Home Manager launchd agent. It
+listens only on `127.0.0.1:8317`; management access requires a separate key and
+is restricted to localhost. The control panel is disabled. It has no connection
+to the personal Hestia proxy.
+
+`server.commercial-mode` prevents the optional request-body capture middleware
+from being installed, including its error-body files and temporary body spools.
+Ordinary access and service error logs remain enabled. Setting only
+`request-log: false` would still allow request bodies to be saved on errors.
+
+Activate with `make switch` from `workstations/`, then sign both work seats into
+the proxy, running this once for each account:
+
+```bash
+cli-proxy-api-local -claude-login
+```
+
+Complete the browser login yourself. Use a private browser window or a separate
+browser profile for the second account, and select the correct work organization.
+Existing Claude Code logins are not imported into the proxy.
+
+Run `claude-local` in a terminal. In T3's local Mac environment, add a Claude
+provider with **Binary path**
+`/etc/profiles/per-user/mikael/bin/claude-local-direnv` and leave
+**CLAUDE_CONFIG_DIR** empty. The launcher loads the client key from a private
+runtime file into `ANTHROPIC_CUSTOM_HEADERS`; the key never enters Nix or T3's
+saved settings. It keeps the default Claude profile and its claude.ai login, so
+instructions, skills and settings remain shared with direct `claude`. Verify
+claude.ai connectors in the new provider before relying on them.
+
+New sessions use round-robin routing. Session affinity keeps a session on its
+seat for up to 24 hours without activity, with subagents inheriting the parent's
+seat. Quota and authentication failures can rebind it to another seat; transient
+failures retain the original binding. There is no usage-aware balancer.
+
+Configuration, the generated client and management keys, OAuth credentials and service logs live
+under `~/.local/state/cli-proxy-api/`, outside the Nix store. Never commit or share
+that directory. To check the service:
+
+```bash
+launchctl print gui/$(id -u)/org.nix-community.home.cli-proxy-api-local
+lsof -nP -iTCP:8317 -sTCP:LISTEN
+claude-local -p --tools '' -- 'Reply with exactly: proxy-ok'
+```
+
+To display both seats' quotas in T3, open **Settings → Providers → Usage providers
+→ Add hub**, choose the local Mac environment, and use
+`http://127.0.0.1:8317` as the URL. Copy the management key to your clipboard
+without displaying it:
+
+```bash
+tr -d '\n' < "$HOME/.local/state/cli-proxy-api/management-key" | pbcopy
+```
+
+Paste it into T3's **Management key** field, save, then open **Usage → Limits**.
+The key is generated once on service startup, stored with `0600` permissions,
+and reused across restarts. It is separate from the inference client key and
+stays out of Git and the Nix store. Existing seat logins do not need to be repeated.
+
+Keep the existing direct Claude provider as a fallback. The separate
+`~/.claude-work-b` login can also remain; the pooled provider uses the proxy's
+own logins. Subscription proxying is not a guarantee of permitted account
+pooling; see [Anthropic's guidance](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use).
+
+### Personal Claude Code through Hestia
 
 On Hestia, log in once:
 
@@ -193,7 +260,7 @@ After `make switch` on the ThinkPad, run `claude-hestia`. Plain `claude` keeps
 your existing setup. Smoke test:
 
 ```bash
-claude-hestia --model claude-sonnet-5 -p --tools '' 'Reply with exactly: proxy-ok'
+claude-hestia --model claude-sonnet-5 -p --tools '' -- 'Reply with exactly: proxy-ok'
 ```
 
 claude.ai connectors are disabled. Refresh over days remains untested;
