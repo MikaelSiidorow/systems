@@ -173,6 +173,8 @@ let
   skills = {
     agent-traces = {
       source = ./skills/agent-traces;
+      # Hestia and tpad reach Grafana; the Mac keeps work sessions off the cluster.
+      linuxOnly = true;
       agents = [
         "codex"
         "claude-code"
@@ -335,7 +337,13 @@ let
       }) (skillTargetPaths name skill.agents)
     );
 
-  skillFiles = lib.foldl' (acc: fileSet: acc // fileSet) { } (lib.mapAttrsToList mkSkillFiles skills);
+  installedSkills = lib.filterAttrs (
+    _: skill: pkgs.stdenv.isLinux || !(skill.linuxOnly or false)
+  ) skills;
+
+  skillFiles = lib.foldl' (acc: fileSet: acc // fileSet) { } (
+    lib.mapAttrsToList mkSkillFiles installedSkills
+  );
 in
 {
   # Off when unset. The settings merge never removes keys, so turning it off
