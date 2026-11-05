@@ -34,6 +34,7 @@ Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex. 
 | [retro](skills/retro/SKILL.md) | Find improvements to the agent setup from a session or review |
 | [unslop](skills/unslop/SKILL.md) | Cut AI tells and padding from prose |
 | [writing-for-agents](skills/writing-for-agents/SKILL.md) | Guidance for writing skills and AGENTS.md files |
+| [agent-traces](skills/agent-traces/SKILL.md) | Query my agents' own traces, events and cost from Grafana |
 
 Some skills are adapted from other people's work under MIT: `file-pr`, `full-send`, `full-stop`, `modernize` and `takeover` from Theo Browne; `grilling`, `retro` and `writing-for-agents` from Matt Pocock; `unslop` from Siqi Chen. Each one keeps its `LICENSE`. The rest are mine.
 

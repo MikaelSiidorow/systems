@@ -171,6 +171,14 @@ let
     lib.unique (map (agent: skillTargets.${agent} name) effectiveAgents);
 
   skills = {
+    agent-traces = {
+      source = ./skills/agent-traces;
+      agents = [
+        "codex"
+        "claude-code"
+      ];
+    };
+
     address-review = {
       source = ./skills/address-review;
       agents = [

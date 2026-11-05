@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# q <tempo|loki|prometheus> <api-path> [name=value ...]
+# GET a datasource API through Grafana's read-only proxy; each name=value is URL-encoded.
+set -euo pipefail
+ds=$1 path=$2
+shift 2
+args=()
+for kv in "$@"; do args+=(--data-urlencode "$kv"); done
+exec curl -sSfG --max-time 30 "${GRAFANA_URL:-https://grafana.miksu.app}/api/datasources/proxy/uid/$ds$path" "${args[@]}"
