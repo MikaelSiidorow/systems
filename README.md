@@ -4,7 +4,7 @@ Configuration for my machines, servers and the services on them: workstations, c
 
 ## Workstations and agents
 
-- [`workstations/`](workstations/README.md): nix-darwin for the work Mac and standalone home-manager for Pop!_OS, rebuilt by hand.
+- [`workstations/`](workstations/README.md): nix-darwin for the work Mac and standalone home-manager for Pop!\_OS, rebuilt by hand. The Mac runs a local CLIProxyAPI pool for its work Claude seats.
 - [`modules/home/core/`](modules/home/core/): shared shell (zsh, direnv, nix-index) and CLI tools.
 - [`modules/home/agents/`](modules/home/agents/README.md): Claude Code and Codex setup. It installs the CLIs, my global `AGENTS.md`, settings baselines that merge into the local config, and a set of skills for taking work from a ticket to a merged PR.
 
