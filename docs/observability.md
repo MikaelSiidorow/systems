@@ -60,6 +60,9 @@ For the Mac, the plan is a local collector (a launchd OTLP receiver writing to d
 
 - **Grafana**: https://grafana.miksu.app (VPN-only via Headscale MagicDNS)
 - **Credentials**: `admin` / password from `grafana-admin` K8s secret (managed by Terraform)
+- **Anonymous read**: anyone who can reach Grafana views it as a Viewer without logging in (`grafana.ini` `auth.anonymous` in `k8s/apps/kube-prometheus-stack.yaml`). Editing and admin still need the login. Agents query through the datasource proxy, `/api/datasources/proxy/uid/{tempo,loki,prometheus}/...`; the `grafana-datasource-proxy-guard` IngressRoute lets only reads through it and the datasource resource route, because they otherwise reach endpoints like Loki's `/ingester/shutdown` and Prometheus's `/-/quit`.
+- **Who reaches it**: personal devices (`mikael@`), CI (`tag:ci`) and Hestia, which carries `tag:telemetry-reader` next to `tag:home-subnet-router` so its agents can read their own telemetry. CI only needs 443 for the deploy smoke test, but anonymous read cannot be limited by source, so its runners can read telemetry too (including agent Bash commands in Loki). Accepted: they join the tailnet only for deploy jobs on main. Tags are set on the server: `sudo headscale nodes list`, then `sudo headscale nodes tag -i <id> -t tag:home-subnet-router -t tag:telemetry-reader` on k8s-server (list every tag the node keeps).
+- **Revoke**: drop the `tag:telemetry-reader` rule in `infra/nixos/hosts/k8s-server/headscale.nix`, or retag Hestia with only `tag:home-subnet-router`. Turning `auth.anonymous` off closes it for every client.
 
 ## Retention & Storage
 

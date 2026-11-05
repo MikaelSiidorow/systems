@@ -37,6 +37,11 @@ spec:
           grafana.ini:
             server:
               enable_gzip: false
+            # Tailnet clients read without logging in; agents use the
+            # datasource proxy. Editing still needs the admin login.
+            auth.anonymous:
+              enabled: true
+              org_role: Viewer
           resources:
             requests:
               memory: 256Mi
@@ -45,6 +50,8 @@ spec:
           additionalDataSources:
             - name: Loki
               type: loki
+              # Tempo's trace-to-logs link and agent queries refer to this UID.
+              uid: loki
               url: http://loki.loki.svc.cluster.local:3100
               access: proxy
               isDefault: false
@@ -245,6 +252,54 @@ spec:
                 sourceRange:
                   - 100.64.0.0/10
                   - fd7a:115c:a1e0::/48
+          # Viewers, anonymous ones included, can send the datasource proxy any
+          # GET (Loki's /ingester/shutdown stops Loki) and any Tempo write, and
+          # the resource route any Prometheus POST (/-/quit stops Prometheus).
+          # Only reads get through.
+          - apiVersion: traefik.io/v1alpha1
+            kind: IngressRoute
+            metadata:
+              name: grafana-datasource-proxy-guard
+              namespace: monitoring
+            spec:
+              entryPoints:
+                - websecure
+              routes:
+                - kind: Rule
+                  match: >-
+                    Host(`grafana.miksu.app`) &&
+                    PathPrefix(`/api/datasources/proxy/`) &&
+                    !(Method(`GET`) &&
+                    PathRegexp(`^/api/datasources/proxy/uid/(tempo/api|loki/loki/api/v1|prometheus/api/v1)/`))
+                  middlewares:
+                    - name: deny-all
+                  services:
+                    - name: kube-prometheus-stack-grafana
+                      port: 80
+                - kind: Rule
+                  # The Prometheus datasource POSTs its queries (httpMethod).
+                  match: >-
+                    Host(`grafana.miksu.app`) &&
+                    PathRegexp(`^/api/datasources/uid/[^/]+/resources/`) &&
+                    !Method(`GET`) &&
+                    !PathRegexp(`^/api/datasources/uid/prometheus/resources/api/v1/(query|query_range|query_exemplars|series|labels|label/[^/]+/values|metadata)$`)
+                  middlewares:
+                    - name: deny-all
+                  services:
+                    - name: kube-prometheus-stack-grafana
+                      port: 80
+              tls:
+                secretName: grafana-tls
+          - apiVersion: traefik.io/v1alpha1
+            kind: Middleware
+            metadata:
+              name: deny-all
+              namespace: monitoring
+            spec:
+              # Every client reaches Traefik from a non-loopback address.
+              ipAllowList:
+                sourceRange:
+                  - 127.0.0.1/32
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

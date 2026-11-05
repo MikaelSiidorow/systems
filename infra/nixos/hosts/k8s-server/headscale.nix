@@ -9,6 +9,7 @@ let
         "tag:home-subnet-router" = [ "mikael@" ];
         "tag:ci" = [ "mikael@" ];
         "tag:ci-deploy" = [ "mikael@" ];
+        "tag:telemetry-reader" = [ "mikael@" ];
       };
 
       autoApprovers.routes."192.168.67.0/24" = [ "tag:home-subnet-router" ];
@@ -35,6 +36,12 @@ let
           action = "accept";
           src = [ "tag:home-subnet-router" ];
           dst = [ "tag:infra:4318" ];
+        }
+        {
+          # Agents on Hestia read their own telemetry through Grafana.
+          action = "accept";
+          src = [ "tag:telemetry-reader" ];
+          dst = [ "tag:infra:443" ];
         }
         {
           # The deploy smoke test checks the tailnet-only Ingress hosts.
