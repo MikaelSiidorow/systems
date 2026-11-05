@@ -20,7 +20,7 @@ Pipe the output through `jq` and print only the fields the question needs. If `q
 - **This session**: `$CLAUDE_CODE_SESSION_ID` is the Claude `session_id`; `$CODEX_THREAD_ID` is the Codex `conversation_id`. `TRACEPARENT` is not set in agent shells.
 - **Claude Code events** in Loki: `{job="claude-code"}`, one JSON line per event. Parse with `| json`; attributes become `attributes_<name>` with dots as underscores (`attributes_session_id`, `attributes_event_name`, `attributes_vcs_repository_name`). `q events` strips the prefix. Events: `user_prompt` (prompt text redacted), `tool_result` (`tool_name`, `tool_input`, `success`, `duration_ms`, `error`), `api_request` (`model`, `cost_usd`, `*_tokens`), `api_error`.
 - **Claude Code spans** in Tempo: one trace per prompt, rooted at `claude_code.interaction`. `claude_code.tool` carries `tool_name` and, for Bash, `full_command`; its child `claude_code.tool.execution` carries `success` and `error`. Span status stays unset on failure. Every span has `span.session.id` and, in a repo, `span.vcs.repository.name`.
-- **Codex events** in Loki: `{job=~"codex.*"}`, same JSON shape. Only `codex exec` (`job="codex_exec"`) sends the full set: `codex.user_prompt`, `codex.tool_result` (`tool_name`, `arguments`, `output`, `duration_ms`), `codex.sse_event`. Interactive Codex (`codex-app-server`) sends only `codex.api_request`. A failed command still reports `success=true`; the exit code is in `output` (`Process exited with code N`). Codex spans are internal plumbing; use the events.
+- **Codex events** in Loki: `{job=~"codex.*"}`, same JSON shape. Only `codex exec` (`job="codex_exec"`) sends the full set: `codex.user_prompt`, `codex.tool_result` (`tool_name`, `arguments`, `output`, `duration_ms`), `codex.sse_event`. Interactive Codex (`codex-app-server`) sends only `codex.api_request`. A failed command still reports `success=true`; the exit code is in `output` (`Process exited with code N`), which `q events` parses into `exit`. Codex spans are internal plumbing; use the events.
 - **Metrics**: no agent series reach Prometheus yet. Take tokens and cost from Loki.
 - **Lag and retention**: data lands seconds after the fact, and an `interaction` span only when its prompt ends, so use Loki for the prompt in flight. Retention is 7 days.
 
@@ -64,20 +64,20 @@ q loki /loki/api/v1/query query='topk(10, sum by (attributes_session_id, attribu
   | jq -r '.data.result[] | [.metric.attributes_session_id, .metric.attributes_vcs_repository_name, .value[1]] | @tsv'
 ```
 
-Codex sessions, then one session's timeline (`exit` is the command's exit code):
+Codex sessions, then one session's timeline (`q events` adds `exit`, the command's exit code):
 
 ```sh
 q events '{job=~"codex.*"} | json | attributes_event_name="codex.user_prompt"' 7d | jq -r '[.event_timestamp, .conversation_id, .model] | @tsv'
 C=$CODEX_THREAD_ID
 q events "{job=~\"codex.*\"} |= \"$C\" | json | attributes_event_name=~\"codex.(user_prompt|tool_result)\"" 7d \
-  | jq -r '[.event_timestamp, .event_name, .tool_name // "", .duration_ms // "", (.arguments // "" | .[0:120]), "exit=" + (.output // "" | capture("exited with code (?<c>[0-9]+)").c // "")] | @tsv'
+  | jq -r '[.event_timestamp, .event_name, .tool_name // "", .duration_ms // "", (.arguments // "" | .[0:120]), "exit=" + (.exit // "")] | @tsv'
 ```
 
 Failed Codex commands:
 
 ```sh
-q events '{job=~"codex.*"} | json | attributes_event_name="codex.tool_result" | attributes_tool_name="exec_command" | attributes_output=~"(?s).*exited with code [1-9].*"' 7d 50 \
-  | jq -r '[.event_timestamp, .conversation_id[0:13], (.arguments | .[0:120]), (.output | capture("exited with code (?<c>[0-9]+)").c)] | @tsv'
+q events '{job=~"codex.*"} | json | attributes_event_name="codex.tool_result" | attributes_tool_name="exec_command" | attributes_output=~"(?s)([^\n]*\n){0,3}Process exited with code [1-9].*"' 7d 50 \
+  | jq -r '[.event_timestamp, .conversation_id[0:13], (.arguments | .[0:120]), .exit] | @tsv'
 ```
 
 Codex tokens per session (input includes cached; Codex reports no cost):

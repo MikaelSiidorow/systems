@@ -3,7 +3,7 @@
 #   q spans '<traceql>' [since=24h] [limit=50]   one JSON line per matched span
 #   q events '<logql>' [since=24h] [limit=500]   one JSON line per Loki event, oldest first
 #   q <tempo|loki|prometheus> <api-path> [name=value ...]   raw GET, values URL-encoded
-# String values are cut at 300 characters.
+# String values are cut at 300 characters; Codex events get `exit`, parsed from the full output.
 set -euo pipefail
 
 raw() {
@@ -41,6 +41,7 @@ case ${1:-} in
       jq -c "[.data.result[] | .stream as \$s | .values[] | {ts: .[0]} + \$s] | sort_by(.ts)[] |
           with_entries(select(.key | test(\"^(attributes_|traceid\$|service_name\$)\")) | .key |= sub(\"^attributes_\"; \"\"))
           | del(.prompt, .prompt_text, .tool_parameters, .tool_input_size_bytes, .tool_result_size_bytes, .user_id, .user_account_id, .user_email, .terminal_type, .host_name, .vcs_owner_name, .vcs_provider_name, .vcs_repository_url_full)
+          | if .output then .exit = ([.output | capture(\"exited with code (?<c>[0-9]+)\").c][0]) else . end
           | $cut_strings"
     ;;
   tempo | loki | prometheus) raw "$@" ;;
