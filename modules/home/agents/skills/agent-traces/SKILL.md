@@ -5,15 +5,16 @@ description: Query Claude Code and Codex telemetry from Hestia in Tempo and Loki
 
 # Agent traces
 
-Claude Code and Codex on Hestia export telemetry to the cluster. Read it with `q`, the script beside this file, which goes through Grafana's read-only datasource proxy:
+Claude Code and Codex on Hestia export telemetry to the cluster. Read it with `q`, the script beside this file, which goes through Grafana's read-only datasource proxy. Shell state does not carry between commands, so start every command with the PATH line:
 
 ```sh
+export PATH="$HOME/.claude/skills/agent-traces:$HOME/.codex/skills/agent-traces:$PATH"
 q spans '<traceql>' [since=24h] [limit=50]    # Tempo: one JSON line per matched span
-q events '<logql>' [since=24h] [limit=500]    # Loki: one JSON line per event, oldest first
+q events '<logql>' [since=24h] [limit=500]    # Loki: newest `limit` events, oldest first
 q <tempo|loki|prometheus> <api-path> [k=v...] # raw GET
 ```
 
-Pipe the output through `jq` and print only the fields the question needs. If `q` times out, this host cannot reach `grafana.miksu.app`: say so instead of guessing.
+Pipe the output through `jq` and print only the fields the question needs. If `q` fails with `Connection timed out` or `Could not resolve host`, this host cannot reach `grafana.miksu.app`: say so instead of guessing. `Operation timed out` means the query was too slow: narrow the window or add a `|=` line filter.
 
 ## Where things live
 
