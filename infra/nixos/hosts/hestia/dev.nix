@@ -30,21 +30,25 @@ in
 
   environment.variables = playwright;
 
-  # Volumes stay, since they hold the dev databases.
+  # Volumes stay, since they hold the dev databases. The age filter spares a
+  # week of build cache, so a size cap stops Rust builds filling the disk.
   systemd.user.services.docker-prune = {
-    description = "Prune unused Docker images, containers and networks";
+    description = "Prune unused Docker images, containers, networks and build cache";
     unitConfig.ConditionUser = username;
     environment.DOCKER_HOST = dockerHost;
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${pkgs.docker}/bin/docker system prune --all --force --filter until=168h";
+      ExecStart = [
+        "${pkgs.docker}/bin/docker system prune --all --force --filter until=168h"
+        "${pkgs.docker}/bin/docker builder prune --force --max-used-space 20GB"
+      ];
     };
   };
   systemd.user.timers.docker-prune = {
     wantedBy = [ "timers.target" ];
     unitConfig.ConditionUser = username;
     timerConfig = {
-      OnCalendar = "weekly";
+      OnCalendar = "daily";
       Persistent = true;
       RandomizedDelaySec = "1h";
     };
