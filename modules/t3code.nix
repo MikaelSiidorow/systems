@@ -66,8 +66,16 @@ let
         # Link the Claude and Codex sessions T3 starts to its turn spans; proposed
         # upstream in https://github.com/pingdotgg/t3code/discussions/31694.
         # Without otlpTracesUrl nothing is exported, so these apply everywhere.
-        # map$9, orElseSucceed, currentSpan and annotateCurrentSpan are bundler
-        # names too; the guard fails the build when an anchor moves.
+        # The patches call map$9, orElseSucceed, currentSpan and
+        # annotateCurrentSpan, also bundler names; fail unless each is still
+        # imported from the Effect chunk, and when an anchor moves.
+        effect=$(grep -E '^import \{.*\} from "\./Effect-[^"]+\.mjs";$' "$cli")
+        for helper in 'map\$9' orElseSucceed currentSpan annotateCurrentSpan; do
+          printf '%s\n' "$effect" | grep -qE " as $helper[,} ]" || {
+            echo "t3code: expected $helper imported from Effect in $cli" >&2
+            exit 1
+          }
+        done
         patchOnce() {
           [ "$(grep -oE "$1" "$cli" | wc -l)" = 1 ] || {
             echo "t3code: expected one '$1' in $cli" >&2
