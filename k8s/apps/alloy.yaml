@@ -102,15 +102,16 @@ spec:
                 }
               }
 
-              // Codex puts the host only on the resource, which the Prometheus
-              // exporter drops, so Hestia's and tpad's series would collide.
+              // Codex tags metrics with the host only as the resource attribute env
+              // (its otel environment), which the Prometheus exporter drops, so
+              // Hestia's and tpad's series would collide.
               // Claude Code already sets host.name on each point.
               otelcol.processor.transform "codex_host" {
                 error_mode = "ignore"
                 metric_statements {
                   context    = "datapoint"
                   statements = [
-                    `set(attributes["host.name"], resource.attributes["host.name"]) where IsMatch(resource.attributes["service.name"], "^codex")`,
+                    `set(attributes["host.name"], resource.attributes["env"]) where IsMatch(resource.attributes["service.name"], "^codex")`,
                   ]
                 }
                 output {
