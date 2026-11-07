@@ -52,25 +52,12 @@ let
         cp -r --preserve=mode ${upstream.unwrapped.desktop}/. "$desktop/"
         chmod -R u+w "$out" "$desktop"
 
-        # Compiled equivalent of AnalyticsService.layer -> AnalyticsService.layerTest.
-        # The make$N suffix is a bundler-assigned name that shifts between releases.
-        # Fail on other upstream changes rather than silently retaining analytics.
-        analytics='effect\(AnalyticsService, make\$[0-9]+\)'
+        # Patches below call bundler-assigned names that shift between releases
+        # (succeed$3 is Layer.succeed, void_$1 Effect.void); fail unless each is
+        # still imported from the Effect chunk, and when an anchor moves.
         cli=$(echo "$out"/libexec/t3code/apps/server/dist/binCli-*.mjs)
-        [ "$(grep -oE "$analytics" "$cli" | wc -l)" = 1 ] || {
-          echo "t3code: expected one '$analytics' in $cli" >&2
-          exit 1
-        }
-        sed -Ei "s/$analytics/AnalyticsService.layerTest/" "$cli"
-
-        # Link the Claude and Codex sessions T3 starts to its turn spans; proposed
-        # upstream in https://github.com/pingdotgg/t3code/discussions/31694.
-        # Without otlpTracesUrl nothing is exported, so these apply everywhere.
-        # The patches call map$9, orElseSucceed, currentSpan and
-        # annotateCurrentSpan, also bundler names; fail unless each is still
-        # imported from the Effect chunk, and when an anchor moves.
         effect=$(grep -E '^import \{.*\} from "\./Effect-[^"]+\.mjs";$' "$cli")
-        for helper in 'map\$9' orElseSucceed currentSpan annotateCurrentSpan; do
+        for helper in 'succeed\$3' 'void_\$1' 'map\$9' orElseSucceed currentSpan annotateCurrentSpan; do
           printf '%s\n' "$effect" | grep -qE " as $helper[,} ]" || {
             echo "t3code: expected $helper imported from Effect in $cli" >&2
             exit 1
@@ -83,6 +70,16 @@ let
           }
           sed -Ei "s|$1|$2|" "$cli"
         }
+
+        # Swap the PostHog-backed AnalyticsService layer for a no-op one, like the
+        # AnalyticsService.layerTest that 0.1.6 removed. Fail on other upstream
+        # changes rather than silently retaining analytics.
+        patchOnce 'effect\(AnalyticsService, make\$[0-9]+\)' \
+          'succeed$3(AnalyticsService, AnalyticsService.of({ record: () => void_$1, flush: void_$1, recordOwners: () => void_$1 }))'
+
+        # Link the Claude and Codex sessions T3 starts to its turn spans; proposed
+        # upstream in https://github.com/pingdotgg/t3code/discussions/31694.
+        # Without otlpTracesUrl nothing is exported, so these apply everywhere.
         traceparent='`00-''${span.traceId}-''${span.spanId}-''${span.sampled ? "01" : "00"}`'
         # One trace per provider turn instead of one per server lifetime.
         patchOnce 'start: fn\("ProviderTurnStartService\.start"\)\(function\* \(input\) \{' \
@@ -90,8 +87,14 @@ let
         # Claude keeps an explicit TRACEPARENT in its env. T3 reuses one Claude
         # process per thread, which reads it once, so later turns in a thread
         # stay under the first turn's span.
-        patchOnce 'const \{ mcpServers, \.\.\.queryOptions \} = input\.options;' \
-          'const { mcpServers, ...untracedQueryOptions } = input.options; const queryOptions = yield* currentSpan.pipe(map$9((span) => ({ ...untracedQueryOptions, env: { ...(untracedQueryOptions.env ?? process.env), TRACEPARENT: '"$traceparent"' } })), orElseSucceed(() => untracedQueryOptions));'
+        if grep -qF 'const { mcpServers, ...queryOptions } = input.options;' "$cli"; then
+          # 0.1.3; drop once llm-agents is past it.
+          patchOnce 'const \{ mcpServers, \.\.\.queryOptions \} = input\.options;' \
+            'const { mcpServers, ...untracedQueryOptions } = input.options; const queryOptions = yield* currentSpan.pipe(map$9((span) => ({ ...untracedQueryOptions, env: { ...(untracedQueryOptions.env ?? process.env), TRACEPARENT: '"$traceparent"' } })), orElseSucceed(() => untracedQueryOptions));'
+        else
+          patchOnce '\[AGENT_THREAD_ENV\]: input\.threadId' \
+            '[AGENT_THREAD_ENV]: input.threadId, ...(yield* currentSpan.pipe(map$9((span) => ({ TRACEPARENT: '"$traceparent"' })), orElseSucceed(() => ({}))))'
+        fi
         # Codex app-server parents a request to the JSON-RPC envelope's trace.
         patchOnce 'const request = fn\("CodexAppServerProtocol\.request"\)\(function\* \(method, payload\) \{' \
           'const offerOutgoingUntraced = offerOutgoing; const request = fn("CodexAppServerProtocol.request")(function* (method, payload) { const trace = method === "turn/start" \|\| method === "turn/steer" ? yield* currentSpan.pipe(map$9((span) => ({ traceparent: '"$traceparent"' })), orElseSucceed(() => void 0)) : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });'
