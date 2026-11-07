@@ -93,6 +93,10 @@ jobs:
         with:
           nix_conf: |
             experimental-features = nix-command flakes
+            # llm-agents packages (T3 Code, Codex, Claude), as on the hosts; a
+            # from-source T3 Code build outlasts the macOS job timeout.
+            extra-substituters = https://cache.numtide.com
+            extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
 
       # Restore on every run, save only on main, so pull requests never wait
       # on an upload. Separate keys from deploy.yml's nix-<os>- caches.
@@ -133,6 +137,10 @@ jobs:
         with:
           nix_conf: |
             experimental-features = nix-command flakes
+            # llm-agents packages (T3 Code, Codex, Claude), as on the hosts; a
+            # from-source T3 Code build outlasts the macOS job timeout.
+            extra-substituters = https://cache.numtide.com
+            extra-trusted-public-keys = niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
 
       # Restore on every run, save only on main, so pull requests never wait
       # on an upload. Separate keys from deploy.yml's nix-<os>- caches.
