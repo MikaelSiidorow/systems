@@ -1,11 +1,11 @@
 ---
 name: agent-traces
-description: Query Claude Code and Codex telemetry from Hestia in Tempo, Loki and Prometheus. Use when asked what a past or current agent session ran, which tool calls failed or were slow, or what sessions cost.
+description: Query Claude Code and Codex telemetry from Hestia and tpad in Tempo, Loki and Prometheus. Use when asked what a past or current agent session ran, which tool calls failed or were slow, or what sessions cost.
 ---
 
 # Agent traces
 
-Claude Code and Codex on Hestia export telemetry to the cluster. Read it with `q`, the script beside this file, which goes through Grafana's read-only datasource proxy. Shell state does not carry between commands, so start every command with the PATH line:
+Claude Code and Codex on Hestia and tpad export telemetry to the cluster; tpad's arrives late when it has been offline. Every signal carries its host: `resources_host_name` in Loki after `| json`, `resource.host.name` in Tempo, `host_name` on Claude metrics. Read it with `q`, the script beside this file, which goes through Grafana's read-only datasource proxy. Shell state does not carry between commands, so start every command with the PATH line:
 
 ```sh
 export PATH="$HOME/.claude/skills/agent-traces:$HOME/.codex/skills/agent-traces:$PATH"
@@ -22,7 +22,7 @@ Pipe the output through `jq` and print only the fields the question needs. If `q
 - **Claude Code events** in Loki: `{job="claude-code"}`, one JSON line per event. Parse with `| json`; attributes become `attributes_<name>` with dots as underscores (`attributes_session_id`, `attributes_event_name`, `attributes_vcs_repository_name`). `q events` strips the prefix. Events: `user_prompt` (prompt text redacted), `tool_result` (`tool_name`, `tool_input`, `success`, `duration_ms`, `error`), `api_request` (`model`, `cost_usd`, `*_tokens`), `api_error`.
 - **Claude Code spans** in Tempo: one trace per prompt, rooted at `claude_code.interaction`. `claude_code.tool` carries `tool_name` and, for Bash, `full_command`; its child `claude_code.tool.execution` carries `success` and `error`. Span status stays unset on failure. Every span has `span.session.id` and, in a repo, `span.vcs.repository.name`.
 - **Codex events** in Loki: `{job=~"codex.*"}`, same JSON shape. Only `codex exec` (`job="codex_exec"`) sends the full set: `codex.user_prompt`, `codex.tool_result` (`tool_name`, `arguments`, `output`, `duration_ms`), `codex.sse_event`. Interactive Codex (`codex-app-server`) sends only `codex.api_request`. A command that runs and fails still reports `success=true` (only failures before launch set `success=false`); the exit code is in `output` (`Process exited with code N`), which `q events` parses into `exit`. Codex spans are internal plumbing; use the events.
-- **Metrics** in Prometheus: `claude_code_{token_usage_tokens,cost_usage_USD,session_count,active_time_seconds}_total`, labelled `host_name`, `model`, `session_id`, `type` (token kind) and `vcs_repository_name`; `codex_*` carry `model` but no host or session. Agents export about once a minute and only while a value changes, and a series idle over 5 minutes restarts from zero, so instant queries and short windows return little: use `max_over_time` over a window. That sums each session's peak counter, so it is approximate: it includes usage from before the window and, across a restart, keeps only the larger segment. For exact or per-session totals, use Loki.
+- **Metrics** in Prometheus: `claude_code_{token_usage_tokens,cost_usage_USD,session_count,active_time_seconds}_total`, labelled `host_name`, `model`, `session_id`, `type` (token kind) and `vcs_repository_name`; `codex_*` carry `model` and `host_name` but no session. Agents export about once a minute and only while a value changes, and a series idle over 5 minutes restarts from zero, so instant queries and short windows return little: use `max_over_time` over a window. That sums each session's peak counter, so it is approximate: it includes usage from before the window and, across a restart, keeps only the larger segment. For exact or per-session totals, use Loki.
 - **Lag and retention**: data lands seconds after the fact, and an `interaction` span only when its prompt ends, so use Loki for the prompt in flight. Retention is 7 days.
 
 ## Recipes

@@ -32,6 +32,8 @@ in
   # This is a minimal configuration for running home-manager standalone on Pop!_OS
   # We're not managing the system itself, just the user environment
 
+  imports = [ ./telemetry.nix ];
+
   # Allow unfree packages (needed for Discord, Steam, etc.)
   nixpkgs.config.allowUnfree = true;
 

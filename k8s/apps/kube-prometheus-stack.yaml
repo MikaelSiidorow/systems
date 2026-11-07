@@ -83,6 +83,10 @@ spec:
         prometheus:
           prometheusSpec:
             enableRemoteWriteReceiver: true
+            # Hestia and tpad queue OTLP for up to 24h while offline; without
+            # this, samples older than the head (about an hour) are rejected.
+            tsdb:
+              outOfOrderTimeWindow: 24h
             scrapeInterval: 60s
             retention: 7d
             resources:
