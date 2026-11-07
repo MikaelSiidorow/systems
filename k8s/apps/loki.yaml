@@ -79,9 +79,6 @@ spec:
         chunksCache:
           enabled: false
 
-        minio:
-          enabled: false
-
         extraObjects:
           - apiVersion: v1
             kind: ConfigMap
