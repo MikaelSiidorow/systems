@@ -103,6 +103,18 @@ in
     max-jobs = 2;
     cores = 6;
   };
+  # Two weeks of generations stay for rollback. A weekly optimise also
+  # dedupes the existing store, which auto-optimise-store would not.
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    randomizedDelaySec = "1h";
+    options = "--delete-older-than 14d";
+  };
+  nix.optimise = {
+    automatic = true;
+    dates = [ "weekly" ];
+  };
 
   services.openssh = {
     enable = true;
