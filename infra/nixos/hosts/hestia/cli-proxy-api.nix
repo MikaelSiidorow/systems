@@ -1,12 +1,12 @@
 { config, pkgs, ... }:
 let
-  release = "v8.0.45";
+  release = "v8.0.51";
   cliProxyApi = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "cli-proxy-api";
     version = pkgs.lib.removePrefix "v" release;
     src = pkgs.fetchurl {
       url = "https://github.com/router-for-me/CLIProxyAPI/releases/download/${release}/CLIProxyAPI_${version}_linux_amd64_no-plugin.tar.gz";
-      sha256 = "ceda9551f78f96a0758731cd103b3d3a96fd70835e96974a04e7061edb5509cb";
+      sha256 = "ed2a0383787c62e854436a57225dbe35e9e74df317c896b66665b12f4f2df86c";
     };
     sourceRoot = ".";
     dontConfigure = true;
