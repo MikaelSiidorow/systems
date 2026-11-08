@@ -96,6 +96,22 @@ spec:
                   endpoint = "0.0.0.0:4318"
                 }
                 output {
+                  metrics = [otelcol.processor.memory_limiter.default.input]
+                  traces  = [otelcol.processor.memory_limiter.default.input]
+                  logs    = [otelcol.processor.memory_limiter.default.input]
+                }
+              }
+
+              // Refuses OTLP data once the heap passes limit - spike_limit
+              // (240MiB of the 384Mi container limit). The receiver then answers
+              // with a retryable error, so Hestia's and tpad's queues resend.
+              // No batch processor: it acknowledges before exporting and drops
+              // what the exporters refuse, so the senders would not retry.
+              otelcol.processor.memory_limiter "default" {
+                check_interval = "1s"
+                limit          = "300MiB"
+                spike_limit    = "60MiB"
+                output {
                   metrics = [otelcol.processor.transform.codex_host.input]
                   traces  = [otelcol.exporter.otlp.tempo.input]
                   logs    = [otelcol.exporter.loki.default.input]
@@ -161,10 +177,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              memory: 96Mi
-            limits:
-              # Headroom for the remote_write WAL that hestia metrics go through.
               memory: 192Mi
+            limits:
+              # Headroom for the remote_write WAL and the agent OTLP from Hestia
+              # and tpad; the working set reached 181Mi in November 2026.
+              memory: 384Mi
 
         controller:
           type: daemonset
