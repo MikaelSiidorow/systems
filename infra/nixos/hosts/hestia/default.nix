@@ -102,7 +102,11 @@ in
     # The defaults (12 jobs x all cores) likely froze Hestia during a remote deploy build.
     max-jobs = 2;
     cores = 6;
+    # Agent builds filled the disk; collect garbage mid-build below 10G free, up to 50G.
+    min-free = 10 * 1024 * 1024 * 1024;
+    max-free = 50 * 1024 * 1024 * 1024;
   };
+  services.journald.extraConfig = "SystemMaxUse=1G";
   # Two weeks of generations stay for rollback. A weekly optimise also
   # dedupes the existing store, which auto-optimise-store would not.
   nix.gc = {
