@@ -44,6 +44,12 @@ let
           dst = [ "tag:infra:443" ];
         }
         {
+          # Hestia's agents run Windows-only game builds on ares over SSH.
+          action = "accept";
+          src = [ "tag:home-subnet-router" ];
+          dst = [ "100.64.0.27:22" ];
+        }
+        {
           # The deploy smoke test checks the tailnet-only Ingress hosts.
           action = "accept";
           src = [ "tag:ci" ];
