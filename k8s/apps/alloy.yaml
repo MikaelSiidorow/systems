@@ -105,18 +105,12 @@ spec:
               // Refuses OTLP data once the heap passes limit - spike_limit
               // (240MiB of the 384Mi container limit). The receiver then answers
               // with a retryable error, so Hestia's and tpad's queues resend.
+              // No batch processor: it acknowledges before exporting and drops
+              // what the exporters refuse, so the senders would not retry.
               otelcol.processor.memory_limiter "default" {
                 check_interval = "1s"
                 limit          = "300MiB"
                 spike_limit    = "60MiB"
-                output {
-                  metrics = [otelcol.processor.batch.default.input]
-                  traces  = [otelcol.processor.batch.default.input]
-                  logs    = [otelcol.processor.batch.default.input]
-                }
-              }
-
-              otelcol.processor.batch "default" {
                 output {
                   metrics = [otelcol.processor.transform.codex_host.input]
                   traces  = [otelcol.exporter.otlp.tempo.input]
