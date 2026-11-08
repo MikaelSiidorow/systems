@@ -142,6 +142,14 @@ in
     Host device 192.168.67.1 192.168.67.2
       IdentityFile ${config.sops.secrets.router-deploy-ssh-key.path}
       IdentitiesOnly yes
+
+    # Agents run Windows-only game builds on the gaming PC. Its OpenSSH lacks
+    # post-quantum key exchange; the session already runs inside Tailscale.
+    Host ares
+      User User
+      IdentityFile /home/${username}/.ssh/id_ed25519_ares
+      IdentitiesOnly yes
+      WarnWeakCrypto no
   '';
 
   # Pin GitHub's published Ed25519 host key so unattended Git operations do
