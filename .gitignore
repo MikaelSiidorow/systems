@@ -1,7 +1,7 @@
-# Terraform
+# OpenTofu (anywhere, so a leftover terraform/ checkout stays ignored too)
 **/.terraform/
-tofu/*.tfvars
-tofu/*.tfvars.json
+*.tfvars
+*.tfvars.json
 *.tfstate
 *.tfstate.*
 **/tfplan
