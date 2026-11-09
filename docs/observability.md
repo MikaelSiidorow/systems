@@ -36,7 +36,7 @@ Metrics, logs, and traces for the K3s cluster, deployed as ArgoCD Applications w
 
 ## Agent telemetry
 
-Claude Code and Codex on Hestia and tpad send traces, events and metrics to a local Alloy queue at `127.0.0.1:4318`, which forwards them to the cluster Alloy. On Hestia that is the host's own Alloy; on tpad it is a user service with the same disk queue and 24h of retries (`workstations/hosts/tpad/telemetry.nix`), so data from the laptop arrives once it is back online. A host opts in by setting `agents.telemetry` (`modules/home/agents/config.nix`), which adds the OTel settings to both agents' config baselines. Other hosts leave it unset; on the Mac that keeps work sessions off the cluster.
+Claude Code and Codex on Hestia and tpad send traces, events and metrics to a local Alloy queue at `127.0.0.1:4318`, which forwards them to the cluster Alloy. On Hestia that is the host's own Alloy; on tpad it is a user service with the same disk queue and 24h of retries (`workstations/hosts/tpad/telemetry.nix`), so data from the laptop arrives once it is back online. A host opts in by setting `agents.telemetry` (`modules/home/agents/config.nix`), which adds the OTel settings to both agents' config baselines and installs the `agent-traces` skill. The Mac sends to its own stack instead (below), so work sessions never reach the cluster.
 
 - **Claude Code**: spans per prompt (`claude_code.interaction`), LLM request and tool call, with file paths and branch and SHA on commits. Tool events carry each tool's input (`OTEL_LOG_TOOL_DETAILS`): Bash commands, MCP arguments, Write contents and Edit strings, each cut at 512 characters, plus the error text when a tool fails. Events carry `session.id` and `prompt.id`; everything carries `host.name` and the repository (`vcs.repository.name`). Prompt text and successful tool output are not exported.
 - **Codex**: `codex.*` log events, traces and metrics, tagged with the host as `environment`. Codex metrics carry the host only as the resource attribute `env`; the cluster Alloy copies it onto each point, so Prometheus series carry `host_name` and hosts do not collide. Tool events carry the tool call, including shell commands, and a snippet of its output. Prompt text is not exported.
@@ -46,9 +46,16 @@ Both agents send delta metrics, which Prometheus cannot store. The cluster Alloy
 
 Find a session in Tempo with TraceQL, e.g. `{ resource.host.name = "hestia" && name = "claude_code.tool" }`, or in Loki by `session_id`.
 
-To turn telemetry off on a host, unset the option and delete the `OTEL_*` and `CLAUDE_CODE_*TELEMETRY*` keys from `~/.claude/settings.json` and the `[otel]` table from `~/.codex/config.toml`. The settings merge only adds keys.
+To turn telemetry off on a host, unset the option and delete the `OTEL_*`, `CLAUDE_CODE_*TELEMETRY*` and `GRAFANA_URL` keys from `~/.claude/settings.json` and the `[otel]` table from `~/.codex/config.toml`. The settings merge only adds keys.
 
-For the Mac, the plan is a local collector (a launchd OTLP receiver writing to disk or a local store) with `agents.telemetry.endpoint` pointed at `http://127.0.0.1:4318`.
+### On the Mac
+
+`workstations/hosts/mbp/telemetry.nix` runs Alloy, Loki, Tempo, Prometheus and Grafana from nixpkgs as launchd agents, every one bound to 127.0.0.1, with nothing exported off the machine. Alloy receives OTLP on 4318 and repeats the cluster pipeline, so the skill's labels and metric names hold. Grafana is at http://127.0.0.1:43000 with anonymous read access and the cluster's datasource UIDs; the backends sit on 43090–43345. Data lives in `~/.local/state/agent-telemetry` for 90 days, with Prometheus also capped at 20 GB; Loki and Tempo expire by age only.
+
+- **No content**: the Mac sets `toolDetails = false`, so Claude exports no Bash commands or tool input, and Codex no tool output or prompts. Codex still sends each command in `arguments`, which no setting turns off, so Alloy deletes `prompt`, `prompt_text`, `user_prompt`, `response`, `body`, `tool_input`, `tool_parameters`, `arguments`, `output`, `full_command` and `error`, and blanks span status messages, before storing anything. Failed tools still show as `success=false`, without the error text.
+- **Reading it**: `agents.telemetry.grafana` and `grafanaSocket` set `GRAFANA_URL` and `GRAFANA_SOCKET` for both agents, and `q` connects through the socket (`~/.local/state/agent-telemetry/grafana.sock`, a `socat` forwarder to Grafana's port). The sandboxes allow only that socket: allowing 127.0.0.1 would open every local port, including SSH tunnels and CLIProxyAPI.
+- **Exposure**: the backend APIs have no auth and no Host check, so a local process or a DNS-rebinding web page could read them. Grafana rejects other Host names, and Loki's delete API is off.
+- **Logs**: each service writes to `stdout.log` and `stderr.log` in its state folder; `launchctl print gui/$(id -u)/org.nix-community.home.telemetry-<name>` shows its state.
 
 ## Components
 
