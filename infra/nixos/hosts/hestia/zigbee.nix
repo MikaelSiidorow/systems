@@ -34,6 +34,11 @@ let
     time.sleep(1)
     os.close(fd)
   '';
+
+  starvationGuard = {
+    MemoryMin = "256M";
+    CPUWeight = 1000;
+  };
 in
 {
   imports = [ inputs.sops-nix.nixosModules.sops ];
@@ -134,8 +139,14 @@ in
       ExecStartPre = lib.mkBefore [
         "${dongleReset} ${config.services.zigbee2mqtt.settings.serial.port}"
       ];
-    };
+    }
+    // starvationGuard;
   };
+
+  # The dongle drops the host when an ASH frame goes unacked for a few
+  # seconds. Under agent memory pressure zigbee2mqtt was swapped out and
+  # missed those acks, so keep it and its broker in RAM and ahead on CPU.
+  systemd.services.mosquitto.serviceConfig = starvationGuard;
 
   networking.firewall.interfaces.enp31s0.allowedTCPPorts = [ 8080 ];
 }

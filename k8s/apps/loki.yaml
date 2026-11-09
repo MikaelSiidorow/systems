@@ -100,6 +100,20 @@ spec:
                         annotations:
                           summary: "{{`{{ $labels.level | title }} in {{ $labels.namespace }}/{{ $labels.app }}`}}"
                           description: "{{`{{ $labels.namespace }}/{{ $labels.app }} logged {{ $value }} {{ $labels.level }}-level message(s) in the last minute.`}}"
+                  - name: hestia
+                    rules:
+                      # zigbee2mqtt logs a bridge/health publish every 10 minutes. After an
+                      # adapter crash it can hang on shutdown while systemd still reports it
+                      # active, which Zigbee2mqttDown in Prometheus cannot see.
+                      - alert: Zigbee2mqttStalled
+                        expr: |
+                          absent_over_time({instance="hestia", unit="zigbee2mqtt.service"} |= "bridge/health" [30m])
+                        for: 5m
+                        labels:
+                          severity: warning
+                        annotations:
+                          summary: zigbee2mqtt on hestia has stopped working.
+                          description: zigbee2mqtt on hestia has logged no health check for over 30 minutes, so every Zigbee entity in Home Assistant is unavailable. Restart zigbee2mqtt.service.
   destination:
     server: https://kubernetes.default.svc
     namespace: loki
