@@ -1,12 +1,12 @@
 .SILENT:
 
-TF=terraform
+TF=tofu
 HESTIA_HOST ?= hestia.home.arpa
 HESTIA_SSH := mikaelsiidorow@$(HESTIA_HOST)
 HESTIA_REPO ?= /etc/nixos-repo
 ROUTER_DEPLOY_SSH_KEY ?= /run/secrets/router-deploy-ssh-key
 
-# Terraform
+# OpenTofu
 
 tf-init:
 	cd terraform && $(TF) init

@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.12"
+  required_version = "~> 1.11"
 
   backend "s3" {
     bucket                      = "terraform-state"
@@ -11,6 +11,7 @@ terraform {
     skip_requesting_account_id  = true
     skip_s3_checksum            = true
     use_path_style              = true
+    use_lockfile                = true
     endpoints = {
       s3 = "https://0d7cd4f74493972b3d64775916c9f6ed.eu.r2.cloudflarestorage.com"
     }
