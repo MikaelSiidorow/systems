@@ -16,7 +16,7 @@ Everything else waits for review: majors, the monitoring stack, other `infra/**`
 
 - `k8s/**`: Argo CD syncs it; there is no workflow run, so wait for the app to reach the new revision.
 - `infra/**`: `nixos-rebuild switch` on k8s-server through `deploy.yml`. Hestia is never deployed by CI; tell the user to deploy it.
-- `terraform/*`, `terraform/k8s/*`: `terraform apply`. Read the plan in the PR's CI report comment.
+- `terraform/*`, `terraform/k8s/*`: `tofu apply`. Read the plan in the PR's CI report comment.
 - `openwrt/**`: builds only; router deploys are manual.
 
 `deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `terraform/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on k8s-server and deploy `main` as it is, so a run can include later merges.

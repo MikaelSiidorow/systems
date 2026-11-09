@@ -21,10 +21,10 @@ ArgoCD auto-syncs from git
 
 **Separation of concerns:**
 
-- **Terraform** (`terraform/`) provisions cloud infrastructure (Hetzner server, Cloudflare DNS)
+- **OpenTofu** (`terraform/`) provisions cloud infrastructure (Hetzner server, Cloudflare DNS)
 - **NixOS** (`infra/nixos/`) manages the Hetzner cluster host and the Hestia home server
 - **OpenWrt** (`openwrt/`, own flake and lock) manages the Cerberus router and Hermes access point
-- **Terraform K8s** (`terraform/k8s/`) manages application secrets (the part that can't be in Git)
+- **OpenTofu K8s** (`terraform/k8s/`) manages application secrets (the part that can't be in Git)
 - **ArgoCD** syncs application manifests from `k8s/` in Git to the cluster
 
 ## Structure
@@ -106,11 +106,11 @@ Refinery application releases do not require per-build image tag commits in this
 
 ### Initial setup (new server)
 
-1. Provision server with Terraform:
+1. Provision server with OpenTofu:
 
    ```bash
-   cd terraform && terraform apply
-   terraform output k3s_ipv4_address
+   cd terraform && tofu apply
+   tofu output k3s_ipv4_address
    ```
 
 2. Update `infra/flake.nix` with the new IP.
@@ -128,12 +128,12 @@ Refinery application releases do not require per-build image tag commits in this
    ssh root@<IP> "kubectl get pods -n argocd"
    ```
 
-5. Apply K8s secrets via Terraform:
+5. Apply K8s secrets via OpenTofu:
 
    ```bash
    cd terraform/k8s
-   terraform init
-   terraform apply
+   tofu init
+   tofu apply
    ```
 
 6. Verify ArgoCD synced the apps:
@@ -146,7 +146,7 @@ Refinery application releases do not require per-build image tag commits in this
 The K3s API (port 6443) is not exposed to the internet. Use an SSH tunnel:
 
 ```bash
-ssh -L 6443:127.0.0.1:6443 root@$(terraform -chdir=terraform output -raw k3s_ipv4_address)
+ssh -L 6443:127.0.0.1:6443 root@$(tofu -chdir=terraform output -raw k3s_ipv4_address)
 ```
 
 Then in another terminal:

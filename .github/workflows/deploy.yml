@@ -323,28 +323,28 @@ jobs:
       TF_VAR_scaleway_billing_alert_email: ${{ vars.SCW_BILLING_ALERT_EMAIL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
-          terraform_version: ~1.12
-      - name: Terraform Format Check
+          tofu_version: ~1.13
+      - name: Tofu Format Check
         id: fmt
-        run: terraform fmt -check -recursive
+        run: tofu fmt -check -recursive
         continue-on-error: true
-      - name: Terraform Init
+      - name: Tofu Init
         id: init
-        run: terraform init
-      - name: Terraform Validate
+        run: tofu init
+      - name: Tofu Validate
         id: validate
-        run: terraform validate -no-color
-      - name: Terraform Plan
+        run: tofu validate -no-color
+      - name: Tofu Plan
         id: plan
-        run: terraform plan -no-color -out=tfplan
+        run: tofu plan -no-color -lock-timeout=10m -out=tfplan
         continue-on-error: true
       - name: Check for infrastructure changes
         id: plan-changes
         if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
         run: |
-          if terraform show -json tfplan | jq -e '
+          if tofu show -json tfplan | jq -e '
             ([.resource_changes[]? | select(.change.actions != ["no-op"])] | length == 0) and
             ([(.output_changes // {})[] | select(.actions != ["no-op"])] | length == 0)' >/dev/null; then
             echo "none=true" >> "$GITHUB_OUTPUT"
@@ -363,7 +363,7 @@ jobs:
           if [ "$INIT" != success ] || [ "$VALIDATE" != success ] || [ "$PLAN" != success ]; then
             status=failure summary="init, validate or plan failed"
           elif [ "$FMT" != success ]; then
-            status=failure summary="terraform fmt found unformatted files"
+            status=failure summary="tofu fmt found unformatted files"
           elif [ "$NO_CHANGES" = true ]; then
             status=success summary="no changes"
           else
@@ -418,9 +418,9 @@ jobs:
             exit 0
           fi
           gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
-      - name: Terraform Apply
+      - name: Tofu Apply
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: terraform apply -auto-approve tfplan
+        run: tofu apply -auto-approve -lock-timeout=10m tfplan
   nixos:
     needs: [changes, terraform]
     if: |
@@ -481,9 +481,9 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
-          terraform_version: ~1.12
+          tofu_version: ~1.13
       - name: Setup SSH and K8s access
         run: |
           mkdir -p ~/.ssh
@@ -499,19 +499,19 @@ jobs:
         run: |
           ssh root@${{ env.K3S_HOST }} \
             "k3s kubectl create namespace wger --dry-run=client -o yaml | k3s kubectl apply -f -"
-      - name: Terraform Format Check
+      - name: Tofu Format Check
         id: fmt
-        run: terraform fmt -check -recursive
+        run: tofu fmt -check -recursive
         continue-on-error: true
-      - name: Terraform Init
+      - name: Tofu Init
         id: init
-        run: terraform init
-      - name: Terraform Validate
+        run: tofu init
+      - name: Tofu Validate
         id: validate
-        run: terraform validate -no-color
-      - name: Terraform Plan
+        run: tofu validate -no-color
+      - name: Tofu Plan
         id: plan
-        run: terraform plan -no-color -out=tfplan
+        run: tofu plan -no-color -lock-timeout=10m -out=tfplan
         continue-on-error: true
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
@@ -534,7 +534,7 @@ jobs:
         id: plan-changes
         if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
         run: |
-          if terraform show -json tfplan | jq -e '
+          if tofu show -json tfplan | jq -e '
             ([.resource_changes[]? | select(.change.actions != ["no-op"])] | length == 0) and
             ([(.output_changes // {})[] | select(.actions != ["no-op"])] | length == 0)' >/dev/null; then
             echo "none=true" >> "$GITHUB_OUTPUT"
@@ -545,7 +545,7 @@ jobs:
         run: |
           set -o pipefail
           changed="$(
-            terraform show -json tfplan |
+            tofu show -json tfplan |
               jq -r '
                 any(
                   .resource_changes[]?;
@@ -576,7 +576,7 @@ jobs:
           if [ "$INIT" != success ] || [ "$VALIDATE" != success ] || [ "$PLAN" != success ]; then
             status=failure summary="init, validate or plan failed"
           elif [ "$FMT" != success ]; then
-            status=failure summary="terraform fmt found unformatted files"
+            status=failure summary="tofu fmt found unformatted files"
           elif [ "$NO_CHANGES" = true ]; then
             status=success summary="no changes"
           else
@@ -632,7 +632,7 @@ jobs:
             exit 0
           fi
           gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
-      - name: Terraform Apply
+      - name: Tofu Apply
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
@@ -651,7 +651,7 @@ jobs:
           TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
           TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
           TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
-        run: terraform apply -auto-approve tfplan
+        run: tofu apply -auto-approve -lock-timeout=10m tfplan
       # NixOS creates the zero role without a password; match the one Terraform
       # just put in refinery-secrets. SQL goes over stdin to keep it out of argv.
       - name: Set zero database role password
