@@ -5,7 +5,8 @@
   claude ? inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default,
   # Local OTLP/HTTP endpoint for T3's own spans. Unset keeps T3's OTel SDK off.
   # Metrics and logs stay off either way, and the relay's tracing stays off
-  # while T3CODE_TELEMETRY_ENABLED is false. Never set it on the work Mac.
+  # while T3CODE_TELEMETRY_ENABLED is false. On the work Mac, only ever its local
+  # collector.
   otlpTracesUrl ? null,
 }:
 let

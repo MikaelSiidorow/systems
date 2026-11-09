@@ -110,7 +110,23 @@ let
       output {
         metrics = [otelcol.processor.transform.codex_host.input]
         logs    = [otelcol.processor.attributes.content.input]
-        traces  = [otelcol.processor.attributes.content.input]
+        traces  = [otelcol.processor.filter.t3code.input]
+      }
+    }
+
+    // T3 traces every sqlite query and git call. Keep only its turn spans,
+    // which Claude and Codex spans parent to, as on Hestia.
+    otelcol.processor.filter "t3code" {
+      error_mode = "ignore"
+
+      traces {
+        span = [
+          `resource.attributes["service.name"] == "t3code-server" and not IsMatch(name, "^((ProviderTurnStartService|RunExecutionService|ClaudeAdapterV2|ClaudeAgentSdkQueryRunner|CodexAdapterV2|orchestrationV2\\.dispatch)\\.|CodexAppServer)")`,
+        ]
+      }
+
+      output {
+        traces = [otelcol.processor.attributes.content.input]
       }
     }
 

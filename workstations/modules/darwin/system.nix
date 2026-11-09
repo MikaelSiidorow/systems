@@ -9,6 +9,8 @@ let
   t3code = import ../../../modules/t3code.nix {
     inherit pkgs inputs;
     codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+    # The Mac's own Alloy (workstations/hosts/mbp/telemetry.nix); nothing leaves it.
+    otlpTracesUrl = "http://127.0.0.1:4318/v1/traces";
   };
 in
 {
