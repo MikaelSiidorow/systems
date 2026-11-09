@@ -9,8 +9,8 @@ on:
         options:
           - all
           - nixos
-          - k8s-terraform
-          - terraform
+          - k8s-tofu
+          - tofu
   # Pull requests run this through ci.yml, which owns the required CI Summary;
   # the changes job below picks which checks apply.
   workflow_call:
@@ -21,7 +21,7 @@ on:
       - ".sops.yaml"
       - "infra/flake.nix"
       - "infra/flake.lock"
-      - "terraform/**"
+      - "tofu/**"
       - ".github/workflows/deploy.yml"
       - ".github/scripts/reconcile-wger.sh"
       # Argo CD deploys these; the smoke job checks the result.
@@ -38,8 +38,8 @@ jobs:
     outputs:
       nixos: ${{ steps.filter.outputs.nixos }}
       openwrt: ${{ steps.filter.outputs.openwrt }}
-      terraform: ${{ steps.filter.outputs.terraform }}
-      k8s_terraform: ${{ steps.filter.outputs.k8s_terraform }}
+      tofu: ${{ steps.filter.outputs.tofu }}
+      k8s_tofu: ${{ steps.filter.outputs.k8s_tofu }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -57,15 +57,15 @@ jobs:
             openwrt:
               - 'openwrt/**'
               - '.sops.yaml'
-            terraform:
-              # Top-level files only; terraform/k8s/ is k8s_terraform. A '!' entry
+            tofu:
+              # Top-level files only; tofu/k8s/ is k8s_tofu. A '!' entry
               # would match every other path, since the patterns are OR'd.
-              - 'terraform/*'
+              - 'tofu/*'
               - '.github/workflows/deploy.yml'
-            k8s_terraform:
-              - 'terraform/k8s/**'
-              - 'terraform/mail.tf'
-              - 'terraform/outputs.tf'
+            k8s_tofu:
+              - 'tofu/k8s/**'
+              - 'tofu/mail.tf'
+              - 'tofu/outputs.tf'
               - '.github/workflows/deploy.yml'
               - '.github/scripts/reconcile-wger.sh'
   nixos-preview:
@@ -298,19 +298,19 @@ jobs:
         with:
           name: pr-report-openwrt
           path: ${{ runner.temp }}/report/openwrt.json
-  terraform:
+  tofu:
     needs: changes
     # Dependabot PRs only get Dependabot secrets, so their plans cannot reach
     # the cloud providers; an action version bump cannot change a plan anyway.
     if: |
-      (github.event_name == 'pull_request' && needs.changes.outputs.terraform == 'true' &&
+      (github.event_name == 'pull_request' && needs.changes.outputs.tofu == 'true' &&
         github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event_name == 'push' && needs.changes.outputs.terraform == 'true') ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["terraform", "all"]'), github.event.inputs.component))
+      (github.event_name == 'push' && needs.changes.outputs.tofu == 'true') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["tofu", "all"]'), github.event.inputs.component))
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform
+        working-directory: tofu
     env:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -384,13 +384,13 @@ jobs:
             echo "${PLAN_OUTPUT:-No plan output.}"
             echo '``````````'
           } >"$RUNNER_TEMP/details.md"
-          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" terraform 40 "Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
+          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" tofu 40 "OpenTofu" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
         if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pr-report-terraform
-          path: ${{ runner.temp }}/report/terraform.json
+          name: pr-report-tofu
+          path: ${{ runner.temp }}/report/tofu.json
       - name: Fail on format or plan error
         if: steps.fmt.outcome == 'failure' || steps.plan.outcome == 'failure'
         run: exit 1
@@ -412,9 +412,9 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Only when every changed file belongs to this Terraform root.
-          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^terraform/[^/]+$'; then
-            echo "The PR changes files outside this Terraform root; leaving it for review."
+          # Only when every changed file belongs to this OpenTofu root.
+          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^tofu/[^/]+$'; then
+            echo "The PR changes files outside this OpenTofu root; leaving it for review."
             exit 0
           fi
           gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
@@ -422,10 +422,10 @@ jobs:
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         run: tofu apply -auto-approve -lock-timeout=10m tfplan
   nixos:
-    needs: [changes, terraform]
+    needs: [changes, tofu]
     if: |
       always() &&
-      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
+      (needs.tofu.result == 'success' || needs.tofu.result == 'skipped') &&
       ((github.event_name == 'push' && needs.changes.outputs.nixos == 'true') ||
       (github.event_name == 'workflow_dispatch' && contains(fromJSON('["nixos", "all"]'), github.event.inputs.component)))
     runs-on: ubuntu-latest
@@ -440,7 +440,7 @@ jobs:
       # Two switches at once fail on a transient systemd unit, so runs queue on a
       # lock on the host. Runs on main deploy main as it is once the lock is held,
       # so a run that waited never rolls back a newer one. The cost: an older run
-      # can deploy a newer commit's NixOS change before that commit's terraform
+      # can deploy a newer commit's NixOS change before that commit's tofu
       # job has applied; the newer run's own deploy follows once it has.
       # Resolve main to a commit with git: when the GitHub API fails, Nix falls
       # back to its cached resolution of github:...main and redeploys an
@@ -462,20 +462,20 @@ jobs:
           echo "Deploying $rev"
           nixos-rebuild switch --flake "github:MikaelSiidorow/systems/$rev?dir=infra#k8s-server"
           EOF
-  k8s-terraform:
-    needs: [changes, terraform, nixos]
+  k8s-tofu:
+    needs: [changes, tofu, nixos]
     if: |
       always() &&
-      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
+      (needs.tofu.result == 'success' || needs.tofu.result == 'skipped') &&
       (needs.nixos.result == 'success' || needs.nixos.result == 'skipped') &&
-      ((github.event_name == 'pull_request' && needs.changes.outputs.k8s_terraform == 'true' &&
+      ((github.event_name == 'pull_request' && needs.changes.outputs.k8s_tofu == 'true' &&
         github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event_name == 'push' && needs.changes.outputs.k8s_terraform == 'true') ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["k8s-terraform", "all"]'), github.event.inputs.component)))
+      (github.event_name == 'push' && needs.changes.outputs.k8s_tofu == 'true') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["k8s-tofu", "all"]'), github.event.inputs.component)))
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/k8s
+        working-directory: tofu/k8s
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -598,13 +598,13 @@ jobs:
             echo "${PLAN_OUTPUT:-No plan output.}"
             echo '``````````'
           } >"$RUNNER_TEMP/details.md"
-          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" k8s-terraform 50 "k8s Terraform" "$status" "$summary" "$RUNNER_TEMP/details.md"
+          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" k8s-tofu 50 "k8s OpenTofu" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
         if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pr-report-k8s-terraform
-          path: ${{ runner.temp }}/report/k8s-terraform.json
+          name: pr-report-k8s-tofu
+          path: ${{ runner.temp }}/report/k8s-tofu.json
       - name: Fail on format or plan error
         if: steps.fmt.outcome == 'failure' || steps.plan.outcome == 'failure'
         run: exit 1
@@ -626,9 +626,9 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Only when every changed file belongs to this Terraform root.
-          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^terraform/k8s/[^/]+$'; then
-            echo "The PR changes files outside this Terraform root; leaving it for review."
+          # Only when every changed file belongs to this OpenTofu root.
+          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^tofu/k8s/[^/]+$'; then
+            echo "The PR changes files outside this OpenTofu root; leaving it for review."
             exit 0
           fi
           gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
@@ -674,7 +674,7 @@ jobs:
           WGER_POSTGRES_PASSWORD: ${{ secrets.WGER_POSTGRES_PASSWORD }}
         run: ../../.github/scripts/reconcile-wger.sh "${{ env.K3S_HOST }}"
   smoke:
-    needs: [terraform, nixos, k8s-terraform]
+    needs: [tofu, nixos, k8s-tofu]
     # Failed or cancelled deploy jobs already fail the run.
     if: |
       always() && github.ref == 'refs/heads/main' &&

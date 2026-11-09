@@ -99,7 +99,7 @@ To change retention, edit the relevant `k8s/apps/*.yaml` file and push — ArgoC
 
 Alerts are routed to Telegram via Alertmanager.
 
-- **Bot token**: Stored as K8s secret `alertmanager-telegram-token` in `monitoring` namespace (managed by Terraform, `terraform/k8s/secrets.tf`)
+- **Bot token**: Stored as K8s secret `alertmanager-telegram-token` in `monitoring` namespace (managed by Terraform, `tofu/k8s/secrets.tf`)
 - **Chat ID**: Configured in `k8s/apps/kube-prometheus-stack.yaml` > `alertmanager.config.receivers`
 - **Routing**: All alerts go to Telegram except `Watchdog` and `InfoInhibitor` (silenced)
 - **Repeat interval**: 4h (won't spam)
@@ -129,7 +129,7 @@ Built-in kube-prometheus-stack alerts cover: pod crashes, node down, OOM kills, 
 | `grafana-admin`               | `monitoring` | `grafana_admin_password` | `GRAFANA_ADMIN_PASSWORD` |
 | `alertmanager-telegram-token` | `monitoring` | `telegram_bot_token`     | `TELEGRAM_BOT_TOKEN`     |
 
-Defined in `terraform/k8s/secrets.tf`, variables in `terraform/k8s/variables.tf`.
+Defined in `tofu/k8s/secrets.tf`, variables in `tofu/k8s/variables.tf`.
 
 ## K3s-Specific Notes
 
@@ -155,7 +155,7 @@ k8s/apps/
   tempo.yaml                   # Trace storage
   alloy.yaml                   # Log/trace collector
 
-terraform/k8s/
+tofu/k8s/
   secrets.tf                   # Grafana + Telegram secrets
   variables.tf                 # Secret variable declarations
 
