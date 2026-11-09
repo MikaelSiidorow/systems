@@ -147,6 +147,8 @@ in
   # seconds. Under agent memory pressure zigbee2mqtt was swapped out and
   # missed those acks, so keep it and its broker in RAM and ahead on CPU.
   systemd.services.mosquitto.serviceConfig = starvationGuard;
+  # A cgroup's MemoryMin only holds up to what its parent allocates.
+  systemd.slices.system.sliceConfig.MemoryMin = "512M";
 
   networking.firewall.interfaces.enp31s0.allowedTCPPorts = [ 8080 ];
 }
