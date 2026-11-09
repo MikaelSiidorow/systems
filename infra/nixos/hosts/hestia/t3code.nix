@@ -79,6 +79,12 @@ in
       UMask = "0077";
       # Headless startup prints a pairing credential; keep it out of the journal.
       StandardOutput = "null";
+      # Agents run solvers and builds that took the 15G host to OOM and
+      # starved zigbee2mqtt. Throttle them first, and on OOM kill only the
+      # offending process rather than every agent session.
+      MemoryHigh = "9G";
+      MemoryMax = "11G";
+      OOMPolicy = "continue";
     };
   };
 }

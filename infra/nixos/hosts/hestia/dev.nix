@@ -19,6 +19,13 @@ in
     daemon.settings.log-opts.max-size = "10m";
   };
 
+  # Agent containers run here, outside t3code.service's memory cap, and have
+  # peaked at 5G. Cap them too, so a container OOMs before the host does.
+  systemd.user.services.docker.serviceConfig = {
+    MemoryHigh = "5G";
+    MemoryMax = "6G";
+  };
+
   # T3 starts terminals and agents itself, without a login shell.
   systemd.services.t3code = {
     path = [ pkgs.docker ];
