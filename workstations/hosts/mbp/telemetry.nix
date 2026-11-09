@@ -25,6 +25,9 @@ let
   # Metadata only (no prompts, output or commands), so a quarter is cheap.
   # Only Prometheus can cap size; Loki and Tempo expire by age alone.
   retention = "2160h";
+  # The agents' only way to Grafana: their sandboxes allow this socket, not
+  # loopback, which would open every local port.
+  grafanaSocket = "${stateDir}/grafana.sock";
 
   lokiConfig = yaml "loki.yaml" {
     auth_enabled = false;
@@ -105,9 +108,39 @@ let
       }
 
       output {
-        metrics = [otelcol.processor.deltatocumulative.default.input]
-        logs    = [otelcol.exporter.loki.default.input]
-        traces  = [otelcol.exporter.otlp.tempo.input]
+        metrics = [otelcol.processor.transform.codex_host.input]
+        logs    = [otelcol.processor.attributes.content.input]
+        traces  = [otelcol.processor.attributes.content.input]
+      }
+    }
+
+    // Second lock behind the agent settings: prompts, commands and tool
+    // output never reach the stores, even if a flag is set elsewhere.
+    // Codex has no setting for tool arguments at all.
+    otelcol.processor.attributes "content" {
+      // Exact names only, so metadata like user_prompt_length stays.
+      // error carries failure text, which can include command output.
+      action {
+        pattern = "^(prompt|prompt_text|user_prompt|response|body|tool_input|tool_parameters|arguments|output|full_command|error)$"
+        action  = "delete"
+      }
+
+      output {
+        logs   = [otelcol.exporter.loki.default.input]
+        traces = [otelcol.processor.transform.status.input]
+      }
+    }
+
+    otelcol.processor.transform "status" {
+      error_mode = "ignore"
+      trace_statements {
+        context    = "span"
+        statements = [
+          `set(span.status.message, "") where span.status.message != ""`,
+        ]
+      }
+      output {
+        traces = [otelcol.exporter.otlp.tempo.input]
       }
     }
 
@@ -127,6 +160,21 @@ let
     loki.write "default" {
       endpoint {
         url = "http://127.0.0.1:${toString ports.loki}/loki/api/v1/push"
+      }
+    }
+
+    // Codex tags metrics with the host only as the resource attribute env,
+    // which the Prometheus exporter drops. As on the cluster.
+    otelcol.processor.transform "codex_host" {
+      error_mode = "ignore"
+      metric_statements {
+        context    = "datapoint"
+        statements = [
+          `set(attributes["host.name"], resource.attributes["env"]) where IsMatch(resource.attributes["service.name"], "^codex")`,
+        ]
+      }
+      output {
+        metrics = [otelcol.processor.deltatocumulative.default.input]
       }
     }
 
@@ -247,6 +295,11 @@ let
       "--web.listen-address=127.0.0.1:${toString ports.prometheus}"
       "--web.enable-remote-write-receiver"
     ];
+    grafana-socket = [
+      (lib.getExe pkgs.socat)
+      "UNIX-LISTEN:${grafanaSocket},fork,unlink-early,mode=600"
+      "TCP:127.0.0.1:${toString ports.grafana}"
+    ];
     grafana = [
       (lib.getExe' pkgs.grafana "grafana")
       "server"
@@ -256,6 +309,14 @@ let
   };
 in
 {
+  agents.telemetry = {
+    endpoint = "http://127.0.0.1:4318";
+    host = "mbp";
+    toolDetails = false;
+    grafana = "http://127.0.0.1:${toString ports.grafana}";
+    inherit grafanaSocket;
+  };
+
   # launchd must be able to open the log paths before the services start.
   home.activation.agentTelemetryState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     run install -d -m 700 ${

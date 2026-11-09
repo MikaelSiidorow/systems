@@ -11,7 +11,10 @@ raw() {
   shift 2
   local args=()
   for kv in "$@"; do args+=(--data-urlencode "$kv"); done
-  curl -sSfG --connect-timeout 5 --max-time 30 "${GRAFANA_URL:-https://grafana.miksu.app}/api/datasources/proxy/uid/$ds$path" "${args[@]}"
+  # Local Grafana is reached through a socket the sandboxes allow.
+  local via=()
+  if [[ -n ${GRAFANA_SOCKET:-} ]]; then via=(--unix-socket "$GRAFANA_SOCKET" --noproxy '*'); fi
+  curl -sSfG "${via[@]}" --connect-timeout 5 --max-time 30 "${GRAFANA_URL:-https://grafana.miksu.app}/api/datasources/proxy/uid/$ds$path" "${args[@]}"
 }
 
 seconds() {

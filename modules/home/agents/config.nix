@@ -11,7 +11,13 @@
 }:
 let
   inherit (config.agents) telemetry;
-  grafanaHost = "grafana.miksu.app";
+  grafana = if telemetry == null then null else telemetry.grafana;
+  socket = if telemetry == null then null else telemetry.grafanaSocket;
+  grafanaHost =
+    if grafana == null then
+      "grafana.miksu.app"
+    else
+      builtins.head (builtins.match "https?://([^:/]+).*" grafana);
 
   # Merged into ~/.claude/settings.json on switch: these keys win, lists are
   # unioned, removals need a manual edit. Public repo: keep work settings local.
@@ -44,10 +50,19 @@ let
         OTEL_METRICS_EXPORTER = "otlp";
         OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
         OTEL_EXPORTER_OTLP_ENDPOINT = telemetry.endpoint;
-        # Bash commands, MCP and skill names, and branch and SHA on commits.
-        OTEL_LOG_TOOL_DETAILS = "1";
         OTEL_METRICS_INCLUDE_REPOSITORY = "true";
         OTEL_RESOURCE_ATTRIBUTES = "host.name=${telemetry.host}";
+      }
+      // lib.optionalAttrs (telemetry != null) {
+        # Bash commands, MCP and skill names, and branch and SHA on commits.
+        # Off is written out, since the merge never removes a key.
+        OTEL_LOG_TOOL_DETAILS = if telemetry.toolDetails then "1" else "0";
+      }
+      // lib.optionalAttrs (grafana != null) {
+        GRAFANA_URL = grafana;
+      }
+      // lib.optionalAttrs (socket != null) {
+        GRAFANA_SOCKET = socket;
       };
       sandbox = {
         # Go CLIs (gh, terraform, kubectl) need trustd to verify TLS on macOS.
@@ -63,9 +78,13 @@ let
           "codex *"
         ];
       }
-      // lib.optionalAttrs (telemetry != null) {
-        # Agents read their own telemetry through Grafana's datasource proxy.
+      # Agents read their own telemetry through Grafana's datasource proxy.
+      // lib.optionalAttrs (telemetry != null && socket == null) {
         network.allowedDomains = [ grafanaHost ];
+      }
+      # A loopback host would open every local port, so local Grafana is a socket.
+      // lib.optionalAttrs (socket != null) {
+        network.allowUnixSockets = [ socket ];
       };
     }
   );
@@ -102,13 +121,28 @@ let
         extends = ":workspace";
         network = {
           enabled = true;
-          domains.${grafanaHost} = "allow";
-          # Grafana resolves to a tailnet IP, which the proxy refuses without
-          # this; other private hosts stay blocked.
-          allow_local_binding = true;
-        };
+        }
+        // (
+          if socket == null then
+            {
+              domains.${grafanaHost} = "allow";
+              # Grafana resolves to a tailnet IP, which the proxy refuses without
+              # this; other private hosts stay blocked.
+              allow_local_binding = true;
+            }
+          else
+            { unix_sockets.${socket} = "allow"; }
+        );
       };
       features.network_proxy = true;
+    }
+    // lib.optionalAttrs (grafana != null) {
+      shell_environment_policy.set = {
+        GRAFANA_URL = grafana;
+      }
+      // lib.optionalAttrs (socket != null) { GRAFANA_SOCKET = socket; };
+    }
+    // lib.optionalAttrs (telemetry != null) {
       otel =
         let
           otlp = path: {
@@ -123,6 +157,12 @@ let
           exporter = otlp "/v1/logs";
           trace_exporter = otlp "/v1/traces";
           metrics_exporter = otlp "/v1/metrics";
+        }
+        // lib.optionalAttrs (!telemetry.toolDetails) {
+          # Codex has no switch for tool arguments (the command); local
+          # collectors drop them (workstations/hosts/mbp/telemetry.nix).
+          tool_result.max_bytes = 0;
+          log_user_prompt = false;
         };
     }
   );
@@ -173,8 +213,8 @@ let
   skills = {
     agent-traces = {
       source = ./skills/agent-traces;
-      # Hestia and tpad reach Grafana; the Mac keeps work sessions off the cluster.
-      linuxOnly = true;
+      # Only hosts that export telemetry have a Grafana to read.
+      needsTelemetry = true;
       agents = [
         "codex"
         "claude-code"
@@ -338,7 +378,7 @@ let
     );
 
   installedSkills = lib.filterAttrs (
-    _: skill: pkgs.stdenv.isLinux || !(skill.linuxOnly or false)
+    _: skill: telemetry != null || !(skill.needsTelemetry or false)
   ) skills;
 
   skillFiles = lib.foldl' (acc: fileSet: acc // fileSet) { } (
@@ -359,6 +399,21 @@ in
           host = lib.mkOption {
             type = lib.types.str;
             description = "Machine name tagged on every signal.";
+          };
+          toolDetails = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Export Bash commands and tool details. Off also keeps Codex tool output and prompts out.";
+          };
+          grafana = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Grafana base URL the agents read telemetry from; null keeps the cluster.";
+          };
+          grafanaSocket = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Unix socket that reaches grafana; the sandboxes then allow only it.";
           };
         };
       }
