@@ -82,7 +82,7 @@
     },
     {
       "description": "Cluster, infra and cloud changes deploy on merge; never auto-merge",
-      "matchFileNames": ["infra/**", "k8s/**", "terraform/**"],
+      "matchFileNames": ["infra/**", "k8s/**", "tofu/**"],
       "automerge": false
     },
     {

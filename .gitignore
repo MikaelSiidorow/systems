@@ -1,7 +1,7 @@
 # Terraform
 **/.terraform/
-terraform/*.tfvars
-terraform/*.tfvars.json
+tofu/*.tfvars
+tofu/*.tfvars.json
 *.tfstate
 *.tfstate.*
 **/tfplan
