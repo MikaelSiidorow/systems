@@ -16,9 +16,14 @@ let
     text = ''
       # -F none: no ControlMaster or relaxed host checks from ~/.ssh/config.
       export RSYNC_RSH="ssh -F none -i ${key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${knownHosts}"
-      # No --delete, so the archive keeps what the agents prune.
-      rsync -a "$HOME/.claude/projects/" mikaelsiidorow@hestia.vpn.miksu.app:claude/
-      rsync -a "$HOME/.codex/sessions/" mikaelsiidorow@hestia.vpn.miksu.app:codex/
+      # No --delete, so the archive keeps what the agents prune. An agent
+      # never run here has no folder yet.
+      if [ -d "$HOME/.claude/projects" ]; then
+        rsync -a "$HOME/.claude/projects/" mikaelsiidorow@hestia.vpn.miksu.app:claude/
+      fi
+      if [ -d "$HOME/.codex/sessions" ]; then
+        rsync -a "$HOME/.codex/sessions/" mikaelsiidorow@hestia.vpn.miksu.app:codex/
+      fi
     '';
   };
 in
