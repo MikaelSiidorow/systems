@@ -1,6 +1,6 @@
 # Hourly copy of the full Claude and Codex transcripts to Hestia's archive
-# (~/agent-transcripts/tpad). The key only reaches rrsync there, which can add
-# and update files in that folder and nothing else.
+# (~/agent-transcripts/tpad). The key only reaches rrsync there, which can
+# write into that folder and nothing else.
 { config, pkgs, ... }:
 let
   key = config.sops.secrets."ssh/transcripts_key".path;
@@ -14,7 +14,8 @@ let
       pkgs.rsync
     ];
     text = ''
-      export RSYNC_RSH="ssh -i ${key} -o IdentitiesOnly=yes -o BatchMode=yes -o UserKnownHostsFile=${knownHosts}"
+      # -F none: no ControlMaster or relaxed host checks from ~/.ssh/config.
+      export RSYNC_RSH="ssh -F none -i ${key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${knownHosts}"
       # No --delete, so the archive keeps what the agents prune.
       rsync -a "$HOME/.claude/projects/" mikaelsiidorow@hestia.vpn.miksu.app:claude/
       rsync -a "$HOME/.codex/sessions/" mikaelsiidorow@hestia.vpn.miksu.app:codex/

@@ -211,8 +211,8 @@ in
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBHSw1Hq0dCnEC2j78BqNKzP+hrn+MLppWELfHgVNCaG"
       # tpad's transcript copy (workstations/hosts/tpad/transcripts.nix): it can
-      # only add and update files in the archive, never read or delete.
-      ''restrict,command="${pkgs.rrsync}/bin/rrsync -wo -no-del /home/${username}/agent-transcripts/tpad" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKxJwbkpPlnIWTloYuXjRxezUGMeZWdsuxRT0Hf0E1Iu tpad transcript archive''
+      # only write into the archive: no reads, deletes or live symlinks.
+      ''restrict,command="${pkgs.rrsync}/bin/rrsync -wo -no-del -munge /home/${username}/agent-transcripts/tpad" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKxJwbkpPlnIWTloYuXjRxezUGMeZWdsuxRT0Hf0E1Iu tpad transcript archive''
     ];
   };
 
