@@ -37,6 +37,8 @@
         endpoint = "http://127.0.0.1:4318";
         host = "hestia";
       };
+      # Full transcripts for later analysis; tpad's arrive in ~/agent-transcripts/tpad.
+      agents.keepTranscripts = true;
 
       # Persistent sessions for SSH: `tmux new -A -s main` reattaches.
       programs.tmux = {
