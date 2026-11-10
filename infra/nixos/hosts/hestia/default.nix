@@ -210,8 +210,16 @@ in
     extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBHSw1Hq0dCnEC2j78BqNKzP+hrn+MLppWELfHgVNCaG"
+      # tpad's transcript copy (workstations/hosts/tpad/transcripts.nix): it can
+      # only add and update files in the archive, never read or delete.
+      ''restrict,command="${pkgs.rrsync}/bin/rrsync -wo -no-del /home/${username}/agent-transcripts/tpad" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKxJwbkpPlnIWTloYuXjRxezUGMeZWdsuxRT0Hf0E1Iu tpad transcript archive''
     ];
   };
+
+  systemd.tmpfiles.rules = [
+    "d /home/${username}/agent-transcripts 0700 ${username} users -"
+    "d /home/${username}/agent-transcripts/tpad 0700 ${username} users -"
+  ];
 
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBHSw1Hq0dCnEC2j78BqNKzP+hrn+MLppWELfHgVNCaG"

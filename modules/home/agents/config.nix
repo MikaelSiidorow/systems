@@ -22,71 +22,77 @@ let
   # Merged into ~/.claude/settings.json on switch: these keys win, lists are
   # unioned, removals need a manual edit. Public repo: keep work settings local.
   claudeSettings = pkgs.writeText "claude-settings-baseline.json" (
-    builtins.toJSON {
-      attribution = {
-        commit = "";
-        pr = "";
-      };
-      statusLine = {
-        type = "command";
-        command = "~/.claude/statusline-command.sh";
-      };
-      theme = "dark";
-      verbose = true;
-      autoMemoryEnabled = false;
-      promptSuggestionEnabled = false;
-      # The sandbox blocks the fsmonitor socket; skip it to avoid IPC errors.
-      env = {
-        GIT_CONFIG_COUNT = "1";
-        GIT_CONFIG_KEY_0 = "core.fsmonitor";
-        GIT_CONFIG_VALUE_0 = "false";
+    builtins.toJSON (
+      {
+        attribution = {
+          commit = "";
+          pr = "";
+        };
+        statusLine = {
+          type = "command";
+          command = "~/.claude/statusline-command.sh";
+        };
+        theme = "dark";
+        verbose = true;
+        autoMemoryEnabled = false;
+        promptSuggestionEnabled = false;
+        # The sandbox blocks the fsmonitor socket; skip it to avoid IPC errors.
+        env = {
+          GIT_CONFIG_COUNT = "1";
+          GIT_CONFIG_KEY_0 = "core.fsmonitor";
+          GIT_CONFIG_VALUE_0 = "false";
+        }
+        // lib.optionalAttrs (telemetry != null) {
+          CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+          # Spans per prompt, LLM request and tool call; Bash children get TRACEPARENT.
+          CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
+          OTEL_TRACES_EXPORTER = "otlp";
+          OTEL_LOGS_EXPORTER = "otlp";
+          OTEL_METRICS_EXPORTER = "otlp";
+          OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
+          OTEL_EXPORTER_OTLP_ENDPOINT = telemetry.endpoint;
+          OTEL_METRICS_INCLUDE_REPOSITORY = "true";
+          OTEL_RESOURCE_ATTRIBUTES = "host.name=${telemetry.host}";
+        }
+        // lib.optionalAttrs (telemetry != null) {
+          # Bash commands, MCP and skill names, and branch and SHA on commits.
+          # Off is written out, since the merge never removes a key.
+          OTEL_LOG_TOOL_DETAILS = if telemetry.toolDetails then "1" else "0";
+        }
+        // lib.optionalAttrs (grafana != null) {
+          GRAFANA_URL = grafana;
+        }
+        // lib.optionalAttrs (socket != null) {
+          GRAFANA_SOCKET = socket;
+        };
+        sandbox = {
+          # Go CLIs (gh, terraform, kubectl) need trustd to verify TLS on macOS.
+          enableWeakerNetworkIsolation = true;
+          excludedCommands = [
+            "git push *"
+            "git pull *"
+            "git fetch *"
+            "git lfs *"
+            "git -C * fetch *"
+            "git -C * pull *"
+            # Codex needs to write ~/.codex and applies its own sandbox.
+            "codex *"
+          ];
+        }
+        # Agents read their own telemetry through Grafana's datasource proxy.
+        // lib.optionalAttrs (telemetry != null && socket == null) {
+          network.allowedDomains = [ grafanaHost ];
+        }
+        # A loopback host would open every local port, so local Grafana is a socket.
+        // lib.optionalAttrs (socket != null) {
+          network.allowUnixSockets = [ socket ];
+        };
       }
-      // lib.optionalAttrs (telemetry != null) {
-        CLAUDE_CODE_ENABLE_TELEMETRY = "1";
-        # Spans per prompt, LLM request and tool call; Bash children get TRACEPARENT.
-        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
-        OTEL_TRACES_EXPORTER = "otlp";
-        OTEL_LOGS_EXPORTER = "otlp";
-        OTEL_METRICS_EXPORTER = "otlp";
-        OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
-        OTEL_EXPORTER_OTLP_ENDPOINT = telemetry.endpoint;
-        OTEL_METRICS_INCLUDE_REPOSITORY = "true";
-        OTEL_RESOURCE_ATTRIBUTES = "host.name=${telemetry.host}";
+      // lib.optionalAttrs config.agents.keepTranscripts {
+        # Default is 30 days; the setting has no "never".
+        cleanupPeriodDays = 3650;
       }
-      // lib.optionalAttrs (telemetry != null) {
-        # Bash commands, MCP and skill names, and branch and SHA on commits.
-        # Off is written out, since the merge never removes a key.
-        OTEL_LOG_TOOL_DETAILS = if telemetry.toolDetails then "1" else "0";
-      }
-      // lib.optionalAttrs (grafana != null) {
-        GRAFANA_URL = grafana;
-      }
-      // lib.optionalAttrs (socket != null) {
-        GRAFANA_SOCKET = socket;
-      };
-      sandbox = {
-        # Go CLIs (gh, terraform, kubectl) need trustd to verify TLS on macOS.
-        enableWeakerNetworkIsolation = true;
-        excludedCommands = [
-          "git push *"
-          "git pull *"
-          "git fetch *"
-          "git lfs *"
-          "git -C * fetch *"
-          "git -C * pull *"
-          # Codex needs to write ~/.codex and applies its own sandbox.
-          "codex *"
-        ];
-      }
-      # Agents read their own telemetry through Grafana's datasource proxy.
-      // lib.optionalAttrs (telemetry != null && socket == null) {
-        network.allowedDomains = [ grafanaHost ];
-      }
-      # A loopback host would open every local port, so local Grafana is a socket.
-      // lib.optionalAttrs (socket != null) {
-        network.allowUnixSockets = [ socket ];
-      };
-    }
+    )
   );
 
   # Like jq's `*`, but unions arrays instead of replacing them.
@@ -420,6 +426,9 @@ in
     );
     default = null;
   };
+
+  # Codex never prunes ~/.codex/sessions, so only Claude needs this.
+  options.agents.keepTranscripts = lib.mkEnableOption "keeping Claude transcripts for ten years instead of 30 days";
 
   config.home = {
     file = skillFiles // {

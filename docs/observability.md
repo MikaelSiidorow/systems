@@ -48,6 +48,12 @@ Find a session in Tempo with TraceQL, e.g. `{ resource.host.name = "hestia" && n
 
 To turn telemetry off on a host, unset the option and delete the `OTEL_*`, `CLAUDE_CODE_*TELEMETRY*` and `GRAFANA_URL` keys from `~/.claude/settings.json` and the `[otel]` table from `~/.codex/config.toml`. The settings merge only adds keys.
 
+### Transcripts
+
+Telemetry leaves out prompts and replies, so full transcripts stay as the agents' own JSONL files. They never reach the cluster, where Grafana is readable without a login. Hestia and tpad set `agents.keepTranscripts`, which keeps Claude's `~/.claude/projects` for ten years instead of 30 days; Codex never prunes `~/.codex/sessions`. Every hour tpad copies both to Hestia's `~/agent-transcripts/tpad/{claude,codex}` (`workstations/hosts/tpad/transcripts.nix`). Its key reaches only `rrsync`, which can add and update files there but not read or delete them. Run `transcripts-push` on tpad to copy now.
+
+A file maps to a session in telemetry: Claude's file name is its `session.id`, and Codex's ends with its thread id. Query the files in place with DuckDB. Record shapes vary too much for `read_json` to infer columns, so read raw objects, and skip the occasional line an interrupted session left half-written: `nix shell nixpkgs#duckdb -c duckdb -c "select json->>'type' as type, count(*) from read_ndjson_objects('~/.claude/projects/*/*.jsonl', ignore_errors = true) group by all"`. Codex files are at `~/.codex/sessions/*/*/*/*.jsonl`.
+
 ### On the Mac
 
 `workstations/hosts/mbp/telemetry.nix` runs Alloy, Loki, Tempo, Prometheus and Grafana from nixpkgs as launchd agents, every one bound to 127.0.0.1, with nothing exported off the machine. Alloy receives OTLP on 4318 and repeats the cluster pipeline, so the skill's labels and metric names hold. Grafana is at http://127.0.0.1:43000 with anonymous read access and the cluster's datasource UIDs; the backends sit on 43090–43345. Data lives in `~/.local/state/agent-telemetry` for 90 days, with Prometheus also capped at 20 GB; Loki and Tempo expire by age only.
