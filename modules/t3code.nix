@@ -122,6 +122,10 @@ let
         # Codex app-server parents a request to the JSON-RPC envelope's trace.
         patchOnce 'const request = fn\("CodexAppServerProtocol\.request"\)\(function\* \(method, payload\) \{' \
           'const offerOutgoingUntraced = offerOutgoing; const request = fn("CodexAppServerProtocol.request")(function* (method, payload) { const trace = method === "turn/start" \|\| method === "turn/steer" ? yield* '"$spanTrace"' : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });'
+        # The prompt names "its task ID", so agents that skip loading the schema
+        # call t3_background_wait with taskId or nothing and fail once.
+        patchOnce 'with its task ID before you end your turn' \
+          'with its task ID in \\`taskIds\\` (an array) before you end your turn'
         ${pkgs.lib.getExe runtimePkgs.nodejs_24} --check "$chunk"
 
         rm "$out/bin/t3" "$desktop/bin/t3code-desktop" \
