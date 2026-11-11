@@ -25,6 +25,10 @@ let
   # Metadata only (no prompts, output or commands), so a quarter is cheap.
   # Only Prometheus can cap size; Loki and Tempo expire by age alone.
   retention = "2160h";
+  # A lone instance cannot fail over, so a late heartbeat after the Mac sleeps
+  # only makes its ring refuse writes and queries. 0s is no fix: Loki then
+  # forgets its own instance at once. A day outlasts a night's sleep.
+  heartbeat_timeout = "24h";
   # The agents' only way to Grafana: their sandboxes allow this socket, not
   # loopback, which would open every local port.
   grafanaSocket = "${stateDir}/grafana.sock";
@@ -36,12 +40,16 @@ let
       http_listen_port = ports.loki;
       grpc_listen_address = "127.0.0.1";
       grpc_listen_port = ports.lokiGrpc;
+      log_level = "warn";
     };
     common = {
       path_prefix = "${stateDir}/loki";
       replication_factor = 1;
       instance_addr = "127.0.0.1";
-      ring.kvstore.store = "inmemory";
+      ring = {
+        kvstore.store = "inmemory";
+        inherit heartbeat_timeout;
+      };
       storage.filesystem = {
         chunks_directory = "${stateDir}/loki/chunks";
         rules_directory = "${stateDir}/loki/rules";
@@ -66,6 +74,14 @@ let
       retention_enabled = true;
       delete_request_store = "filesystem";
     };
+    # These caches ask the compactor for cache generations, which only the
+    # delete API keeps, so every query logged an error.
+    query_range = {
+      cache_index_stats_results = false;
+      cache_volume_results = false;
+      cache_series_results = false;
+      cache_label_results = false;
+    };
     limits_config = {
       retention_period = retention;
       # The delete API is unauthenticated: a web page could erase logs.
@@ -80,6 +96,7 @@ let
       http_listen_port = ports.tempo;
       grpc_listen_address = "127.0.0.1";
       grpc_listen_port = ports.tempoGrpc;
+      log_level = "warn";
     };
     distributor.receivers.otlp.protocols.grpc.endpoint = "127.0.0.1:${toString ports.tempoOtlp}";
     ingester.lifecycler = {
@@ -87,6 +104,7 @@ let
       ring = {
         kvstore.store = "inmemory";
         replication_factor = 1;
+        inherit heartbeat_timeout;
       };
     };
     memberlist.bind_addr = [ "127.0.0.1" ];
