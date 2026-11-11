@@ -10,6 +10,7 @@
 let
   stateDir = "${config.xdg.stateHome}/cli-proxy-api";
   clientKeyFile = "${stateDir}/client-key";
+  claude = inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
   settings = pkgs.writeText "cli-proxy-api-local.json" (
     builtins.toJSON {
       config-version = 8;
@@ -32,6 +33,10 @@ let
         session-affinity-rebind-on = "quota";
       };
       oauth.auth-dir = "${stateDir}/auth";
+      # The proxy reports its own pinned Claude Code version for clients it
+      # doesn't recognise (T3 Code), and the API rejects newer models for old
+      # versions. Report the version we actually run.
+      claude-header-defaults.user-agent = "claude-cli/${claude.version} (external, cli)";
     }
   );
   hub = pkgs.writeShellApplication {
@@ -71,8 +76,7 @@ let
     '';
   };
   claudeLocal = import ../../modules/claude-proxy.nix {
-    inherit pkgs clientKeyFile;
-    claude = inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+    inherit pkgs clientKeyFile claude;
     name = "claude-local";
     baseUrl = "http://127.0.0.1:8317";
   };
