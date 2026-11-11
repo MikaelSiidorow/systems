@@ -16,6 +16,6 @@ My open PRs in the current repo, drafts included.
 3. **Needs you**: design questions, feedback you would push back on, drafts that look done, conflicts you could not settle.
 4. **Waiting on review**: who has it and since when; past a working day, suggest a nudge without sending it.
 
-**Dispatch** for group 2: propose one per PR and wait for the user's go. Send it to the PR's linked T3 thread (`t3_thread_send`: run `address-review`), else `delegate_task` with `isolation: "worktree"` on the PR's branch.
+**Dispatch** for group 2: propose one per PR and wait for the user's go. Send it to the PR's linked T3 thread (`t3_thread_send`: run `address-review`). Otherwise launch one with `t3_thread_launch` on the PR's branch: `workspaceStrategy: {type: "existing_worktree", worktreePath}` when `git worktree list` shows the branch; else `{type: "worktree", baseRef: "origin/<branch>", branch: "<branch>", startFromOrigin: true}` when no local branch has that name (T3 runs the thread in the project root when it does; there, omit `branch` and tell the thread to push with `git push origin HEAD:<branch>`).
 
 Report the groups in order, one line per PR with its link, plus what you rebased or skipped.
