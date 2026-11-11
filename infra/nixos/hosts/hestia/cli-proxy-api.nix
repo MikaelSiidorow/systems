@@ -1,5 +1,11 @@
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 let
+  claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
   release = "v8.0.59";
   cliProxyApi = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "cli-proxy-api";
@@ -35,6 +41,11 @@ let
         disable-cooling: true
     oauth:
       auth-dir: "/var/lib/cli-proxy-api/auth"
+    # The proxy reports its own pinned Claude Code version for clients it
+    # doesn't recognise (T3 Code), and the API rejects newer models for old
+    # versions. Report the version we actually run.
+    claude-header-defaults:
+      user-agent: "claude-cli/${claudeCode.version} (external, cli)"
     observability:
       logs:
         request-log: false
