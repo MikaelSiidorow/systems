@@ -279,7 +279,7 @@ Templates and visual editors also produce clean formatting. The tell is decorati
 
 ### 20. Decorative headings
 
-**Problem:** Headings capitalize every main word, and headings or list items carry emojis or arrows (→) as decoration. A horizontal rule sits between every section, or the document opens with a top-level heading that repeats its own title. A heading written for effect ("The decision, on one screen") should name what the section holds ("How the six options compare"). Use sentence case, remove the decoration and the rules, and let the title stand once.
+**Problem:** Headings capitalize every main word, and headings or list items carry emojis or arrows (→) as decoration. A horizontal rule sits between every section, or the document opens with a top-level heading that repeats its own title. A heading written for effect ("The decision, on one screen") should name what the section holds ("How the six options compare"). Use sentence case, remove the decoration and the rules, and let the title stand once. Bullet symbols typed into the text (•, ▪, ◦, ‣) count as decoration too: mark list items with a plain hyphen (`-`).
 **Before:**
 > ## Strategic Negotiations And Global Partnerships
 **After:**

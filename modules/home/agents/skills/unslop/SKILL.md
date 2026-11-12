@@ -23,6 +23,7 @@ Edit the text in place, keeping its meaning, facts, links, code and the author's
 - Break up rule-of-three cadence, "not X but Y" parallelisms, staccato punchlines and aphorisms.
 - Turn boldface and inline-header lists back into sentences unless the format needs them.
 - Use sentence case in headings and straight quotes.
+- Mark list items with a plain hyphen (`-`).
 
 ## 3. Check
 
