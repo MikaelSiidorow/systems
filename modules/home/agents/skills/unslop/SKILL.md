@@ -19,7 +19,7 @@ Edit the text in place, keeping its meaning, facts, links, code and the author's
 ## 2. Plain words
 
 - Replace inflated vocabulary and significance claims with the concrete claim ("is", "has", "fixes").
-- Replace em and en dashes with commas, colons, parentheses or full stops.
+- Replace em and en dashes with commas, colons, parentheses or full stops, and middle dots (·) used as separators with commas, line breaks or full stops.
 - Break up rule-of-three cadence, "not X but Y" parallelisms, staccato punchlines and aphorisms.
 - Turn boldface and inline-header lists back into sentences unless the format needs them.
 - Use sentence case in headings and straight quotes.
