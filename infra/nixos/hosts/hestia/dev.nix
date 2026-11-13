@@ -37,6 +37,9 @@ in
 
   environment.variables = playwright;
 
+  # Lets agents here drive Amp threads (`amp threads continue <id>`).
+  environment.systemPackages = [ pkgs.amp-cli ];
+
   # Volumes stay, since they hold the dev databases. The age filter spares a
   # week of build cache, so a size cap stops Rust builds filling the disk.
   systemd.user.services.docker-prune = {

@@ -51,6 +51,7 @@ in
     lights-toggle
     t3code.desktop
     (pkgs.callPackage ../../pkgs/amp-desktop { })
+    pkgs.amp-cli
   ]
   ++ t3code.direnvProviders;
 
