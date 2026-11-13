@@ -50,6 +50,7 @@ in
     tailscale-headscale-setup
     lights-toggle
     t3code.desktop
+    (pkgs.callPackage ../../pkgs/amp-desktop { })
   ]
   ++ t3code.direnvProviders;
 
