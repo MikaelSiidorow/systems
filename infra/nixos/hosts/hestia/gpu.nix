@@ -9,6 +9,8 @@
       "nvidia-x11"
       "nvidia-kernel-modules"
       "nvidia-settings"
+      # The one unfree package outside the GPU stack; see dev.nix.
+      "amp-cli"
     ];
   hardware.graphics.enable = true;
   services.xserver.videoDrivers = [ "nvidia" ];
