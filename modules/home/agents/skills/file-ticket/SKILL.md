@@ -13,7 +13,7 @@ description: File a Linear or GitHub ticket in the right team, project and queue
 
 - **Team**: the related ticket's team, else the team whose recent tickets cover this repo or area. Ask if still unclear; a ticket on the wrong team gets lost.
 - **Project**: only when it clearly belongs (a follow-up in that project, or one the user named). Otherwise none.
-- **State**: if the team has a Triage state and the ticket is not the user's to start now, file it there and leave priority to the team. If it is the user's to start now: Todo, assigned to them.
+- **State**: if the team has a Triage state and the ticket is not the user's to start now, file it there and leave priority to the team. If it is the user's to start now: the team's unstarted state (Todo, Ready to Dev; teams name it differently, so list its states), assigned to them.
 - **Labels and priority**: only when clear, and only labels the tracker already has.
 
 **Body**: the problem first (what happens, what should happen), then repro steps or evidence, then acceptance criteria. No implementation plan unless asked. Link the source (PR, thread, error). Run it through `unslop`, and leave out secrets.
