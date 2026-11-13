@@ -62,11 +62,12 @@ let
           exit 1
         }
         patchOnce() {
-          [ "$(grep -oE "$1" "$chunk" | wc -l)" = 1 ] || {
-            echo "t3code: expected one '$1' in $chunk" >&2
+          local file=''${3:-$chunk}
+          [ "$(grep -oE "$1" "$file" | wc -l)" = 1 ] || {
+            echo "t3code: expected one '$1' in $file" >&2
             exit 1
           }
-          sed -Ei "s|$1|$2|" "$chunk"
+          sed -Ei "s|$1|$2|" "$file"
         }
         # Import the Effect helpers the patches call under our own names. Import
         # aliases shift between releases, but the Effect chunk keeps effect's
@@ -127,6 +128,18 @@ let
         patchOnce 'with its task ID before you end your turn' \
           'with its task ID in \\`taskIds\\` (an array) before you end your turn'
         ${pkgs.lib.getExe runtimePkgs.nodejs_24} --check "$chunk"
+
+        # Wake a PR-watching thread for new comments, not edits. Review bots
+        # rewrite their summary comments in place, and each rewrite resumed a
+        # long thread from a cold cache.
+        activeAt='const activeAt = \(remark\) => remark\.editedAt \?\? remark\.createdAt;'
+        watchChunk=$(grep -lE "$activeAt" "$dist"/*.mjs)
+        [ "$(printf '%s\n' "$watchChunk" | wc -l)" = 1 ] || {
+          echo "t3code: expected one chunk watching PR remarks in $dist" >&2
+          exit 1
+        }
+        patchOnce "$activeAt" 'const activeAt = (remark) => remark.createdAt;' "$watchChunk"
+        ${pkgs.lib.getExe runtimePkgs.nodejs_24} --check "$watchChunk"
 
         rm "$out/bin/t3" "$desktop/bin/t3code-desktop" \
           "$desktop/libexec/t3code/apps/server"
