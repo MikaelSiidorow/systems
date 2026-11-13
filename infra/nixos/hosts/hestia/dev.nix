@@ -1,6 +1,7 @@
 {
   options,
   pkgs,
+  inputs,
   username,
   ...
 }:
@@ -38,7 +39,10 @@ in
   environment.variables = playwright;
 
   # Lets agents here drive Amp threads (`amp threads continue <id>`).
-  environment.systemPackages = [ pkgs.amp-cli ];
+  # From llm-agents: nixpkgs stable trails Amp releases by months.
+  environment.systemPackages = [
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.amp
+  ];
 
   # Volumes stay, since they hold the dev databases. The age filter spares a
   # week of build cache, so a size cap stops Rust builds filling the disk.
