@@ -7,6 +7,7 @@
   stdenvNoCC,
   fetchurl,
   dpkg,
+  asar,
   makeWrapper,
   electron_44,
   xdg-utils,
@@ -22,13 +23,19 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     dpkg
+    asar
     makeWrapper
   ];
 
   installPhase = ''
     runHook preInstall
 
-    install -Dm644 opt/amp/resources/app.asar $out/share/amp-desktop/app.asar
+    asar extract opt/amp/resources/app.asar $out/share/amp-desktop
+    # Open at Login saves Electron's and the bundle's store paths, which an
+    # update and a GC remove. Save the wrapper's name, as the .desktop does.
+    substituteInPlace $out/share/amp-desktop/dist/main.js \
+      --replace-fail 'process.execPath,
+      ...app.isPackaged ? [] : [app.getAppPath()],' '"amp-desktop",'
     cp -r usr/share/icons $out/share/icons
     install -Dm644 usr/share/applications/amp-desktop.desktop -t $out/share/applications
     substituteInPlace $out/share/applications/amp-desktop.desktop \
@@ -36,7 +43,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
     # xdg-open opens the browser for sign-in and links.
     makeWrapper ${lib.getExe electron_44} $out/bin/amp-desktop \
-      --add-flags $out/share/amp-desktop/app.asar \
+      --add-flags $out/share/amp-desktop \
       --prefix PATH : ${lib.makeBinPath [ xdg-utils ]} \
       --inherit-argv0
 
