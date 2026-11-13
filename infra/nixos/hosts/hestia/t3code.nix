@@ -20,7 +20,18 @@ let
       name = "claude";
     };
   };
-  claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
+  # Run Claude Code's native build, which updates itself, so a new model works
+  # without a pin bump and a Hestia deploy. The pinned build only installs it.
+  claudeInstaller = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
+  claudeCode = pkgs.writeShellApplication {
+    name = "claude";
+    text = ''
+      native="$HOME/.local/bin/claude"
+      # T3 reads the agent's stdout, so keep the installer off it.
+      [[ -x $native ]] || ${claudeInstaller}/bin/claude install latest >&2
+      exec "$native" "$@"
+    '';
+  };
   claudeHestia = import ../../../../modules/claude-proxy.nix {
     inherit pkgs;
     claude = claudeCode;
@@ -85,6 +96,20 @@ in
       MemoryHigh = "9G";
       MemoryMax = "11G";
       OOMPolicy = "continue";
+    };
+  };
+
+  # T3 runs Claude headless, so don't count on its own update check.
+  systemd.services.claude-update = {
+    description = "Update the native Claude Code build";
+    startAt = "daily";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    environment.HOME = "/home/${username}";
+    serviceConfig = {
+      Type = "oneshot";
+      User = username;
+      ExecStart = "${claudeCode}/bin/claude update";
     };
   };
 }
