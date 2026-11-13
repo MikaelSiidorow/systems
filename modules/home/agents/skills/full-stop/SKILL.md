@@ -18,7 +18,7 @@ Never merge, enable auto-merge, enter a merge queue or push to the default branc
 
 1. **Finish the change** with the smallest change that works. On the default branch, branch first.
 2. **Prove it** (see Proof).
-3. **Draft PR**: `file-pr` if none exists, with one line in the description saying how you proved it. Handle existing comments with `address-review`.
+3. **Draft PR**: `file-pr` if none exists; its Proof carries step 2. Handle existing comments with `address-review`.
 4. **Review while draft**: `review-rounds`, then push its fixes.
 5. **Ready**: `rebase` if behind, `gh pr ready`, request the reviewers the repo's docs name.
 6. **Bots and CI**: `babysit-pr` until green, skipping its review rounds. Prove each fix before pushing it.
