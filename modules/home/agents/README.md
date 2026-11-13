@@ -36,6 +36,6 @@ Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex; 
 | [writing-for-agents](skills/writing-for-agents/SKILL.md) | Guidance for writing skills and AGENTS.md files |
 | [agent-traces](skills/agent-traces/SKILL.md) | Query my agents' own traces, events and cost from Grafana (hosts with telemetry only) |
 
-Some skills are adapted from other people's work under MIT: `babysit-pr`, `file-pr`, `full-send`, `full-stop`, `modernize` and `takeover` from Theo Browne; `grilling`, `retro` and `writing-for-agents` from Matt Pocock; `unslop` from Siqi Chen. Each one keeps its `LICENSE`. The rest are mine.
+Some skills are adapted from other people's work under MIT: `babysit-pr`, `file-pr`, `full-send`, `full-stop`, `modernize` and `takeover` from Theo Browne; `grilling`, `retro` and `writing-for-agents` from Matt Pocock, plus parts of `file-pr`; `unslop` from Siqi Chen. Each one keeps its `LICENSE`. The rest are mine.
 
 To add a skill, create `skills/<name>/SKILL.md`, register it in the `skills` set in `config.nix`, and add a row above.
