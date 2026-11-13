@@ -1,7 +1,7 @@
 # ThinkPad (Pop!_OS) host configuration for home-manager standalone
 { pkgs, inputs, ... }:
 let
-  t3code = import ../../../modules/t3code.nix {
+  t3code = import ../../../modules/t3code {
     inherit pkgs inputs;
     # T3 runs both providers through Hestia's CLIProxyAPI.
     codex = import ../../../modules/codex-proxy.nix {

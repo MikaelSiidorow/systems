@@ -6,7 +6,7 @@
   ...
 }:
 let
-  t3code = import ../../../modules/t3code.nix {
+  t3code = import ../../../modules/t3code {
     inherit pkgs inputs;
     codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
     # The Mac's own Alloy (workstations/hosts/mbp/telemetry.nix); nothing leaves it.
