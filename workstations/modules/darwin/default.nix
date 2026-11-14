@@ -59,6 +59,7 @@ in
   imports = [
     ./system.nix
     ./homebrew.nix
+    ./power.nix
   ];
 
   environment.systemPackages = [
