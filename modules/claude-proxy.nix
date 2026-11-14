@@ -17,6 +17,9 @@ let
         # unset only clears the shell; settings could restore a saved key.
         ANTHROPIC_API_KEY = "";
         CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1";
+        # A model newer than this build would get an assumed 200K window and
+        # compact early; let the API's real limit decide instead.
+        CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT = "1";
       };
     }
   );
@@ -45,6 +48,7 @@ pkgs.writeShellApplication {
     }
     unset ANTHROPIC_API_KEY
     export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
+    export CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1
     args=()
     extra_settings='{}'
     while (( $# )); do
