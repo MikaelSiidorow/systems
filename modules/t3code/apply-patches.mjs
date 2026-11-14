@@ -50,7 +50,10 @@ for (const [name, text] of files) {
   if (text === original.get(name)) continue;
   const used = Object.keys(helpers).filter((local) => text.includes(local));
   if (used.length > 0) {
-    const effectChunk = text.match(/^import \{.*\} from "\.\/(Effect-[^"]+\.mjs)";$/m)?.[1];
+    // Found by content: the bundler names the chunk after any module in it.
+    const effectChunk = [...text.matchAll(/^import \{.*\} from "\.\/([^"]+\.mjs)";$/gm)]
+      .map((match) => match[1])
+      .find((chunk) => /^\/\/ .*\/effect\/dist\/Effect\.js$/m.test(original.get(chunk) ?? ""));
     if (!effectChunk) fail(`${name} imports no Effect chunk`);
     const taken = used.filter((local) => original.get(name).includes(local));
     if (taken.length > 0) fail(`${name} already uses ${taken.join(", ")}`);
