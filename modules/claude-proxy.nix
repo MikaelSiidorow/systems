@@ -16,7 +16,6 @@ let
         ANTHROPIC_AUTH_TOKEN = if clientKeyFile == null then "hestia-tailnet" else "";
         # unset only clears the shell; settings could restore a saved key.
         ANTHROPIC_API_KEY = "";
-        CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1";
       };
     }
   );
@@ -44,7 +43,6 @@ pkgs.writeShellApplication {
         ''
     }
     unset ANTHROPIC_API_KEY
-    export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
     args=()
     extra_settings='{}'
     while (( $# )); do
