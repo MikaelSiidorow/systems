@@ -27,6 +27,7 @@
       "handy"
       "postico"
       # "raycast" # Now installed and updated by the enterprise MDM.
+      "tailscale-app"
     ];
   };
 
