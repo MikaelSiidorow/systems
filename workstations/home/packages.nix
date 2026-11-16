@@ -56,17 +56,13 @@
         shellcheck
         shfmt
         mergiraf
+        opentofu
 
         # Security
         _1password-cli
       ]
-      # Platform-specific packages (NixOS/Linux only - macOS uses Homebrew)
-      ++ lib.optionals (!isDarwin) [
-        terraform
-      ]
       # Platform-specific packages (macOS only)
       ++ lib.optionals isDarwin [
-        opentofu
         google-cloud-sdk
       ];
   };
