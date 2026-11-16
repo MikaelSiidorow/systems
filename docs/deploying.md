@@ -5,7 +5,7 @@ Operational reference: how changes reach each machine, first-time setup, cluster
 ## Architecture
 
 ```
-NixOS (k3s.nix)                              Terraform (terraform/k8s/)
+NixOS (k3s.nix)                              OpenTofu (tofu/k8s/)
   |                                             |
   |-- Traefik (ingress)                         |-- refinery namespace
   |-- cert-manager (TLS)                        |-- refinery-secrets
@@ -21,18 +21,18 @@ ArgoCD auto-syncs from git
 
 **Separation of concerns:**
 
-- **Terraform** (`terraform/`) provisions cloud infrastructure (Hetzner server, Cloudflare DNS)
+- **OpenTofu** (`tofu/`) provisions cloud infrastructure (Hetzner server, Cloudflare DNS)
 - **NixOS** (`infra/nixos/`) manages the Hetzner cluster host and the Hestia home server
 - **OpenWrt** (`openwrt/`, own flake and lock) manages the Cerberus router and Hermes access point
-- **Terraform K8s** (`terraform/k8s/`) manages application secrets (the part that can't be in Git)
+- **OpenTofu K8s** (`tofu/k8s/`) manages application secrets (the part that can't be in Git)
 - **ArgoCD** syncs application manifests from `k8s/` in Git to the cluster
 
 ## Structure
 
 ```
 systems/
-├── terraform/               # Cloud resources (Hetzner, Cloudflare)
-│   └── k8s/                 # K8s secrets (Terraform + kubernetes provider)
+├── tofu/                    # Cloud resources (Hetzner, Cloudflare)
+│   └── k8s/                 # K8s secrets (OpenTofu + kubernetes provider)
 ├── workstations/            # nix-darwin + home-manager flake (own flake.lock)
 ├── modules/home/            # Shared home-manager modules: core (shell, CLI tools), agents
 ├── openwrt/                 # Router firmware + UCI config flake (own flake.lock, updated daily)
@@ -60,23 +60,23 @@ systems/
 
 ## Pipeline
 
-Push to `main` triggers deploys automatically based on changed paths. Manual deploys via workflow dispatch (select component: `terraform`, `nixos`, `k8s-terraform`, or `all`).
+Push to `main` triggers deploys automatically based on changed paths. Manual deploys via workflow dispatch (select component: `tofu`, `nixos`, `k8s-tofu`, or `all`).
 
 ### Deploy pipeline ordering
 
 ```
-terraform  →  nixos  →  k8s-terraform
-(infra)       (OS)      (app secrets)
-                           ↓
-                     ArgoCD auto-syncs
-                     (app manifests from git)
-                           ↓
-                         smoke
+tofu  →  nixos  →  k8s-tofu
+(infra)  (OS)     (app secrets)
+                     ↓
+               ArgoCD auto-syncs
+               (app manifests from git)
+                     ↓
+                   smoke
 ```
 
-1. **`terraform`** — creates/updates cloud resources (server, DNS)
+1. **`tofu`** — creates/updates cloud resources (server, DNS)
 2. **`nixos`** — deploys NixOS config via deploy-rs (installs K3s, ArgoCD, etc.)
-3. **`k8s-terraform`** — creates namespaces and secrets via SSH tunnel to K3s API
+3. **`k8s-tofu`** — creates namespaces and secrets via SSH tunnel to K3s API
 4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
 5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
 
@@ -106,11 +106,11 @@ Refinery application releases do not require per-build image tag commits in this
 
 ### Initial setup (new server)
 
-1. Provision server with Terraform:
+1. Provision server with OpenTofu:
 
    ```bash
-   cd terraform && terraform apply
-   terraform output k3s_ipv4_address
+   cd tofu && tofu apply
+   tofu output k3s_ipv4_address
    ```
 
 2. Update `infra/flake.nix` with the new IP.
@@ -128,12 +128,12 @@ Refinery application releases do not require per-build image tag commits in this
    ssh root@<IP> "kubectl get pods -n argocd"
    ```
 
-5. Apply K8s secrets via Terraform:
+5. Apply K8s secrets via OpenTofu:
 
    ```bash
-   cd terraform/k8s
-   terraform init
-   terraform apply
+   cd tofu/k8s
+   tofu init
+   tofu apply
    ```
 
 6. Verify ArgoCD synced the apps:
@@ -146,7 +146,7 @@ Refinery application releases do not require per-build image tag commits in this
 The K3s API (port 6443) is not exposed to the internet. Use an SSH tunnel:
 
 ```bash
-ssh -L 6443:127.0.0.1:6443 root@$(terraform -chdir=terraform output -raw k3s_ipv4_address)
+ssh -L 6443:127.0.0.1:6443 root@$(tofu -chdir=tofu output -raw k3s_ipv4_address)
 ```
 
 Then in another terminal:
@@ -163,4 +163,4 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 
 - **GitHub Actions secrets**: provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`), SSH keys, R2 credentials, app secrets (`REFINERY_*`)
 - **GitHub Actions variables**: `K3S_HOST`
-- **K8s secrets**: managed by `terraform/k8s/`, passed as `TF_VAR_*` env vars in CI. `k8s/**/secrets.yaml` is gitignored.
+- **K8s secrets**: managed by `tofu/k8s/`, passed as `TF_VAR_*` env vars in CI. `k8s/**/secrets.yaml` is gitignored.

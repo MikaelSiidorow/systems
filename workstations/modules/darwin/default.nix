@@ -44,7 +44,7 @@ let
       fi
 
       # Workstation config and its shared modules need a rebuild here;
-      # infra/, k8s/ and terraform/ are deployed elsewhere.
+      # infra/, k8s/ and tofu/ are deployed elsewhere.
       if git -C "$repo" diff --quiet "$current" "$remote" -- workstations modules 2>/dev/null; then
         echo "$remote" >"$state"
         exit 0

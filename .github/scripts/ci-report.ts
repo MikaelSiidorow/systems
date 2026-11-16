@@ -41,8 +41,8 @@ const EXPECTED: Omit<Section, "status" | "summary" | "details">[] = [
   { key: "k8s", order: 15, title: "k8s manifests" },
   { key: "nixos", order: 20, title: "k8s-server + Hestia" },
   { key: "openwrt", order: 30, title: "OpenWrt routers" },
-  { key: "terraform", order: 40, title: "Terraform" },
-  { key: "k8s-terraform", order: 50, title: "k8s Terraform" },
+  { key: "tofu", order: 40, title: "OpenTofu" },
+  { key: "k8s-tofu", order: 50, title: "k8s OpenTofu" },
 ];
 // Per-check comments from before this report existed.
 const LEGACY = ["### NixOS Preview", "### Terraform Results", "### K8s Terraform Results"];

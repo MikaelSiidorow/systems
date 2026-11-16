@@ -117,6 +117,7 @@
                 kubeconform
                 kubernetes-helm
                 kustomize
+                opentofu
                 oxfmt
                 yq-go
               ];
