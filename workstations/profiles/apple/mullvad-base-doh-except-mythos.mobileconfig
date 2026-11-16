@@ -32,12 +32,30 @@
 					</array>
 				</dict>
 				<dict>
+					<!-- Tailnet names: leave them to the VPN's resolver (Tailscale MagicDNS, Headscale). -->
+					<key>Action</key>
+					<string>EvaluateConnection</string>
+					<key>ActionParameters</key>
+					<array>
+						<dict>
+							<key>DomainAction</key>
+							<string>NeverConnect</string>
+							<key>Domains</key>
+							<array>
+								<string>ts.net</string>
+								<string>vpn.miksu.app</string>
+								<string>home.arpa</string>
+							</array>
+						</dict>
+					</array>
+				</dict>
+				<dict>
 					<key>Action</key>
 					<string>Connect</string>
 				</dict>
 			</array>
 			<key>PayloadDescription</key>
-			<string>Mullvad Encrypted DNS base (HTTPS), disabled on Mythos Wi-Fi</string>
+			<string>Mullvad Encrypted DNS base (HTTPS), disabled on Mythos Wi-Fi; tailnet names use the VPN's DNS</string>
 			<key>PayloadDisplayName</key>
 			<string>Mullvad Base DoH (except Mythos)</string>
 			<key>PayloadIdentifier</key>
@@ -53,7 +71,7 @@
 		</dict>
 	</array>
 	<key>PayloadDescription</key>
-	<string>Uses Mullvad Base DNS over HTTPS except on the Mythos Wi-Fi network, where DHCP-provided DNS is used.</string>
+	<string>Uses Mullvad Base DNS over HTTPS except on the Mythos Wi-Fi network, where DHCP-provided DNS is used. Tailnet names (ts.net, vpn.miksu.app, home.arpa) bypass it so Tailscale and Headscale DNS can answer them.</string>
 	<key>PayloadDisplayName</key>
 	<string>Mullvad Base DoH (except Mythos)</string>
 	<key>PayloadIdentifier</key>
