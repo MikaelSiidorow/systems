@@ -6,13 +6,13 @@
 }:
 let
   claudeCode = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
-  release = "v8.0.69";
+  release = "v8.0.75";
   cliProxyApi = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "cli-proxy-api";
     version = pkgs.lib.removePrefix "v" release;
     src = pkgs.fetchurl {
       url = "https://github.com/router-for-me/CLIProxyAPI/releases/download/${release}/CLIProxyAPI_${version}_linux_amd64_no-plugin.tar.gz";
-      sha256 = "ceebea8f1de6cb71a52001f0340abdbfda4d02672d365ed5459a4d56ea9afc75";
+      sha256 = "6f816be5be3a45891bbb68954b7514087e575cb4c5f4e553fcb1dd4c27c25250";
     };
     sourceRoot = ".";
     dontConfigure = true;
