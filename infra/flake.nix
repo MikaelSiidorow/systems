@@ -114,11 +114,13 @@
           (system: {
             default = nixpkgs.legacyPackages.${system}.mkShellNoCC {
               packages = with nixpkgs.legacyPackages.${system}; [
+                age
                 kubeconform
                 kubernetes-helm
                 kustomize
                 opentofu
                 oxfmt
+                sops
                 yq-go
               ];
             };

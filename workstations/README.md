@@ -50,7 +50,7 @@ Optional: append `extra-substituters = https://cache.flakehub.com` to `/etc/nix/
 
 ### SOPS age key restore
 
-The age private key at `~/.config/sops/age/keys.txt` unlocks the repo's encrypted secrets. It is intentionally not managed by Nix; it is the recovery key, backed up in Bitwarden as `sops age key`. rbw, pinentry, and rbw's config (email, base_url, pinentry) are all managed declaratively by `home/sops.nix`, so there is nothing to `rbw config set` by hand.
+The age private key at `~/.config/sops/age/keys.txt` unlocks the repo's encrypted secrets. It is intentionally not managed by Nix; it is the recovery key, backed up in Bitwarden as `sops age keys`. rbw, pinentry, and rbw's config (email, base_url, pinentry) are all managed declaratively by `home/sops.nix`, so there is nothing to `rbw config set` by hand.
 
 `rbw register` asks for a Bitwarden personal API key: paste the `client_id`, then `client_secret`, from the web vault under **Settings > Security > Keys > "View API Key"**. That authorizes this CLI device past Bitwarden's new-client login challenge; you still enter the master password at `rbw login`.
 
@@ -63,7 +63,7 @@ rbw register   # client_id, then client_secret (see above)
 rbw login      # master password
 
 ( umask 077
-  rbw get "sops age key" \
+  rbw get --full "sops age keys" \
     | awk '/^AGE-SECRET-KEY-/ { print; found=1 } END { if (!found) exit 1 }' \
     > ~/.config/sops/age/keys.txt
 )
@@ -87,7 +87,7 @@ nix shell nixpkgs#rbw nixpkgs#pinentry-curses -c sh -c '
   rbw register
   rbw login
   umask 077
-  rbw get "sops age key" \
+  rbw get --full "sops age keys" \
     | awk "/^AGE-SECRET-KEY-/ { print; found=1 } END { if (!found) exit 1 }" \
     > ~/.config/sops/age/keys.txt
 '
@@ -162,7 +162,7 @@ Use `make update-fast` to update app/catalog inputs without moving the default s
 
 ## Secrets
 
-Secrets use `sops-nix` with a single personal age recipient. The age private key lives at `~/.config/sops/age/keys.txt` on each machine and is backed up in Bitwarden as `sops age key`.
+Secrets use `sops-nix` with a single personal age recipient. The age private keys live at `~/.config/sops/age/keys.txt` on each machine and are backed up in Bitwarden as `sops age keys`: the original key, which these secrets still use, and a post-quantum one for newer files such as `infra/secrets/ci.yaml`.
 
 Current managed secret:
 

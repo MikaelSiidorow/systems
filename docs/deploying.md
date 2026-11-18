@@ -109,8 +109,8 @@ Refinery application releases do not require per-build image tag commits in this
 1. Provision server with OpenTofu:
 
    ```bash
-   cd tofu && tofu apply
-   tofu output k3s_ipv4_address
+   make tf-init tf-apply
+   cd tofu && sops exec-env ../infra/secrets/ci.yaml 'tofu output k3s_ipv4_address'
    ```
 
 2. Update `infra/flake.nix` with the new IP.
@@ -132,8 +132,7 @@ Refinery application releases do not require per-build image tag commits in this
 
    ```bash
    cd tofu/k8s
-   tofu init
-   tofu apply
+   sops exec-env ../../infra/secrets/ci.yaml 'tofu init && tofu apply'
    ```
 
 6. Verify ArgoCD synced the apps:
@@ -146,7 +145,7 @@ Refinery application releases do not require per-build image tag commits in this
 The K3s API (port 6443) is not exposed to the internet. Use an SSH tunnel:
 
 ```bash
-ssh -L 6443:127.0.0.1:6443 root@$(tofu -chdir=tofu output -raw k3s_ipv4_address)
+ssh -L 6443:127.0.0.1:6443 root@$(sops exec-env infra/secrets/ci.yaml 'tofu -chdir=tofu output -raw k3s_ipv4_address')
 ```
 
 Then in another terminal:
@@ -161,6 +160,18 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 
 ## Secrets
 
-- **GitHub Actions secrets**: provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`), SSH keys, R2 credentials, app secrets (`REFINERY_*`)
+- **`infra/secrets/ci.yaml`** (SOPS): secrets that CI and you both need, one environment variable per key. Encrypted to your post-quantum age key and to CI's, whose private half is the `SOPS_AGE_KEY` Actions secret. `.github/scripts/ci-secrets.sh` loads it into a job. Edit with `sops infra/secrets/ci.yaml`.
+- **GitHub Actions secrets**: `SOPS_AGE_KEY`, provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`), SSH keys, R2 credentials, app secrets (`REFINERY_*`)
 - **GitHub Actions variables**: `K3S_HOST`
 - **K8s secrets**: managed by `tofu/k8s/`, passed as `TF_VAR_*` env vars in CI. `k8s/**/secrets.yaml` is gitignored.
+
+## OpenTofu state
+
+Both roots keep their state in the `terraform-state` R2 bucket, encrypted with `TF_VAR_state_passphrase` from `infra/secrets/ci.yaml`. Every `tofu` command that touches state needs it, so run them through SOPS: the `make tf-*` targets do, and anything else goes inside `sops exec-env infra/secrets/ci.yaml '<command>'`. Losing the passphrase loses the state, so it lives only in that file, which your age key (backed up in Bitwarden) decrypts.
+
+A run that dies mid-apply can leave its lock behind, and later runs then wait ten minutes and fail with `Error acquiring the state lock`. Check that no deploy is running, then release it with the lock ID from that error:
+
+```bash
+cd tofu   # or tofu/k8s
+sops exec-env "$(git rev-parse --show-toplevel)/infra/secrets/ci.yaml" 'tofu force-unlock <lock-id>'
+```

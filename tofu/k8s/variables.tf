@@ -1,3 +1,9 @@
+variable "state_passphrase" {
+  type        = string
+  sensitive   = true
+  description = "Passphrase that encrypts the OpenTofu state and plan files."
+}
+
 variable "cloudflare_api_token" {
   type      = string
   sensitive = true

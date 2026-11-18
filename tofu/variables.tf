@@ -1,3 +1,9 @@
+variable "state_passphrase" {
+  type        = string
+  sensitive   = true
+  description = "Passphrase that encrypts the OpenTofu state and plan files."
+}
+
 variable "scaleway_organization_id" {
   type        = string
   description = "Scaleway organization that owns the transactional email project."
