@@ -51,6 +51,7 @@ in
     lights-toggle
     t3code.desktop
     (pkgs.callPackage ../../pkgs/amp-desktop { })
+    (pkgs.callPackage ../../pkgs/meetily { })
     # From llm-agents: nixpkgs stable trails Amp releases by months.
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.amp
   ]
