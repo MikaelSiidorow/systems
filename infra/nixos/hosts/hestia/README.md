@@ -9,6 +9,14 @@ T3's Claude and Codex providers use Hestia's CLIProxyAPI. Terminal `claude`
 uses your direct login; `claude-hestia` uses the proxy. Provider changes apply
 to new sessions.
 
+The CLIProxyAPI management dashboard is available at
+<https://hestia.vpn.miksu.app:8317/management.html> over the tailnet. Sign in
+with the separate management key stored on Hestia at
+`/var/lib/cli-proxy-api/management-key`; it is required for all management
+requests. Caddy listens only on Hestia's tailnet address, and the proxy itself
+listens on loopback. The dashboard can manage provider logins, including Claude
+reauthentication.
+
 ## Enroll Hestia
 
 The NixOS configuration enables `tailscaled`, IP forwarding, the Tailscale UDP

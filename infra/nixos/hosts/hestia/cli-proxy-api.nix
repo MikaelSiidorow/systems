@@ -29,6 +29,7 @@ let
     access:
       api-keys: []
     management:
+      # Tailnet management works through Caddy's loopback upstream.
       allow-remote: false
       secret-key: "@MANAGEMENT_KEY@"
       disable-auto-update-panel: true
