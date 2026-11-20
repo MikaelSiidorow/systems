@@ -56,7 +56,6 @@ jobs:
             # daily because OpenWrt republishes package indexes often.
             openwrt:
               - 'openwrt/**'
-              - '.sops.yaml'
             tofu:
               # Top-level files only; tofu/k8s/ is k8s_tofu. A '!' entry
               # would match every other path, since the patterns are OR'd.
