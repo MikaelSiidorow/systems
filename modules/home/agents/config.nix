@@ -96,7 +96,7 @@ let
   );
 
   # Like jq's `*`, but unions arrays instead of replacing them.
-  claudeSettingsMerge = pkgs.writeText "claude-settings-merge.jq" ''
+  jsonSettingsMerge = pkgs.writeText "claude-settings-merge.jq" ''
     def merge($a; $b):
       if ($a | type) == "object" and ($b | type) == "object" then
         reduce ($b | keys_unsorted[]) as $k ($a; .[$k] = merge($a[$k]; $b[$k]))
@@ -170,6 +170,34 @@ let
           tool_result.max_bytes = 0;
           log_user_prompt = false;
         };
+    }
+  );
+
+  # Merged into ~/.gemini/antigravity-cli/settings.json like Claude's. agy has
+  # no keys for OTel export, effort or env, so those stay unset.
+  antigravitySettings = pkgs.writeText "antigravity-settings-baseline.json" (
+    builtins.toJSON {
+      "$schema" = "https://antigravity.google/schemas/v1/settings.json";
+      colorScheme = "dark";
+      # agy defaults to auto mode (like Codex auto review), which needs the
+      # sandbox; sandboxed commands have no network.
+      enableTerminalSandbox = true;
+      permissions.allow = [
+        # Same read-only gh calls as codex/rules/nix-managed.rules.
+        "command(gh pr view)"
+        "command(gh pr list)"
+        "command(gh pr status)"
+        "command(gh pr diff)"
+        "command(gh pr checks)"
+        "command(gh issue view)"
+        "command(gh issue list)"
+        "command(gh issue status)"
+        "command(gh run view)"
+        "command(gh run list)"
+        "command(gh repo view)"
+      ]
+      # Allowed domains also open the sandbox's network to them.
+      ++ lib.optionals (telemetry != null && socket == null) [ "read_url(${grafanaHost})" ];
     }
   );
 
@@ -482,7 +510,7 @@ in
       else
         claude_merged="$(mktemp)"
         if [ -e "$claude_settings" ]; then
-          ${lib.getExe pkgs.jq} -s -f ${claudeSettingsMerge} "$claude_settings" ${claudeSettings} >"$claude_merged"
+          ${lib.getExe pkgs.jq} -s -f ${jsonSettingsMerge} "$claude_settings" ${claudeSettings} >"$claude_merged"
         else
           ${lib.getExe pkgs.jq} . ${claudeSettings} >"$claude_merged"
         fi
@@ -493,6 +521,29 @@ in
         rm -f "$claude_merged"
       fi
     '';
+
+    activation.antigravitySettings = lib.mkIf (!pkgs.stdenv.isDarwin) (
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        agy_settings="$HOME/.gemini/antigravity-cli/settings.json"
+        if [ -L "$agy_settings" ]; then
+          warnEcho "Skipping Antigravity settings merge: $agy_settings is a symlink"
+        elif [ -e "$agy_settings" ] && ! ${lib.getExe pkgs.jq} -e . "$agy_settings" >/dev/null 2>&1; then
+          warnEcho "Skipping Antigravity settings merge: $agy_settings is not valid JSON"
+        else
+          agy_merged="$(mktemp)"
+          if [ -e "$agy_settings" ]; then
+            ${lib.getExe pkgs.jq} -s -f ${jsonSettingsMerge} "$agy_settings" ${antigravitySettings} >"$agy_merged"
+          else
+            ${lib.getExe pkgs.jq} . ${antigravitySettings} >"$agy_merged"
+          fi
+          if ! cmp -s "$agy_merged" "$agy_settings"; then
+            run mkdir -p "$HOME/.gemini/antigravity-cli"
+            run install -m 600 "$agy_merged" "$agy_settings"
+          fi
+          rm -f "$agy_merged"
+        fi
+      ''
+    );
 
     activation.codexSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       codex_config="$HOME/.codex/config.toml"
