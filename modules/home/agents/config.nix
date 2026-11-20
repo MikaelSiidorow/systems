@@ -201,6 +201,8 @@ let
     codex = name: ".codex/skills/${name}";
     claude-code = name: ".claude/skills/${name}";
     opencode = name: ".config/opencode/skills/${name}";
+    # Read by the agy CLI and the Antigravity apps alike.
+    antigravity = name: ".gemini/config/skills/${name}";
   };
 
   skillTargetPaths =
@@ -213,8 +215,14 @@ let
           builtins.filter (agent: agent != "opencode") agents
         else
           agents;
+      # Antigravity is only installed on tpad and Hestia, not the Mac.
+      hostAgents =
+        if pkgs.stdenv.isDarwin then
+          builtins.filter (agent: agent != "antigravity") effectiveAgents
+        else
+          effectiveAgents;
     in
-    lib.unique (map (agent: skillTargets.${agent} name) effectiveAgents);
+    lib.unique (map (agent: skillTargets.${agent} name) hostAgents);
 
   skills = {
     agent-traces = {
@@ -223,6 +231,7 @@ let
       needsTelemetry = true;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -231,6 +240,7 @@ let
       source = ./skills/address-review;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -239,6 +249,7 @@ let
       source = ./skills/babysit-pr;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -247,6 +258,7 @@ let
       source = ./skills/dependency-prs;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -255,6 +267,7 @@ let
       source = ./skills/file-pr;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -263,6 +276,7 @@ let
       source = ./skills/file-ticket;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -271,6 +285,7 @@ let
       source = ./skills/full-send;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -279,6 +294,7 @@ let
       source = ./skills/full-stop;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -287,6 +303,7 @@ let
       source = ./skills/grilling;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -295,6 +312,7 @@ let
       source = ./skills/modernize;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -303,6 +321,7 @@ let
       source = ./skills/morning-prs;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -311,6 +330,7 @@ let
       source = ./skills/rebase;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -319,6 +339,7 @@ let
       source = ./skills/retro;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -327,6 +348,7 @@ let
       source = ./skills/review-pr;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -335,6 +357,7 @@ let
       source = ./skills/review-rounds;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -343,6 +366,7 @@ let
       source = ./skills/takeover;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -351,6 +375,7 @@ let
       source = ./skills/ticket-kickoff;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -359,6 +384,7 @@ let
       source = ./skills/unslop;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -367,6 +393,7 @@ let
       source = ./skills/writing-for-agents;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -441,6 +468,9 @@ in
         # must be executable; nix store copies are read-only without this.
         executable = true;
       };
+    }
+    // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+      ".gemini/AGENTS.md".source = ./shared/AGENTS.md;
     };
 
     activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
