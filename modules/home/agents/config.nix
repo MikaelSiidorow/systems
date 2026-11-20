@@ -201,6 +201,49 @@ let
     }
   );
 
+  # agy has no OTel export, so hooks build the spans (antigravity/otel-hook.sh).
+  antigravityOtelHook = pkgs.writeShellApplication {
+    name = "agy-otel-hook";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.git
+      pkgs.jq
+    ];
+    text = ''
+      endpoint=${lib.escapeShellArg telemetry.endpoint}
+      host=${lib.escapeShellArg telemetry.host}
+      details=${lib.boolToString telemetry.toolDetails}
+    ''
+    + builtins.readFile ./antigravity/otel-hook.sh;
+  };
+
+  antigravityHooks = pkgs.writeText "antigravity-hooks.json" (
+    builtins.toJSON {
+      otel =
+        let
+          hook = event: {
+            type = "command";
+            command = "${lib.getExe antigravityOtelHook} ${event}";
+            timeout = 5;
+          };
+          toolHook = event: [
+            {
+              matcher = "*";
+              hooks = [ (hook event) ];
+            }
+          ];
+        in
+        {
+          PreToolUse = toolHook "PreToolUse";
+          PostToolUse = toolHook "PostToolUse";
+          PreInvocation = [ (hook "PreInvocation") ];
+          PostInvocation = [ (hook "PostInvocation") ];
+          Stop = [ (hook "Stop") ];
+        };
+    }
+  );
+
   codexPython = pkgs.python3.withPackages (ps: [ ps.tomlkit ]);
 
   codexSettingsMerge = pkgs.writeText "codex-config-merge.py" ''
@@ -499,6 +542,9 @@ in
     }
     // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
       ".gemini/AGENTS.md".source = ./shared/AGENTS.md;
+    }
+    // lib.optionalAttrs (!pkgs.stdenv.isDarwin && telemetry != null) {
+      ".gemini/config/hooks.json".source = antigravityHooks;
     };
 
     activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
