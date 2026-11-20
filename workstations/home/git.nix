@@ -34,6 +34,8 @@ in
         untrackedCache = true;
       };
       branch.sort = "-committerdate";
+      # Drop origin/* refs whose branch was deleted, e.g. after a PR merges.
+      fetch.prune = true;
       merge.conflictstyle = "zdiff3";
       pull.ff = "only";
       rebase.autoStash = true;
