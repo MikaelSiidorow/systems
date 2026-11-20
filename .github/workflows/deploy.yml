@@ -22,6 +22,8 @@ on:
       - "infra/flake.nix"
       - "infra/flake.lock"
       - "tofu/**"
+      - "infra/secrets/ci.yaml"
+      - ".github/scripts/ci-secrets.sh"
       - ".github/workflows/deploy.yml"
       - ".github/scripts/reconcile-wger.sh"
       # Argo CD deploys these; the smoke job checks the result.
