@@ -26,6 +26,17 @@
       "versioningTemplate": "semver"
     },
     {
+      "description": "sops release binary and SHA-256 checksum that CI downloads",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/scripts/ci-secrets\\.sh$/"],
+      "matchStrings": [
+        "SOPS_VERSION=(?<currentValue>v[0-9.]+)\\nSOPS_SHA256=(?<currentDigest>[a-f0-9]{64})"
+      ],
+      "depNameTemplate": "getsops/sops",
+      "datasourceTemplate": "github-release-attachments",
+      "versioningTemplate": "semver"
+    },
+    {
       "description": "k3s HelmCharts that the k8s-server NixOS config installs",
       "customType": "regex",
       "managerFilePatterns": ["/^infra/nixos/hosts/k8s-server/[^/]+-helmchart\\.yaml$/"],

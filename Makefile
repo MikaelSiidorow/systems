@@ -1,6 +1,7 @@
 .SILENT:
 
-TF=tofu
+# tofu with the state passphrase from SOPS in its environment
+TF=sops exec-env $(CURDIR)/infra/secrets/ci.yaml
 HESTIA_HOST ?= hestia.home.arpa
 HESTIA_SSH := mikaelsiidorow@$(HESTIA_HOST)
 HESTIA_REPO ?= /etc/nixos-repo
@@ -9,16 +10,16 @@ ROUTER_DEPLOY_SSH_KEY ?= /run/secrets/router-deploy-ssh-key
 # OpenTofu
 
 tf-init:
-	cd tofu && $(TF) init
+	cd tofu && $(TF) 'tofu init'
 
 tf-plan:
-	cd tofu && $(TF) plan
+	cd tofu && $(TF) 'tofu plan'
 
 tf-apply:
-	cd tofu && $(TF) apply -auto-approve
+	cd tofu && $(TF) 'tofu apply -auto-approve'
 
 tf-destroy:
-	cd tofu && $(TF) destroy -auto-approve
+	cd tofu && $(TF) 'tofu destroy -auto-approve'
 
 # SSH convenience
 ssh:

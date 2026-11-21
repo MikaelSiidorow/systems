@@ -22,6 +22,8 @@ on:
       - "infra/flake.nix"
       - "infra/flake.lock"
       - "tofu/**"
+      - "infra/secrets/ci.yaml"
+      - ".github/scripts/ci-secrets.sh"
       - ".github/workflows/deploy.yml"
       - ".github/scripts/reconcile-wger.sh"
       # Argo CD deploys these; the smoke job checks the result.
@@ -56,16 +58,19 @@ jobs:
             # daily because OpenWrt republishes package indexes often.
             openwrt:
               - 'openwrt/**'
-              - '.sops.yaml'
             tofu:
               # Top-level files only; tofu/k8s/ is k8s_tofu. A '!' entry
               # would match every other path, since the patterns are OR'd.
               - 'tofu/*'
+              - 'infra/secrets/ci.yaml'
+              - '.github/scripts/ci-secrets.sh'
               - '.github/workflows/deploy.yml'
             k8s_tofu:
               - 'tofu/k8s/**'
               - 'tofu/mail.tf'
               - 'tofu/outputs.tf'
+              - 'infra/secrets/ci.yaml'
+              - '.github/scripts/ci-secrets.sh'
               - '.github/workflows/deploy.yml'
               - '.github/scripts/reconcile-wger.sh'
   nixos-preview:
@@ -203,7 +208,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           DIFF: ${{ steps.diff.outputs.diff }}
         run: |
-          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvx 'infra/flake.lock'; then
+          files=$(gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only)
+          if grep -qvx 'infra/flake.lock' <<<"$files"; then
             echo "The PR changes more than infra/flake.lock; leaving it for review."
             exit 0
           fi
@@ -326,6 +332,10 @@ jobs:
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: ~1.13
+      - name: Load CI secrets
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: '"$GITHUB_WORKSPACE/.github/scripts/ci-secrets.sh"'
       - name: Tofu Format Check
         id: fmt
         run: tofu fmt -check -recursive
@@ -413,7 +423,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Only when every changed file belongs to this OpenTofu root.
-          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^tofu/[^/]+$'; then
+          files=$(gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only)
+          if grep -qvE '^tofu/[^/]+$' <<<"$files"; then
             echo "The PR changes files outside this OpenTofu root; leaving it for review."
             exit 0
           fi
@@ -484,6 +495,10 @@ jobs:
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: ~1.13
+      - name: Load CI secrets
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: '"$GITHUB_WORKSPACE/.github/scripts/ci-secrets.sh"'
       - name: Setup SSH and K8s access
         run: |
           mkdir -p ~/.ssh
@@ -627,7 +642,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Only when every changed file belongs to this OpenTofu root.
-          if gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only | grep -qvE '^tofu/k8s/[^/]+$'; then
+          files=$(gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only)
+          if grep -qvE '^tofu/k8s/[^/]+$' <<<"$files"; then
             echo "The PR changes files outside this OpenTofu root; leaving it for review."
             exit 0
           fi
