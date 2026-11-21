@@ -106,7 +106,9 @@ jobs:
           # Bases from before the flake moved into infra/ keep it at the root.
           base=./base/infra
           [ -f "$base/flake.nix" ] || base=./base
-          nix build "$base#nixosConfigurations.olympus.config.system.build.toplevel" -o result-base
+          # Bases from before the host was renamed call it k8s-server.
+          nix build "$base#nixosConfigurations.olympus.config.system.build.toplevel" -o result-base ||
+            nix build "$base#nixosConfigurations.k8s-server.config.system.build.toplevel" -o result-base
         continue-on-error: true
       - name: Build PR config
         id: build-pr
