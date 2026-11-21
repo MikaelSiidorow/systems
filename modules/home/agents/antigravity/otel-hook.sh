@@ -1,7 +1,7 @@
 # Turns Antigravity hook events into OTLP spans, since agy has no OTel export.
 # One trace per turn, rooted at antigravity.interaction, with a child per tool
 # call and per model invocation (which may span the tools it ran). A
-# TRACEPARENT from T3 or a parent agent becomes the turn's parent. Prepended
+# TRACEPARENT from T3 becomes the turn's parent. Prepended
 # by Nix: endpoint, host, details.
 #
 # agy waits on every hook, so this always answers at once, sends in the
@@ -22,7 +22,11 @@ conversation=$(field .conversationId | tr -cd 'A-Za-z0-9-')
 [ -n "$conversation" ] || exit 0
 dir="${XDG_RUNTIME_DIR:-/tmp}/agy-otel-$(id -u)/$conversation"
 # A new agy process starts fresh, so a turn left open by a crash is dropped.
-[ "$event" != SessionStart ] || rm -rf "$dir"
+# The turn itself opens on the first model call, not while agy sits idle.
+if [ "$event" = SessionStart ]; then
+  rm -rf "$dir"
+  exit 0
+fi
 mkdir -p "$dir"
 
 # The first event of a turn opens it; noclobber keeps parallel hooks to one.
