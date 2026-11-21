@@ -6,8 +6,11 @@ name: Renovate
 # Configuration lives in renovate.json. T3 revision pins are kept together
 # here; other flake inputs are updated by update-flake-lock.yml.
 on:
+  # Mondays for every repo. Other days only this one, where renovate.json
+  # limits those runs to the T3 Code pins.
   schedule:
     - cron: "37 3 * * 1"
+    - cron: "37 3 * * 0,2-6"
   # Also run on demand, e.g. after ticking a box on the Dependency Dashboard.
   workflow_dispatch:
 
@@ -38,7 +41,7 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
         env:
-          RENOVATE_REPOSITORIES: '["MikaelSiidorow/systems","MikaelSiidorow/refinery","MikaelSiidorow/siidorow.com"]'
+          RENOVATE_REPOSITORIES: ${{ github.event.schedule == '37 3 * * 0,2-6' && '["MikaelSiidorow/systems"]' || '["MikaelSiidorow/systems","MikaelSiidorow/refinery","MikaelSiidorow/siidorow.com"]' }}
           RENOVATE_ONBOARDING: "false"
           RENOVATE_REQUIRE_CONFIG: required
           # The only post-upgrade commands a renovate.json may run; no shell.

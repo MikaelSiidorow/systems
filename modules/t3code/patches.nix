@@ -47,6 +47,14 @@ in
       replace = "cwd: input.cwd, baseEnv: { ...processEnvironment, ...(input.processEnvironment?.T3CODE_THREAD_ID === void 0 ? {} : { T3CODE_THREAD_ID: input.processEnvironment.T3CODE_THREAD_ID }), ...(yield* ${spanTrace}.pipe(t3pMap((trace) => trace === void 0 ? {} : { TRACEPARENT: trace.traceparent }))) },";
     }
     {
+      # agy 1.5.8 takes the first workspace it lists, which was the attachments
+      # directory, so its commands ran outside the thread's checkout. T3 lists
+      # the cwd first for Claude the same way.
+      why = "List the thread's cwd before the attachments directory in Antigravity's ACP workspaces.";
+      find = "additionalDirectories: [options.host.paths.attachmentsDir]";
+      replace = "additionalDirectories: [...(input.cwd == null ? [] : [input.cwd]), options.host.paths.attachmentsDir]";
+    }
+    {
       why = "Parent Codex app-server turns to the turn span through the JSON-RPC envelope (pingdotgg/t3code#31694).";
       find = "const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) {";
       replace = "const offerOutgoingUntraced = offerOutgoing; const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) { const trace = method === \"turn/start\" || method === \"turn/steer\" ? yield* ${spanTrace} : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });";

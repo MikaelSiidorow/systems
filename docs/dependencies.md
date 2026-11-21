@@ -1,6 +1,6 @@
 # Dependency updates
 
-Renovate and the flake-lock workflows open the PRs. Merging deploys, so merge one PR at a time and verify before the next. Ask before merging a major, an `infra/**` change or Terraform with a non-empty plan.
+Renovate and the flake-lock workflows open the PRs. Renovate runs on Mondays, except for the T3 Code pins (`llm-agents`), which it bumps daily; a red T3 Code PR usually means a patch in `modules/t3code/patches.nix` lost its anchor. Merging deploys, so merge one PR at a time and verify before the next. Ask before merging a major, an `infra/**` change or Terraform with a non-empty plan.
 
 ## What merges itself
 
