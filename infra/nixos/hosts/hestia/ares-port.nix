@@ -13,6 +13,9 @@ let
   offAfterSeconds = 180;
   # A router reboot or network reload brings the port back up; reassert it.
   reassertSeconds = 600;
+  # The plug reports every 10-40 s. Without readings, open the port so a
+  # Zigbee outage cannot leave a running ares offline.
+  staleSeconds = 300;
 
   aresPort = pkgs.writeShellApplication {
     name = "ares-port";
@@ -26,9 +29,10 @@ let
       applied=""
       applied_at=0
       low_since=""
+      last_seen=$(date +%s)
 
       set_port() {
-        if ssh -o BatchMode=yes -o ConnectTimeout=5 \
+        if timeout 20 ssh -o BatchMode=yes -o ConnectTimeout=5 \
           -i ${config.sops.secrets.router-deploy-ssh-key.path} \
           root@${router} "ip link set ${port} $1"; then
           [ "$applied" = "$1" ] || echo "${port} $1"
@@ -41,6 +45,13 @@ let
 
       decide() {
         local now=$1 power=$2
+        if [ -n "$power" ]; then
+          last_seen=$now
+        elif (( now - last_seen >= ${toString staleSeconds} )); then
+          low_since=""
+          [ "$applied" = up ] || set_port up
+          return
+        fi
         if [ -n "$power" ]; then
           if (( power >= ${toString onWatts} )); then
             low_since=""
