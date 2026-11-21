@@ -31,6 +31,7 @@ let
 in
 {
   imports = [
+    ./ares-port.nix
     ./cli-proxy-api.nix
     ./dev.nix
     ./gpu.nix

@@ -92,6 +92,14 @@ The Cerberus and Hermes OpenWrt configurations live in this repository. Router
 deployment runs from Hestia's `/etc/nixos-repo` checkout and uses the
 SOPS-managed `router-deploy-ssh-key` provided by this Hestia configuration.
 
+## Ares port
+
+`ares-port.service` keeps Cerberus port `lan1`, the gaming PC ares, shut while
+the PC is off, so its Wake-on-LAN link light stays dark. It reads the PC's
+power from the `pc_plug` Zigbee plug: above 20 W it opens the port, and after
+three minutes below 10 W it closes it again. Follow it with
+`journalctl -u ares-port`.
+
 ## Local reverse proxy
 
 Caddy gives the two local web interfaces memorable HTTP addresses and proxies
