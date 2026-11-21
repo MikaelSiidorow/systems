@@ -39,6 +39,14 @@ in
       replace = "[AGENT_THREAD_ENV]: input.threadId, ...(yield* ${spanTrace}.pipe(t3pMap((trace) => trace === void 0 ? {} : { TRACEPARENT: trace.traceparent })))";
     }
     {
+      # Antigravity's ACP process also lives for the whole thread, so as with
+      # Claude its hooks parent every turn to the first turn's span.
+      why = "Give Antigravity the thread ID and turn span its OTel hook reads; T3 passes the thread ID only to its MCP bridge.";
+      find = "cwd: input\\.cwd,\\s*baseEnv: processEnvironment,";
+      regex = true;
+      replace = "cwd: input.cwd, baseEnv: { ...processEnvironment, ...(input.processEnvironment?.T3CODE_THREAD_ID === void 0 ? {} : { T3CODE_THREAD_ID: input.processEnvironment.T3CODE_THREAD_ID }), ...(yield* ${spanTrace}.pipe(t3pMap((trace) => trace === void 0 ? {} : { TRACEPARENT: trace.traceparent }))) },";
+    }
+    {
       why = "Parent Codex app-server turns to the turn span through the JSON-RPC envelope (pingdotgg/t3code#31694).";
       find = "const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) {";
       replace = "const offerOutgoingUntraced = offerOutgoing; const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) { const trace = method === \"turn/start\" || method === \"turn/steer\" ? yield* ${spanTrace} : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });";
