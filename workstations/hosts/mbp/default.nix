@@ -5,6 +5,8 @@
 
   system.primaryUser = username;
   users.users.${username}.home = "/Users/${username}";
+  power.stayAwakeOnAC = true;
+  power.ignoreLidOnAC = true;
   home-manager.users.${username}.imports = [
     ./telemetry.nix
     ./away.nix
