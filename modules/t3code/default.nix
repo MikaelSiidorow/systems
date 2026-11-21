@@ -70,9 +70,8 @@ let
           --inherit-argv0
       '';
   direnvWrapper =
-    name: executable: preamble:
+    name: executable:
     pkgs.writeShellScriptBin name ''
-      ${preamble}
       export DIRENV_LOG_FORMAT=
       # A blocked or broken .envrc makes `direnv exec` exit before the agent
       # starts, which T3 reports only as exit code 1. Run without it instead.
@@ -83,21 +82,12 @@ let
       exec ${executable} "$@"
     '';
   direnvProviders = [
-    (direnvWrapper "codex-direnv" "${codex}/bin/codex" "")
-    (direnvWrapper "claude-direnv" "${claude}/bin/claude" "")
+    (direnvWrapper "codex-direnv" "${codex}/bin/codex")
+    (direnvWrapper "claude-direnv" "${claude}/bin/claude")
   ]
   # T3 runs only an executable named agy or antigravity as `agy acp`, so this
   # wrapper cannot follow the -direnv naming.
-  ++ pkgs.lib.optional (antigravity != null) (
-    direnvWrapper "antigravity" "${antigravity}/bin/agy" ''
-      # T3's sign-in sets BROWSER to a helper that shows the Google link in
-      # its UI, but agy refuses to call BROWSER without a display, so sign-in
-      # failed on headless Hestia.
-      if [ -n "''${BROWSER:-}" ] && [ -z "''${DISPLAY:-}''${WAYLAND_DISPLAY:-}" ]; then
-        export DISPLAY=:0
-      fi
-    ''
-  );
+  ++ pkgs.lib.optional (antigravity != null) (direnvWrapper "antigravity" "${antigravity}/bin/agy");
 in
 (upstream.override {
   t3code-unwrapped = patched;
