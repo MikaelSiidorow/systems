@@ -21,6 +21,8 @@ rand() { od -An -tx1 -N"$1" /dev/urandom | tr -d ' \n'; }
 conversation=$(field .conversationId | tr -cd 'A-Za-z0-9-')
 [ -n "$conversation" ] || exit 0
 dir="${XDG_RUNTIME_DIR:-/tmp}/agy-otel-$(id -u)/$conversation"
+# A new agy process starts fresh, so a turn left open by a crash is dropped.
+[ "$event" != SessionStart ] || rm -rf "$dir"
 mkdir -p "$dir"
 
 # The first event of a turn opens it; noclobber keeps parallel hooks to one.

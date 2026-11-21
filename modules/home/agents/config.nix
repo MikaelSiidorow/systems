@@ -235,6 +235,7 @@ let
           ];
         in
         {
+          SessionStart = [ (hook "SessionStart") ];
           PreToolUse = toolHook "PreToolUse";
           PostToolUse = toolHook "PostToolUse";
           PreInvocation = [ (hook "PreInvocation") ];

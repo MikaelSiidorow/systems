@@ -47,7 +47,7 @@ Both agents send delta metrics, which Prometheus cannot store. The cluster Alloy
 
 Find a session in Tempo with TraceQL, e.g. `{ resource.host.name = "hestia" && name = "claude_code.tool" }`, or in Loki by `session_id`.
 
-To turn telemetry off on a host, unset the option and delete the `OTEL_*`, `CLAUDE_CODE_*TELEMETRY*` and `GRAFANA_URL` keys from `~/.claude/settings.json` and the `[otel]` table from `~/.codex/config.toml`. The settings merge only adds keys.
+To turn telemetry off on a host, unset the option and delete the `OTEL_*`, `CLAUDE_CODE_*TELEMETRY*` and `GRAFANA_URL` keys from `~/.claude/settings.json`, the `[otel]` table from `~/.codex/config.toml`, and the `read_url(grafana…)` rule from `~/.gemini/antigravity-cli/settings.json`, which also opens Antigravity's sandbox to Grafana. The settings merge only adds keys.
 
 ### Transcripts
 
