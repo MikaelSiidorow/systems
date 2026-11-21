@@ -73,7 +73,13 @@ let
     name: executable:
     pkgs.writeShellScriptBin name ''
       export DIRENV_LOG_FORMAT=
-      exec ${pkgs.direnv}/bin/direnv exec "$PWD" ${executable} "$@"
+      # A blocked or broken .envrc makes `direnv exec` exit before the agent
+      # starts, which T3 reports only as exit code 1. Run without it instead.
+      if ${pkgs.direnv}/bin/direnv exec "$PWD" true >/dev/null 2>&1; then
+        exec ${pkgs.direnv}/bin/direnv exec "$PWD" ${executable} "$@"
+      fi
+      echo "${name}: direnv could not load $PWD; starting without it" >&2
+      exec ${executable} "$@"
     '';
   direnvProviders = [
     (direnvWrapper "codex-direnv" "${codex}/bin/codex")
