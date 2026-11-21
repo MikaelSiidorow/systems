@@ -84,6 +84,28 @@
     };
   };
 
+  # SOPS: olympus decrypts with its own post-quantum age key and nothing else.
+  # The key is made here and never leaves the host. sops-nix's generateKey
+  # only makes the older X25519 kind.
+  sops.age = {
+    keyFile = "/var/lib/sops-nix/key.txt";
+    sshKeyPaths = [ ];
+  };
+  sops.gnupg.sshKeyPaths = [ ];
+
+  systemd.services.sops-age-key = {
+    description = "Generate the host's age key for SOPS";
+    wantedBy = [ "multi-user.target" ];
+    unitConfig.ConditionPathExists = "!${config.sops.age.keyFile}";
+    serviceConfig = {
+      Type = "oneshot";
+      StateDirectory = "sops-nix";
+      StateDirectoryMode = "0700";
+    };
+    # age-keygen refuses to overwrite a file and creates it with mode 0600.
+    script = "${pkgs.age}/bin/age-keygen -pq -o ${config.sops.age.keyFile}";
+  };
+
   # PostgreSQL
   services.postgresql = {
     enable = true;
@@ -220,6 +242,7 @@
 
   # Basic packages
   environment.systemPackages = with pkgs; [
+    age # the deploy prints the host's SOPS recipient with age-keygen
     vim
     git
     htop
