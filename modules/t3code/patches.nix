@@ -41,18 +41,10 @@ in
     {
       # Antigravity's ACP process also lives for the whole thread, so as with
       # Claude its hooks parent every turn to the first turn's span.
-      why = "Give Antigravity the thread ID and turn span its OTel hook reads; T3 passes the thread ID only to its MCP bridge.";
-      find = "cwd: input\\.cwd,\\s*baseEnv: processEnvironment,";
+      why = "Give Antigravity the turn span its OTel hook reads; T3 passes it the thread ID but not the trace.";
+      find = "prepareSpawn\\(runtimeInput\\.cwd, threadEnvironment === void 0 \\? processEnvironment : \\{\\s*\\.\\.\\.processEnvironment,\\s*\\.\\.\\.threadEnvironment\\s*\\}\\)";
       regex = true;
-      replace = "cwd: input.cwd, baseEnv: { ...processEnvironment, ...(input.processEnvironment?.T3CODE_THREAD_ID === void 0 ? {} : { T3CODE_THREAD_ID: input.processEnvironment.T3CODE_THREAD_ID }), ...(yield* ${spanTrace}.pipe(t3pMap((trace) => trace === void 0 ? {} : { TRACEPARENT: trace.traceparent }))) },";
-    }
-    {
-      # agy 1.5.8 takes the first workspace it lists, which was the attachments
-      # directory, so its commands ran outside the thread's checkout. T3 lists
-      # the cwd first for Claude the same way.
-      why = "List the thread's cwd before the attachments directory in Antigravity's ACP workspaces.";
-      find = "additionalDirectories: [options.host.paths.attachmentsDir]";
-      replace = "additionalDirectories: [...(input.cwd == null ? [] : [input.cwd]), options.host.paths.attachmentsDir]";
+      replace = "prepareSpawn(runtimeInput.cwd, { ...processEnvironment, ...(threadEnvironment ?? {}), ...(yield* ${spanTrace}.pipe(t3pMap((trace) => trace === void 0 ? {} : { TRACEPARENT: trace.traceparent }))) })";
     }
     {
       why = "Parent Codex app-server turns to the turn span through the JSON-RPC envelope (pingdotgg/t3code#31694).";

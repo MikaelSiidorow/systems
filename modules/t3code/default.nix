@@ -13,6 +13,33 @@
 }:
 let
   upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.t3code;
+  # 0.1.11 signs Antigravity in on headless hosts like Hestia, and llm-agents
+  # still has 0.1.10. This builds from source on each host (the bundle
+  # patches target 0.1.11, so the Mac needs it too). Drop it once
+  # llm-agents ships 0.1.11 (numtide/llm-agents.nix#12578). The Rust helpers
+  # stay on llm-agents' source.
+  unwrapped =
+    if pkgs.lib.versionAtLeast upstream.version "0.1.11" then
+      upstream.unwrapped
+    else
+      upstream.unwrapped.overrideAttrs (old: rec {
+        version = "0.1.11";
+        src = pkgs.fetchFromGitHub {
+          owner = "pingdotgg";
+          repo = "t3code";
+          tag = "v${version}";
+          hash = "sha256-oI8gyTWFgtTmVK+0cVQaEcfO8EzxUUOW5s8JFG/z/U8=";
+        };
+        pnpmDeps = old.pnpmDeps.overrideAttrs {
+          inherit src;
+          outputHash = "sha256-bq+hxFjUgRk0NYaMkz7rtpyQtQ3ora5J2efi9fiRk9k=";
+        };
+        preBuild =
+          builtins.replaceStrings
+            [ "update-release-package-versions.ts ${old.version}" ]
+            [ "update-release-package-versions.ts ${version}" ]
+            old.preBuild;
+      });
   runtimePkgs = inputs.llm-agents.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
   telemetryFlags = pkgs.lib.escapeShellArgs (
     [
@@ -31,7 +58,7 @@ let
   );
   # Patch cached build outputs so Electron and the web/server bundle need no rebuild.
   patched =
-    pkgs.runCommand "t3code-${upstream.version}"
+    pkgs.runCommand "t3code-${unwrapped.version}"
       {
         outputs = [
           "out"
@@ -39,7 +66,7 @@ let
         ];
         nativeBuildInputs = [ pkgs.makeBinaryWrapper ];
         passthru = {
-          inherit (upstream.unwrapped)
+          inherit (unwrapped)
             version
             appName
             src
@@ -51,8 +78,8 @@ let
       }
       ''
         mkdir -p "$out" "$desktop"
-        cp -r --preserve=mode ${upstream.unwrapped}/. "$out/"
-        cp -r --preserve=mode ${upstream.unwrapped.desktop}/. "$desktop/"
+        cp -r --preserve=mode ${unwrapped}/. "$out/"
+        cp -r --preserve=mode ${unwrapped.desktop}/. "$desktop/"
         chmod -R u+w "$out" "$desktop"
 
         ${pkgs.lib.getExe runtimePkgs.nodejs_24} ${./apply-patches.mjs} \
