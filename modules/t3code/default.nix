@@ -91,12 +91,11 @@ let
   ++ pkgs.lib.optional (antigravity != null) (
     direnvWrapper "antigravity" "${antigravity}/bin/agy" ''
       # T3's sign-in sets BROWSER to a helper that shows the Google link in
-      # its UI. agy opens the link with xdg-open, which hands it to BROWSER,
-      # but only with a display set, so sign-in failed on headless Hestia.
+      # its UI, but agy refuses to call BROWSER without a display, so sign-in
+      # failed on headless Hestia.
       if [ -n "''${BROWSER:-}" ] && [ -z "''${DISPLAY:-}''${WAYLAND_DISPLAY:-}" ]; then
         export DISPLAY=:0
       fi
-      export PATH="$PATH:${pkgs.xdg-utils}/bin"
     ''
   );
 in
