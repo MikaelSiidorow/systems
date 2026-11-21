@@ -28,30 +28,21 @@ terraform {
       keys = key_provider.pbkdf2.state
     }
 
-    # Lets the first apply read the still-plaintext state. Once both roots
-    # have applied, remove it and set `enforced = true` on state and plan.
-    method "unencrypted" "migrate" {}
-
+    # enforced: refuse to read or write either file unencrypted.
     state {
-      method = method.aes_gcm.state
-
-      fallback {
-        method = method.unencrypted.migrate
-      }
+      method   = method.aes_gcm.state
+      enforced = true
     }
 
     plan {
-      method = method.aes_gcm.state
+      method   = method.aes_gcm.state
+      enforced = true
     }
 
     # For the root state that mail.tf reads.
     remote_state_data_sources {
       default {
         method = method.aes_gcm.state
-
-        fallback {
-          method = method.unencrypted.migrate
-        }
       }
     }
   }
