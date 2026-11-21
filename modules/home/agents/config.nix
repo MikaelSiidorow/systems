@@ -594,6 +594,28 @@ in
       ''
     );
 
+    # T3 runs agy with a private GEMINI_HOME per provider instance, under
+    # ~/.t3/<state>/providers/antigravity/<hash>/, and links only the skills into
+    # it. Link the instructions and hooks too. A new instance gets them on the
+    # next switch. T3 rewrites the profile's settings each session, so the
+    # settings baseline stays CLI-only.
+    activation.antigravityT3Profiles = lib.mkIf (!pkgs.stdenv.isDarwin) (
+      lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+        for profile in "$HOME"/.t3/*/providers/antigravity/*/; do
+          [ -d "$profile" ] || continue
+          for file in AGENTS.md ${lib.optionalString (telemetry != null) "config/hooks.json"}; do
+            link="$profile$file"
+            if [ -e "$link" ] && [ ! -L "$link" ]; then
+              warnEcho "Skipping $link: not a symlink"
+              continue
+            fi
+            run mkdir -p "$(dirname "$link")"
+            run ln -sfn "$HOME/.gemini/$file" "$link"
+          done
+        done
+      ''
+    );
+
     activation.codexSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       codex_config="$HOME/.codex/config.toml"
       codex_merged="$(mktemp)"
