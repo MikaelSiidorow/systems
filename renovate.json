@@ -105,6 +105,11 @@
       "automerge": true
     },
     {
+      "description": "CI runs this binary with the key to every CI secret, so let a release age before its PR opens",
+      "matchPackageNames": ["getsops/sops"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
       "description": "The monitoring stack reports on the other updates, so review its own",
       "matchFileNames": [
         "k8s/apps/alloy.yaml",
