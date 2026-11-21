@@ -529,23 +529,25 @@ in
   options.agents.keepTranscripts = lib.mkEnableOption "keeping Claude transcripts for ten years instead of 30 days";
 
   config.home = {
-    file = skillFiles // {
-      ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
-      ".codex/AGENTS.md".source = ./shared/AGENTS.md;
-      ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
-      ".claude/statusline-command.sh" = {
-        source = ./claude-code/statusline-command.sh;
-        # Claude Code runs the statusLine command through a shell, so the file
-        # must be executable; nix store copies are read-only without this.
-        executable = true;
+    file =
+      skillFiles
+      // {
+        ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
+        ".codex/AGENTS.md".source = ./shared/AGENTS.md;
+        ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
+        ".claude/statusline-command.sh" = {
+          source = ./claude-code/statusline-command.sh;
+          # Claude Code runs the statusLine command through a shell, so the file
+          # must be executable; nix store copies are read-only without this.
+          executable = true;
+        };
+      }
+      // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+        ".gemini/AGENTS.md".source = ./shared/AGENTS.md;
+      }
+      // lib.optionalAttrs (!pkgs.stdenv.isDarwin && telemetry != null) {
+        ".gemini/config/hooks.json".source = antigravityHooks;
       };
-    }
-    // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-      ".gemini/AGENTS.md".source = ./shared/AGENTS.md;
-    }
-    // lib.optionalAttrs (!pkgs.stdenv.isDarwin && telemetry != null) {
-      ".gemini/config/hooks.json".source = antigravityHooks;
-    };
 
     activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       claude_settings="$HOME/.claude/settings.json"
