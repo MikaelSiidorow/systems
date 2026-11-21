@@ -160,8 +160,8 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 
 ## Secrets
 
-- **`infra/secrets/ci.yaml`** (SOPS): secrets that CI and you both need, one environment variable per key. Encrypted to your post-quantum age key and to CI's, whose private half is the `SOPS_AGE_KEY` Actions secret. `.github/scripts/ci-secrets.sh` loads it into a job. Edit with `sops infra/secrets/ci.yaml`.
-- **GitHub Actions secrets**: `SOPS_AGE_KEY`, provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`), SSH keys, R2 credentials, app secrets (`REFINERY_*`)
+- **`infra/secrets/ci.yaml`** (SOPS): secrets that CI and you both need, one environment variable per key: the OpenTofu state passphrase, the provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `SCW_SECRET_KEY`) and the R2 state credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Values must be single-line and free of `%`. Encrypted to your post-quantum age key and to CI's, whose private half is the `SOPS_AGE_KEY` Actions secret. `.github/scripts/ci-secrets.sh` loads it into a job. Edit with `sops infra/secrets/ci.yaml`.
+- **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`REFINERY_*`, `WGER_*`)
 - **GitHub Actions variables**: `K3S_HOST`
 - **K8s secrets**: managed by `tofu/k8s/`, passed as `TF_VAR_*` env vars in CI. `k8s/**/secrets.yaml` is gitignored.
 

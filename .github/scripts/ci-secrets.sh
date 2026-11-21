@@ -2,6 +2,8 @@
 # Decrypts infra/secrets/ci.yaml and hands every key in it to the job's later
 # steps as an environment variable, masked in the logs. Needs SOPS_AGE_KEY.
 # Values must be single-line: GITHUB_ENV and log masking both work per line.
+# They must not contain '%' either, which the runner decodes in a mask, so the
+# real value would go unmasked.
 set -euo pipefail
 
 SOPS_VERSION=v3.13.3
@@ -15,7 +17,8 @@ chmod +x "$sops"
 
 "$sops" decrypt --output-type json "$GITHUB_WORKSPACE/infra/secrets/ci.yaml" |
   jq -r 'to_entries[] |
-    if (.value | tostring | contains("\n")) then error("\(.key) is multi-line")
+    if (.key | test("^[A-Za-z_][A-Za-z0-9_]*$") | not) then error("bad key name: \(.key)")
+    elif (.value | tostring | test("[\n\r%]")) then error("\(.key) has a newline or %")
     else "\(.key)=\(.value)" end' |
   while IFS= read -r line; do
     echo "::add-mask::${line#*=}"
