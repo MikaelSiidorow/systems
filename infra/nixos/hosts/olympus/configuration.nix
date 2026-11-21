@@ -5,6 +5,13 @@
   ...
 }:
 
+let
+  passwordRoles = [
+    "refinery"
+    "zero"
+    "wger"
+  ];
+in
 {
   imports = [
     ./disko.nix
@@ -92,6 +99,7 @@
     sshKeyPaths = [ ];
   };
   sops.gnupg.sshKeyPaths = [ ];
+  sops.defaultSopsFile = ../../../secrets/olympus.yaml;
 
   systemd.services.sops-age-key = {
     description = "Generate the host's age key for SOPS";
@@ -144,7 +152,7 @@
       }
       # zero-cache manages event triggers for schema change tracking, and only
       # a superuser can create or alter them. The refinery app keeps its own
-      # non-superuser role. CI sets the password.
+      # non-superuser role.
       {
         name = "zero";
         ensureClauses = {
@@ -236,6 +244,41 @@
         END IF;
       END
       $$;
+      SQL
+    '';
+  };
+
+  # The apps log in with passwords, which infra/secrets/olympus.yaml holds.
+  # The cluster's Secrets carry the same values.
+  sops.secrets = lib.genAttrs (map (role: "postgres-${role}-password") passwordRoles) (_: {
+    owner = "postgres";
+  });
+
+  systemd.services.postgresql-role-passwords = {
+    description = "Set PostgreSQL role passwords from SOPS";
+    after = [
+      "postgresql.service"
+      "postgresql-setup.service"
+    ];
+    requires = [
+      "postgresql.service"
+      "postgresql-setup.service"
+    ];
+    wantedBy = [ "multi-user.target" ];
+    restartTriggers = [ config.sops.secrets.postgres-zero-password.sopsFileHash ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      User = "postgres";
+    };
+    # psql reads each file itself and quotes the value, so a password never
+    # appears in a command line.
+    script = ''
+      ${config.services.postgresql.package}/bin/psql --set=ON_ERROR_STOP=1 <<'SQL'
+      ${lib.concatMapStrings (role: ''
+        \set password `cat ${config.sops.secrets."postgres-${role}-password".path}`
+        ALTER ROLE ${role} PASSWORD :'password';
+      '') passwordRoles}
       SQL
     '';
   };

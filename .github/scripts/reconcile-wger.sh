@@ -11,11 +11,6 @@ if [[ ! "$k3s_host" =~ ^[A-Za-z0-9.:-]+$ ]]; then
   exit 1
 fi
 
-if [[ ! "${WGER_POSTGRES_PASSWORD:-}" =~ ^[A-Za-z0-9_-]{32,}$ ]]; then
-  echo "WGER_POSTGRES_PASSWORD must be at least 32 URL-safe characters." >&2
-  exit 1
-fi
-
 remote() {
   # All remote arguments are fixed below or validated above.
   # shellcheck disable=SC2029
@@ -46,9 +41,6 @@ if remote_kubectl -n wger get secret wger-email >/dev/null 2>&1; then
     fi
   done
 fi
-
-printf "ALTER ROLE wger PASSWORD '%s';\n" "$WGER_POSTGRES_PASSWORD" |
-  remote sudo -u postgres psql --set=ON_ERROR_STOP=1
 
 # Terraform has installed the replacement Endpoints resource, so the
 # EndpointSlice left by the old static manifest can now be removed safely.
