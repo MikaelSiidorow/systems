@@ -1,7 +1,8 @@
 # Turns Antigravity hook events into OTLP spans, since agy has no OTel export.
-# One trace per turn, rooted at antigravity.interaction, with a child per model
-# call and tool call. A TRACEPARENT from T3 or a parent agent becomes the
-# turn's parent. Prepended by Nix: endpoint, host, details.
+# One trace per turn, rooted at antigravity.interaction, with a child per tool
+# call and per model invocation (which may span the tools it ran). A
+# TRACEPARENT from T3 or a parent agent becomes the turn's parent. Prepended
+# by Nix: endpoint, host, details.
 #
 # agy waits on every hook, so this always answers at once, sends in the
 # background and never blocks a tool: PreToolUse defers to normal permissions.
@@ -97,7 +98,7 @@ case $event in
     key="llm-$(field .invocationNum)"
     start=$(cat "$dir/$key" 2>/dev/null || echo "$now")
     rm -f "$dir/$key"
-    send antigravity.llm_request "$turnSpan" "$start" "$(jq -c '{invocation: .invocationNum}' <<<"$input")"
+    send antigravity.invocation "$turnSpan" "$start" "$(jq -c '{invocation: .invocationNum}' <<<"$input")"
     ;;
   Stop)
     error=$(field .error)
