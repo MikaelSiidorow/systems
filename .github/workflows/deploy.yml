@@ -468,6 +468,8 @@ jobs:
           fi
           echo "Deploying $rev"
           nixos-rebuild switch --flake "github:MikaelSiidorow/systems/$rev?dir=infra#olympus"
+          # The public half of the host's age key, for .sops.yaml.
+          echo "SOPS recipient: $(age-keygen -y /var/lib/sops-nix/key.txt)"
           EOF
   k8s-tofu:
     needs: [changes, tofu, nixos]
