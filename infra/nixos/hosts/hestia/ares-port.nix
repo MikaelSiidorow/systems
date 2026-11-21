@@ -43,6 +43,11 @@ let
         fi
       }
 
+      if [ $# -gt 0 ]; then
+        set_port "$1"
+        exit
+      fi
+
       decide() {
         local now=$1 power=$2
         if [ -n "$power" ]; then
@@ -97,6 +102,9 @@ in
     requires = [ "mosquitto.service" ];
     serviceConfig = {
       ExecStart = "${aresPort}/bin/ares-port";
+      # Fail open: however the watcher stops, including with mosquitto, a
+      # running ares must not stay offline.
+      ExecStopPost = "${aresPort}/bin/ares-port up";
       Restart = "always";
       RestartSec = 10;
     };
