@@ -9,7 +9,7 @@ let
     inherit pkgs inputs;
     # Alloy keeps only the turn spans; see monitoring.nix.
     otlpTracesUrl = "http://127.0.0.1:4318/v1/traces";
-    # T3 runs both providers through this host's CLIProxyAPI.
+    # T3 runs Codex and Claude through this host's CLIProxyAPI.
     codex = import ../../../../modules/codex-proxy.nix {
       inherit pkgs;
       codex = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex;
@@ -19,6 +19,8 @@ let
       claude = claudeCode;
       name = "claude";
     };
+    # Its own Google login, never the proxy.
+    antigravity = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli;
   };
   # Run Claude Code's native build, which updates itself, so a new model works
   # without a pin bump and a Hestia deploy. The pinned build only installs it.

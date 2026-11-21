@@ -3,6 +3,8 @@
   inputs,
   codex ? inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex,
   claude ? inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default,
+  # Antigravity CLI, on hosts that run it. Unset leaves T3 without it.
+  antigravity ? null,
   # Local OTLP/HTTP endpoint for T3's own spans. Unset keeps T3's OTel SDK off.
   # Metrics and logs stay off either way, and the relay's tracing stays off
   # while T3CODE_TELEMETRY_ENABLED is false. On the work Mac, only ever its local
@@ -76,7 +78,10 @@ let
   direnvProviders = [
     (direnvWrapper "codex-direnv" "${codex}/bin/codex")
     (direnvWrapper "claude-direnv" "${claude}/bin/claude")
-  ];
+  ]
+  # T3 runs only an executable named agy or antigravity as `agy acp`, so this
+  # wrapper cannot follow the -direnv naming.
+  ++ pkgs.lib.optional (antigravity != null) (direnvWrapper "antigravity" "${antigravity}/bin/agy");
 in
 (upstream.override {
   t3code-unwrapped = patched;

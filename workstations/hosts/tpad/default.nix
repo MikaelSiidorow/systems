@@ -1,9 +1,11 @@
 # ThinkPad (Pop!_OS) host configuration for home-manager standalone
 { pkgs, inputs, ... }:
 let
+  # From llm-agents: nixpkgs stable trails Antigravity releases by months.
+  antigravity = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli;
   t3code = import ../../../modules/t3code {
     inherit pkgs inputs;
-    # T3 runs both providers through Hestia's CLIProxyAPI.
+    # T3 runs Codex and Claude through Hestia's CLIProxyAPI.
     codex = import ../../../modules/codex-proxy.nix {
       inherit pkgs;
       codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
@@ -13,6 +15,8 @@ let
       claude = inputs.claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
       name = "claude";
     };
+    # Its own Google login, never the proxy.
+    inherit antigravity;
   };
   tailscale-headscale-setup = pkgs.writeShellApplication {
     name = "tailscale-headscale-setup";
@@ -52,10 +56,10 @@ in
     t3code.desktop
     (pkgs.callPackage ../../pkgs/amp-desktop { })
     (pkgs.callPackage ../../pkgs/meetily { })
-    # From llm-agents: nixpkgs stable trails Amp and Antigravity releases by months.
+    # From llm-agents: nixpkgs stable trails Amp releases by months.
     # Never route Antigravity OAuth through CLIProxyAPI; Google bans accounts for it.
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.amp
-    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli
+    antigravity
   ]
   ++ t3code.direnvProviders;
 
