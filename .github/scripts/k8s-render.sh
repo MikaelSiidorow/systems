@@ -48,9 +48,9 @@ for app in k8s/apps/*.yaml; do
   fi
 done
 
-# k8s-server's NixOS config hands these to k3s, which installs them before
+# olympus's NixOS config hands these to k3s, which installs them before
 # Argo CD exists.
-for file in infra/nixos/hosts/k8s-server/*-helmchart.yaml; do
+for file in infra/nixos/hosts/olympus/*-helmchart.yaml; do
   name="$(yq '.metadata.name' "$file")"
   render_chart "k3s-$name" "$name" \
     "$(yq '.spec.chart' "$file")" \

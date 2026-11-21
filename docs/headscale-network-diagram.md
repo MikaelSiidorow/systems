@@ -18,7 +18,7 @@ graph TB
             FW_22[TCP 22 SSH]
         end
 
-        subgraph Server["k3s-server (cx33 · Helsinki)<br/>89.167.124.71"]
+        subgraph Server["olympus (cx33 · Helsinki)<br/>89.167.124.71"]
             subgraph K8s["Kubernetes (K3s)"]
                 TRAEFIK["Traefik Ingress<br/>hostPort 80/443<br/>TLS termination"]
                 CERTMGR["cert-manager<br/>Let's Encrypt"]
@@ -131,7 +131,7 @@ flowchart TD
 
 ## Client-to-ArgoCD Access Flow
 
-ArgoCD and Grafana are only reachable through the Tailscale VPN: they have no public DNS record, and a Traefik `tailnet-only` middleware refuses clients outside 100.64.0.0/10 (k8s-server disables Tailscale subnet SNAT and gives Traefik the tailnet address as an external IP, so Traefik sees real client addresses).
+ArgoCD and Grafana are only reachable through the Tailscale VPN: they have no public DNS record, and a Traefik `tailnet-only` middleware refuses clients outside 100.64.0.0/10 (olympus disables Tailscale subnet SNAT and gives Traefik the tailnet address as an external IP, so Traefik sees real client addresses).
 
 ```mermaid
 flowchart LR

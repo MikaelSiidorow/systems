@@ -51,7 +51,7 @@ jobs:
             k8s:
               - 'k8s/**'
               - '.github/scripts/k8s-*.sh'
-              - 'infra/nixos/hosts/k8s-server/*-helmchart.yaml'
+              - 'infra/nixos/hosts/olympus/*-helmchart.yaml'
               - '.github/workflows/ci.yml'
               - 'infra/flake.nix'
               - 'infra/flake.lock'

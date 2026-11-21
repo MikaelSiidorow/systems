@@ -47,7 +47,7 @@
 
   # Networking
   networking = {
-    hostName = "k8s-server";
+    hostName = "olympus";
     useDHCP = lib.mkDefault true;
     firewall = {
       enable = true;

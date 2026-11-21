@@ -7,7 +7,7 @@
 set -euo pipefail
 
 version=$1
-out=${2:-infra/nixos/hosts/k8s-server/traefik-crds.yaml}
+out=${2:-infra/nixos/hosts/olympus/traefik-crds.yaml}
 
 crds=$(helm show crds traefik --repo https://traefik.github.io/charts --version "$version")
 

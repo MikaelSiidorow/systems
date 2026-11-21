@@ -106,11 +106,13 @@ jobs:
           # Bases from before the flake moved into infra/ keep it at the root.
           base=./base/infra
           [ -f "$base/flake.nix" ] || base=./base
-          nix build "$base#nixosConfigurations.k8s-server.config.system.build.toplevel" -o result-base
+          # Bases from before the host was renamed call it k8s-server.
+          nix build "$base#nixosConfigurations.olympus.config.system.build.toplevel" -o result-base ||
+            nix build "$base#nixosConfigurations.k8s-server.config.system.build.toplevel" -o result-base
         continue-on-error: true
       - name: Build PR config
         id: build-pr
-        run: nix build ./pr/infra#nixosConfigurations.k8s-server.config.system.build.toplevel -o result-pr
+        run: nix build ./pr/infra#nixosConfigurations.olympus.config.system.build.toplevel -o result-pr
         continue-on-error: true
       - name: Evaluate PR deploy config
         id: check-pr
@@ -154,18 +156,18 @@ jobs:
           if [ "$status" = failure ]; then
             summary="build or evaluation failed"
           elif [ "$DIFF" = "No changes detected." ]; then
-            summary="no k8s-server closure changes; Hestia evaluates"
+            summary="no olympus closure changes; Hestia evaluates"
           else
             status=changes
             n=$(printf '%s\n' "$DIFF" | grep -c .)
             [ "$n" = 1 ] && noun=change || noun=changes
-            summary="$n k8s-server closure $noun; Hestia evaluates"
+            summary="$n olympus closure $noun; Hestia evaluates"
           fi
           {
             echo "| Step | Result |"
             echo "|---|---|"
-            echo "| Build k8s-server (base) | $(mark "$BUILD_BASE") |"
-            echo "| Build k8s-server (PR) | $(mark "$BUILD_PR") |"
+            echo "| Build olympus (base) | $(mark "$BUILD_BASE") |"
+            echo "| Build olympus (PR) | $(mark "$BUILD_PR") |"
             echo "| Evaluate deploy config | $(mark "$CHECK_PR") |"
             echo "| Evaluate Hestia | $(mark "$BUILD_HESTIA") |"
             echo
@@ -174,7 +176,7 @@ jobs:
             echo "${DIFF:-No closure diff available.}"
             echo '``````````'
           } >"$RUNNER_TEMP/details.md"
-          pr/.github/scripts/report-section.sh nixos 20 "k8s-server + Hestia" "$status" "$summary" "$RUNNER_TEMP/details.md"
+          pr/.github/scripts/report-section.sh nixos 20 "Olympus + Hestia" "$status" "$summary" "$RUNNER_TEMP/details.md"
       - name: Upload CI report section
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -190,7 +192,7 @@ jobs:
         run: exit 1
       # The weekly infra lock update merges itself once CI Summary passes,
       # unless it changes a version that needs a look at the release notes.
-      # The smoke job checks k8s-server after the deploy; Hestia stays manual.
+      # The smoke job checks olympus after the deploy; Hestia stays manual.
       - name: Create GitHub App token
         id: app-token
         if: >-
@@ -242,8 +244,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the committed Traefik CRDs
         run: |
-          file=infra/nixos/hosts/k8s-server/traefik-crds.yaml
-          version=$(yq '.spec.version' infra/nixos/hosts/k8s-server/traefik-helmchart.yaml)
+          file=infra/nixos/hosts/olympus/traefik-crds.yaml
+          version=$(yq '.spec.version' infra/nixos/hosts/olympus/traefik-helmchart.yaml)
           .github/scripts/traefik-crds.sh "$version" "$RUNNER_TEMP/traefik-crds.yaml"
           if ! diff -q "$file" "$RUNNER_TEMP/traefik-crds.yaml" >/dev/null; then
             echo "::error file=$file::Out of date for traefik chart $version. Run: .github/scripts/traefik-crds.sh $version"
@@ -272,8 +274,8 @@ jobs:
           purge-prefixes: nix-${{ runner.os }}-
           purge-created: 0
           purge-primary-key: never
-      - name: Build k8s-server config
-        run: nix build ./infra#nixosConfigurations.k8s-server.config.system.build.toplevel --no-link
+      - name: Build olympus config
+        run: nix build ./infra#nixosConfigurations.olympus.config.system.build.toplevel --no-link
   openwrt-check:
     needs: changes
     if: |
@@ -471,7 +473,7 @@ jobs:
             exit 1
           fi
           echo "Deploying $rev"
-          nixos-rebuild switch --flake "github:MikaelSiidorow/systems/$rev?dir=infra#k8s-server"
+          nixos-rebuild switch --flake "github:MikaelSiidorow/systems/$rev?dir=infra#olympus"
           EOF
   k8s-tofu:
     needs: [changes, tofu, nixos]
@@ -709,7 +711,7 @@ jobs:
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
-      # A tag:ci node, which the Headscale ACL only lets reach k8s-server:443,
+      # A tag:ci node, which the Headscale ACL only lets reach olympus:443,
       # checks the tailnet-only hosts. Without the key they are only checked
       # to refuse the public address.
       - name: Check for the Headscale key
@@ -727,7 +729,7 @@ jobs:
           sha256sum: a1cba18826b1f91cb25ef7f5b8259b5258339b42db7867af9269e21829ea78cc
           use-cache: "false"
           args: --login-server=https://hs.miksu.app --accept-dns=false
-      - name: Smoke test k8s-server
+      - name: Smoke test olympus
         env:
           TAILNET_IP: ${{ steps.tailnet.outcome == 'success' && '100.64.0.1' || '' }}
           NIXOS_DEPLOYED: ${{ needs.nixos.result == 'success' }}

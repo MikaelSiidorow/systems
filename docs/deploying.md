@@ -36,9 +36,9 @@ systems/
 ├── workstations/            # nix-darwin + home-manager flake (own flake.lock)
 ├── modules/home/            # Shared home-manager modules: core (shell, CLI tools), agents
 ├── openwrt/                 # Router firmware + UCI config flake (own flake.lock, updated daily)
-├── infra/                   # NixOS flake: Hestia, k8s-server (own flake.lock)
+├── infra/                   # NixOS flake: Hestia, Olympus (own flake.lock)
 │   ├── nixos/hosts/
-│   │   ├── k8s-server/      # Hetzner K3s and public infrastructure
+│   │   ├── olympus/         # Hetzner K3s and public infrastructure
 │   │   └── hestia/          # Home Assistant and home-network services
 │   └── secrets/             # SOPS-encrypted host secrets
 ├── k8s/
@@ -89,7 +89,7 @@ Hestia is deployed independently from a machine that can resolve and reach
 nix run ./infra#deploy -- ./infra#hestia
 ```
 
-The existing CI NixOS job continues to deploy only `k8s-server`; Hestia being
+The existing CI NixOS job continues to deploy only `olympus`; Hestia being
 offline does not block Hetzner deployments.
 
 Router firmware and deployment outputs are built on x86_64 Linux. Deployments
@@ -119,7 +119,7 @@ Refinery application releases do not require per-build image tag commits in this
 
    ```bash
    nix run github:nix-community/nixos-anywhere -- \
-     --flake ./infra#k8s-server --target-host root@<IP>
+     --flake ./infra#olympus --target-host root@<IP>
    ```
 
 4. Wait for ArgoCD to start:
@@ -148,7 +148,7 @@ The K3s API (port 6443) is not exposed to the internet. Use an SSH tunnel:
 ssh -L 6443:127.0.0.1:6443 root@$(sops exec-env infra/secrets/ci.yaml 'tofu -chdir=tofu output -raw k3s_ipv4_address')
 ```
 
-Then in another terminal:
+Then in another terminal (the node is still called `k8s-server`: local-path volumes are pinned to the node name, so k3s keeps it through `--node-name`):
 
 ```bash
 # Fetch kubeconfig (one-time)

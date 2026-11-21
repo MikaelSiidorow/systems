@@ -43,7 +43,7 @@ resource "hcloud_firewall" "k3s" {
 }
 
 resource "hcloud_server" "k3s_server" {
-  name        = "k3s-server"
+  name        = "olympus"
   server_type = "cx33"      # 4 vCPU / 8GB RAM / 80GB (shared)
   image       = "debian-12" # Will be replaced with NixOS via nixos-anywhere
   location    = "hel1"
