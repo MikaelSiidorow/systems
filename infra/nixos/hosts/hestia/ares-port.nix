@@ -98,12 +98,16 @@ in
       "mosquitto.service"
       "network-online.target"
     ];
-    wants = [ "network-online.target" ];
-    requires = [ "mosquitto.service" ];
+    # Wants, not Requires: a broker stop must not stop the watcher for good.
+    # With no broker mosquitto_sub exits and Restart= retries until it is back.
+    wants = [
+      "mosquitto.service"
+      "network-online.target"
+    ];
     serviceConfig = {
       ExecStart = "${aresPort}/bin/ares-port";
-      # Fail open: however the watcher stops, including with mosquitto, a
-      # running ares must not stay offline.
+      # Fail open: however the watcher stops, a running ares must not stay
+      # offline.
       ExecStopPost = "${aresPort}/bin/ares-port up";
       Restart = "always";
       RestartSec = 10;
