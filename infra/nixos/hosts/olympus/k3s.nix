@@ -207,6 +207,9 @@ in
     extraFlags = toString [
       "--disable=traefik" # Deploy our own Traefik via HelmChart CRD
       "--tls-san=100.64.0.1" # Allow API access over Tailscale VPN
+      # The node keeps the host's old name: local-path volumes are pinned to
+      # the node name, so a node called olympus would start without its data.
+      "--node-name=k8s-server"
     ];
   };
 

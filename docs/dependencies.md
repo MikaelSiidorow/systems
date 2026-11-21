@@ -5,7 +5,7 @@ Renovate and the flake-lock workflows open the PRs. Merging deploys, so merge on
 ## What merges itself
 
 - Workstations and openwrt flake locks.
-- The weekly infra flake lock, unless its k8s-server closure brings a new k3s or kernel minor, or a PostgreSQL or systemd major (`deploy.yml` enables auto-merge). Hestia still needs a manual deploy, and a kernel bump a reboot.
+- The weekly infra flake lock, unless its olympus closure brings a new k3s or kernel minor, or a PostgreSQL or systemd major (`deploy.yml` enables auto-merge). Hestia still needs a manual deploy, and a kernel bump a reboot.
 - The weekly GitHub Actions group (minor/patch/digest; majors get their own grouped PR for review), but only when it doesn't touch `deploy.yml` or `k8s-rollout.yml`. A shared action like `actions/checkout` pulls those in, so expect to review it most weeks.
 - `k8s/**` minor/patch chart and image updates (not 0.x), three days after release, except the monitoring stack (alloy, kube-prometheus-stack, loki, tempo). A release without a publish date (images outside Docker Hub) never gets a PR; force it from the Dependency Dashboard.
 - Bot Terraform PRs whose plan shows no changes (`deploy.yml` enables auto-merge).
@@ -15,11 +15,11 @@ Everything else waits for review: majors, the monitoring stack, other `infra/**`
 ## What a merge deploys
 
 - `k8s/**`: Argo CD syncs it; there is no workflow run, so wait for the app to reach the new revision.
-- `infra/**`: `nixos-rebuild switch` on k8s-server through `deploy.yml`. Hestia is never deployed by CI; tell the user to deploy it.
+- `infra/**`: `nixos-rebuild switch` on olympus through `deploy.yml`. Hestia is never deployed by CI; tell the user to deploy it.
 - `tofu/*`, `tofu/k8s/*`: `tofu apply`. Read the plan in the PR's CI report comment.
 - `openwrt/**`: builds only; router deploys are manual.
 
-`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on k8s-server and deploy `main` as it is, so a run can include later merges.
+`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus and deploy `main` as it is, so a run can include later merges.
 
 ## Known failures
 

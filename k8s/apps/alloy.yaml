@@ -186,7 +186,7 @@ spec:
         controller:
           type: daemonset
 
-        # OTLP from hestia, reachable only on k8s-server's tailnet address.
+        # OTLP from hestia, reachable only on olympus's tailnet address.
         extraObjects:
           - apiVersion: v1
             kind: Service

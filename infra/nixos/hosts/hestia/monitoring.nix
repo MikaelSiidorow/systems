@@ -1,7 +1,7 @@
 { pkgs, ... }:
 {
   # Ships host metrics and the journal over OTLP to the cluster Alloy on
-  # k8s-server (tailnet only), so a freeze is visible from outside the host.
+  # olympus (tailnet only), so a freeze is visible from outside the host.
   # Local agents send OTLP to 127.0.0.1:4318 and share the same disk queue.
   services.alloy.enable = true;
 

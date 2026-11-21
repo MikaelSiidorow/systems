@@ -77,8 +77,8 @@ A file maps to a session in telemetry: Claude's file name is its `session.id`, a
 - **Grafana**: https://grafana.miksu.app (VPN-only via Headscale MagicDNS)
 - **Credentials**: `admin` / password from `grafana-admin` K8s secret (managed by Terraform)
 - **Anonymous read**: anyone who can reach Grafana views it as a Viewer without logging in (`grafana.ini` `auth.anonymous` in `k8s/apps/kube-prometheus-stack.yaml`). Editing and admin still need the login. Agents query through the datasource proxy, `/api/datasources/proxy/uid/{tempo,loki,prometheus}/...`; the `grafana-datasource-proxy-guard` IngressRoute lets only reads through it and the datasource resource route, because they otherwise reach endpoints like Loki's `/ingester/shutdown` and Prometheus's `/-/quit`.
-- **Who reaches it**: personal devices (`mikael@`), CI (`tag:ci`) and Hestia, which carries `tag:telemetry-reader` next to `tag:home-subnet-router` so its agents can read their own telemetry. CI only needs 443 for the deploy smoke test, but anonymous read cannot be limited by source, so its runners can read telemetry too (including agent Bash commands in Loki). Accepted: they join the tailnet only for deploy jobs on main. Tags are set on the server: `sudo headscale nodes list`, then `sudo headscale nodes tag -i <id> -t tag:home-subnet-router -t tag:telemetry-reader` on k8s-server (list every tag the node keeps).
-- **Revoke**: drop the `tag:telemetry-reader` rule in `infra/nixos/hosts/k8s-server/headscale.nix`, or retag Hestia with only `tag:home-subnet-router`. Turning `auth.anonymous` off closes it for every client.
+- **Who reaches it**: personal devices (`mikael@`), CI (`tag:ci`) and Hestia, which carries `tag:telemetry-reader` next to `tag:home-subnet-router` so its agents can read their own telemetry. CI only needs 443 for the deploy smoke test, but anonymous read cannot be limited by source, so its runners can read telemetry too (including agent Bash commands in Loki). Accepted: they join the tailnet only for deploy jobs on main. Tags are set on the server: `sudo headscale nodes list`, then `sudo headscale nodes tag -i <id> -t tag:home-subnet-router -t tag:telemetry-reader` on olympus (list every tag the node keeps).
+- **Revoke**: drop the `tag:telemetry-reader` rule in `infra/nixos/hosts/olympus/headscale.nix`, or retag Hestia with only `tag:home-subnet-router`. Turning `auth.anonymous` off closes it for every client.
 
 ## Retention & Storage
 
@@ -135,7 +135,7 @@ Defined in `tofu/k8s/secrets.tf`, variables in `tofu/k8s/variables.tf`.
 
 - `kubeEtcd`, `kubeScheduler`, `kubeControllerManager`, `kubeProxy` scrapers are disabled (K3s doesn't expose these metrics)
 - `ServerSideApply=true` is required for kube-prometheus-stack and Loki (large CRDs)
-- `grafana.miksu.app` DNS is via Headscale MagicDNS extra records (`infra/nixos/hosts/k8s-server/headscale.nix`)
+- `grafana.miksu.app` DNS is via Headscale MagicDNS extra records (`infra/nixos/hosts/olympus/headscale.nix`)
 
 ## Datasource Correlation
 
@@ -159,7 +159,7 @@ tofu/k8s/
   secrets.tf                   # Grafana + Telegram secrets
   variables.tf                 # Secret variable declarations
 
-infra/nixos/hosts/k8s-server/
+infra/nixos/hosts/olympus/
   headscale.nix                # grafana.miksu.app MagicDNS record
 
 .github/workflows/

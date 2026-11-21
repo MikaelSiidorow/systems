@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post-deploy smoke test for k8s-server: the host is up, Argo CD has synced
+# Post-deploy smoke test for olympus: the host is up, Argo CD has synced
 # the deployed commit, every workload has rolled out and stays up, and every
 # Ingress host answers.
 set -euo pipefail
@@ -46,7 +46,7 @@ host_ready() {
   # shellcheck disable=SC2029
   state=$(ssh "${ssh_options[@]}" "root@$k3s_host" systemctl is-system-running)
   if [ "$state" != running ]; then
-    echo "k8s-server is ${state:-unreachable}."
+    echo "olympus is ${state:-unreachable}."
     ssh "${ssh_options[@]}" "root@$k3s_host" systemctl --failed --no-legend
     return 1
   fi
@@ -54,17 +54,17 @@ host_ready() {
 }
 
 echo "::group::Host"
-wait_for "$host_timeout" "k8s-server to be up" host_ready
+wait_for "$host_timeout" "olympus to be up" host_ready
 if [ "${NIXOS_DEPLOYED:-}" = true ]; then
   # A later run may already have deployed a newer commit.
   # shellcheck disable=SC2029
   running=$(ssh "${ssh_options[@]}" "root@$k3s_host" nixos-version --configuration-revision) || running=
   git cat-file -e "$running^{commit}" 2>/dev/null || git fetch -q origin main || true
   if ! git merge-base --is-ancestor "$sha" "$running" 2>/dev/null; then
-    echo "::error::k8s-server runs ${running:-an unknown revision}, not $sha or newer."
+    echo "::error::olympus runs ${running:-an unknown revision}, not $sha or newer."
     exit 1
   fi
-  echo "k8s-server runs $running."
+  echo "olympus runs $running."
 fi
 echo "::endgroup::"
 
@@ -170,7 +170,7 @@ up() {
 }
 
 echo "::group::Ingress"
-# Some hosts resolve to the tailnet only, so connect to k8s-server directly.
+# Some hosts resolve to the tailnet only, so connect to olympus directly.
 # Hosts behind the tailnet-only middleware must refuse the public address;
 # with TAILNET_IP set (the runner joined the tailnet) they must answer there.
 hosts=$(kubectl get ingress -A -o json | jq -r '

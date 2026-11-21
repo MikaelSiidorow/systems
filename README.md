@@ -10,7 +10,7 @@ Configuration for my machines, servers and the services on them: workstations, c
 
 ## Infrastructure
 
-- [`infra/`](infra/): NixOS flake for the Hetzner K3s host (`k8s-server`) and [Hestia](infra/nixos/hosts/hestia/README.md), the home server running Home Assistant and the Tailscale subnet router. Host secrets are SOPS-encrypted.
+- [`infra/`](infra/): NixOS flake for the Hetzner K3s host (`olympus`) and [Hestia](infra/nixos/hosts/hestia/README.md), the home server running Home Assistant and the Tailscale subnet router. Host secrets are SOPS-encrypted.
 - [`k8s/`](k8s/): manifests that ArgoCD syncs from Git: Refinery, [wger](docs/wger.md), Headscale ingress and the [observability stack](docs/observability.md).
 - [`tofu/`](tofu/): OpenTofu for the Hetzner server and Cloudflare DNS; `tofu/k8s/` manages cluster secrets, the part that can't live in Git.
 - [`openwrt/`](openwrt/): firmware builds and UCI config for the [Cerberus router](openwrt/r6220/README.md) and the [Hermes access point](openwrt/archer-c6-v2/README.md).

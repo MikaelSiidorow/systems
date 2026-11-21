@@ -53,13 +53,13 @@
       };
 
       nixosConfigurations = {
-        k8s-server = nixpkgs.lib.nixosSystem {
+        olympus = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
             disko.nixosModules.disko
             sops-nix.nixosModules.sops
-            ./nixos/hosts/k8s-server/configuration.nix
-            # The deploy smoke test checks k8s-server runs the deployed commit.
+            ./nixos/hosts/olympus/configuration.nix
+            # The deploy smoke test checks olympus runs the deployed commit.
             { system.configurationRevision = self.rev or self.dirtyRev or null; }
           ];
         };
@@ -81,12 +81,12 @@
 
       deploy = {
         nodes = {
-          k8s-server = {
+          olympus = {
             hostname = "89.167.124.71";
             sshUser = "root";
             profiles.system = {
               user = "root";
-              path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.k8s-server;
+              path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.olympus;
             };
           };
 

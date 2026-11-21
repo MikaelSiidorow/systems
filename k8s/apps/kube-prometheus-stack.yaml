@@ -210,7 +210,7 @@ spec:
               memory: 128Mi
 
         prometheus-node-exporter:
-          # Names the k8s-server node in dashboards; hestia pushes as "hestia".
+          # Names the olympus node in dashboards; hestia pushes as "hestia".
           prometheus:
             monitor:
               relabelings:

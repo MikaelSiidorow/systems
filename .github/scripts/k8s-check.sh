@@ -20,4 +20,4 @@ kubeconform -strict -summary \
   -skip CustomResourceDefinition \
   -schema-location default \
   -schema-location "$crd_schemas" \
-  k8s/apps infra/nixos/hosts/k8s-server/*-helmchart.yaml "$out"/*.yaml
+  k8s/apps infra/nixos/hosts/olympus/*-helmchart.yaml "$out"/*.yaml
