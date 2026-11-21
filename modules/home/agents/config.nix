@@ -96,7 +96,7 @@ let
   );
 
   # Like jq's `*`, but unions arrays instead of replacing them.
-  claudeSettingsMerge = pkgs.writeText "claude-settings-merge.jq" ''
+  jsonSettingsMerge = pkgs.writeText "claude-settings-merge.jq" ''
     def merge($a; $b):
       if ($a | type) == "object" and ($b | type) == "object" then
         reduce ($b | keys_unsorted[]) as $k ($a; .[$k] = merge($a[$k]; $b[$k]))
@@ -173,6 +173,78 @@ let
     }
   );
 
+  # Merged into ~/.gemini/antigravity-cli/settings.json like Claude's. agy has
+  # no keys for OTel export, effort or env, so those stay unset.
+  antigravitySettings = pkgs.writeText "antigravity-settings-baseline.json" (
+    builtins.toJSON {
+      "$schema" = "https://antigravity.google/schemas/v1/settings.json";
+      colorScheme = "dark";
+      # agy defaults to auto mode (like Codex auto review), which needs the
+      # sandbox; sandboxed commands have no network.
+      enableTerminalSandbox = true;
+      permissions.allow = [
+        # Same read-only gh calls as codex/rules/nix-managed.rules.
+        "command(gh pr view)"
+        "command(gh pr list)"
+        "command(gh pr status)"
+        "command(gh pr diff)"
+        "command(gh pr checks)"
+        "command(gh issue view)"
+        "command(gh issue list)"
+        "command(gh issue status)"
+        "command(gh run view)"
+        "command(gh run list)"
+        "command(gh repo view)"
+      ]
+      # Allowed domains also open the sandbox's network to them.
+      ++ lib.optionals (telemetry != null && socket == null) [ "read_url(${grafanaHost})" ];
+    }
+  );
+
+  # agy has no OTel export, so hooks build the spans (antigravity/otel-hook.sh).
+  antigravityOtelHook = pkgs.writeShellApplication {
+    name = "agy-otel-hook";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.git
+      pkgs.jq
+    ];
+    text = ''
+      endpoint=${lib.escapeShellArg telemetry.endpoint}
+      host=${lib.escapeShellArg telemetry.host}
+      details=${lib.boolToString telemetry.toolDetails}
+    ''
+    + builtins.readFile ./antigravity/otel-hook.sh;
+  };
+
+  antigravityHooks = pkgs.writeText "antigravity-hooks.json" (
+    builtins.toJSON {
+      otel =
+        let
+          hook = event: {
+            type = "command";
+            command = "${lib.getExe antigravityOtelHook} ${event}";
+            timeout = 5;
+          };
+          toolHook = event: [
+            {
+              matcher = "*";
+              hooks = [ (hook event) ];
+            }
+          ];
+        in
+        {
+          SessionStart = [ (hook "SessionStart") ];
+          PreToolUse = toolHook "PreToolUse";
+          PostToolUse = toolHook "PostToolUse";
+          PreInvocation = [ (hook "PreInvocation") ];
+          PostInvocation = [ (hook "PostInvocation") ];
+          Stop = [ (hook "Stop") ];
+        };
+    }
+  );
+
   codexPython = pkgs.python3.withPackages (ps: [ ps.tomlkit ]);
 
   codexSettingsMerge = pkgs.writeText "codex-config-merge.py" ''
@@ -201,6 +273,8 @@ let
     codex = name: ".codex/skills/${name}";
     claude-code = name: ".claude/skills/${name}";
     opencode = name: ".config/opencode/skills/${name}";
+    # Read by the agy CLI and the Antigravity apps alike.
+    antigravity = name: ".gemini/config/skills/${name}";
   };
 
   skillTargetPaths =
@@ -213,8 +287,14 @@ let
           builtins.filter (agent: agent != "opencode") agents
         else
           agents;
+      # Antigravity is only installed on tpad and Hestia, not the Mac.
+      hostAgents =
+        if pkgs.stdenv.isDarwin then
+          builtins.filter (agent: agent != "antigravity") effectiveAgents
+        else
+          effectiveAgents;
     in
-    lib.unique (map (agent: skillTargets.${agent} name) effectiveAgents);
+    lib.unique (map (agent: skillTargets.${agent} name) hostAgents);
 
   skills = {
     agent-traces = {
@@ -223,6 +303,7 @@ let
       needsTelemetry = true;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -231,6 +312,7 @@ let
       source = ./skills/address-review;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -239,6 +321,7 @@ let
       source = ./skills/babysit-pr;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -247,6 +330,7 @@ let
       source = ./skills/dependency-prs;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -255,6 +339,7 @@ let
       source = ./skills/file-pr;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -263,6 +348,7 @@ let
       source = ./skills/file-ticket;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -271,6 +357,7 @@ let
       source = ./skills/full-send;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -279,6 +366,7 @@ let
       source = ./skills/full-stop;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -287,6 +375,7 @@ let
       source = ./skills/grilling;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -295,6 +384,7 @@ let
       source = ./skills/modernize;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -303,6 +393,7 @@ let
       source = ./skills/morning-prs;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -311,6 +402,7 @@ let
       source = ./skills/rebase;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -319,6 +411,7 @@ let
       source = ./skills/retro;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -327,6 +420,7 @@ let
       source = ./skills/review-pr;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -335,6 +429,7 @@ let
       source = ./skills/review-rounds;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -343,6 +438,7 @@ let
       source = ./skills/takeover;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -351,6 +447,7 @@ let
       source = ./skills/ticket-kickoff;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -359,6 +456,7 @@ let
       source = ./skills/unslop;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -367,6 +465,7 @@ let
       source = ./skills/writing-for-agents;
       agents = [
         "codex"
+        "antigravity"
         "claude-code"
       ];
     };
@@ -431,17 +530,25 @@ in
   options.agents.keepTranscripts = lib.mkEnableOption "keeping Claude transcripts for ten years instead of 30 days";
 
   config.home = {
-    file = skillFiles // {
-      ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
-      ".codex/AGENTS.md".source = ./shared/AGENTS.md;
-      ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
-      ".claude/statusline-command.sh" = {
-        source = ./claude-code/statusline-command.sh;
-        # Claude Code runs the statusLine command through a shell, so the file
-        # must be executable; nix store copies are read-only without this.
-        executable = true;
+    file =
+      skillFiles
+      // {
+        ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
+        ".codex/AGENTS.md".source = ./shared/AGENTS.md;
+        ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
+        ".claude/statusline-command.sh" = {
+          source = ./claude-code/statusline-command.sh;
+          # Claude Code runs the statusLine command through a shell, so the file
+          # must be executable; nix store copies are read-only without this.
+          executable = true;
+        };
+      }
+      // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+        ".gemini/AGENTS.md".source = ./shared/AGENTS.md;
+      }
+      // lib.optionalAttrs (!pkgs.stdenv.isDarwin && telemetry != null) {
+        ".gemini/config/hooks.json".source = antigravityHooks;
       };
-    };
 
     activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       claude_settings="$HOME/.claude/settings.json"
@@ -452,7 +559,7 @@ in
       else
         claude_merged="$(mktemp)"
         if [ -e "$claude_settings" ]; then
-          ${lib.getExe pkgs.jq} -s -f ${claudeSettingsMerge} "$claude_settings" ${claudeSettings} >"$claude_merged"
+          ${lib.getExe pkgs.jq} -s -f ${jsonSettingsMerge} "$claude_settings" ${claudeSettings} >"$claude_merged"
         else
           ${lib.getExe pkgs.jq} . ${claudeSettings} >"$claude_merged"
         fi
@@ -463,6 +570,29 @@ in
         rm -f "$claude_merged"
       fi
     '';
+
+    activation.antigravitySettings = lib.mkIf (!pkgs.stdenv.isDarwin) (
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        agy_settings="$HOME/.gemini/antigravity-cli/settings.json"
+        if [ -L "$agy_settings" ]; then
+          warnEcho "Skipping Antigravity settings merge: $agy_settings is a symlink"
+        elif [ -e "$agy_settings" ] && ! ${lib.getExe pkgs.jq} -e . "$agy_settings" >/dev/null 2>&1; then
+          warnEcho "Skipping Antigravity settings merge: $agy_settings is not valid JSON"
+        else
+          agy_merged="$(mktemp)"
+          if [ -e "$agy_settings" ]; then
+            ${lib.getExe pkgs.jq} -s -f ${jsonSettingsMerge} "$agy_settings" ${antigravitySettings} >"$agy_merged"
+          else
+            ${lib.getExe pkgs.jq} . ${antigravitySettings} >"$agy_merged"
+          fi
+          if ! cmp -s "$agy_merged" "$agy_settings"; then
+            run mkdir -p "$HOME/.gemini/antigravity-cli"
+            run install -m 600 "$agy_merged" "$agy_settings"
+          fi
+          rm -f "$agy_merged"
+        fi
+      ''
+    );
 
     activation.codexSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       codex_config="$HOME/.codex/config.toml"

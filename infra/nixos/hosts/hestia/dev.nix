@@ -38,10 +38,12 @@ in
 
   environment.variables = playwright;
 
-  # Lets agents here drive Amp threads (`amp threads continue <id>`).
-  # From llm-agents: nixpkgs stable trails Amp releases by months.
+  # Lets agents here drive Amp threads (`amp threads continue <id>`); `agy` is Antigravity.
+  # From llm-agents: nixpkgs stable trails Amp and Antigravity releases by months.
+  # Never route Antigravity OAuth through CLIProxyAPI; Google bans accounts for it.
   environment.systemPackages = [
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.amp
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli
   ];
 
   # Volumes stay, since they hold the dev databases. The age filter spares a

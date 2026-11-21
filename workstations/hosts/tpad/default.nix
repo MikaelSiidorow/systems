@@ -52,8 +52,10 @@ in
     t3code.desktop
     (pkgs.callPackage ../../pkgs/amp-desktop { })
     (pkgs.callPackage ../../pkgs/meetily { })
-    # From llm-agents: nixpkgs stable trails Amp releases by months.
+    # From llm-agents: nixpkgs stable trails Amp and Antigravity releases by months.
+    # Never route Antigravity OAuth through CLIProxyAPI; Google bans accounts for it.
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.amp
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli
   ]
   ++ t3code.direnvProviders;
 

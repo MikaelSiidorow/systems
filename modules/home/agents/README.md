@@ -4,15 +4,16 @@ Home-manager module that installs Claude Code, Codex and (on Linux) OpenCode, an
 
 ## What gets installed
 
-- [`shared/AGENTS.md`](shared/AGENTS.md): my global instructions, linked to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`.
-- [`config.nix`](config.nix): settings baselines merged into `~/.claude/settings.json` and `~/.codex/config.toml` on every switch. Baseline keys win and the rest of each file is kept, so local and work-only settings survive. It also registers each skill and the agents it targets, and adds OTel export on hosts that set `agents.telemetry` (see [docs/observability.md](../../../docs/observability.md#agent-telemetry)).
+- [`shared/AGENTS.md`](shared/AGENTS.md): my global instructions, linked to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and, outside the Mac, `~/.gemini/AGENTS.md` (Antigravity).
+- [`config.nix`](config.nix): settings baselines merged into `~/.claude/settings.json`, `~/.codex/config.toml` and, outside the Mac, `~/.gemini/antigravity-cli/settings.json` on every switch. Baseline keys win and the rest of each file is kept, so local and work-only settings survive. It also registers each skill and the agents it targets, and adds OTel export on hosts that set `agents.telemetry` (see [docs/observability.md](../../../docs/observability.md#agent-telemetry)).
 - [`codex/rules/`](codex/rules/): Codex command rules, such as pre-approved read-only `gh` calls.
+- [`antigravity/otel-hook.sh`](antigravity/otel-hook.sh): Antigravity hook that sends OTLP spans on hosts with `agents.telemetry`, since `agy` has no OTel export.
 - [`claude-code/statusline-command.sh`](claude-code/statusline-command.sh): the Claude Code status line.
 - [`packages.nix`](packages.nix): the CLIs themselves (from the `claude-code-nix`, `codex-cli-nix` and `opencode-nix` flake inputs) and shell aliases such as `c`, `cco` and `crew`.
 
 ## Skills
 
-Each skill in [`skills/`](skills/) is installed for both Claude Code and Codex; `agent-traces` only on hosts that set `agents.telemetry`. Most cover my PR workflow end to end, from picking up a ticket to merging.
+Each skill in [`skills/`](skills/) is installed for Claude Code, Codex and, outside the Mac, Antigravity (`~/.gemini/config/skills`); `agent-traces` only on hosts that set `agents.telemetry`. Most cover my PR workflow end to end, from picking up a ticket to merging.
 
 | Skill | What it does |
 | --- | --- |
