@@ -75,7 +75,7 @@ let
       export DIRENV_LOG_FORMAT=
       # A blocked or broken .envrc makes `direnv exec` exit before the agent
       # starts, which T3 reports only as exit code 1. Run without it instead.
-      if ${pkgs.direnv}/bin/direnv exec "$PWD" true >/dev/null 2>&1; then
+      if ${pkgs.direnv}/bin/direnv exec "$PWD" ${pkgs.coreutils}/bin/true >/dev/null 2>&1; then
         exec ${pkgs.direnv}/bin/direnv exec "$PWD" ${executable} "$@"
       fi
       echo "${name}: direnv could not load $PWD; starting without it" >&2
