@@ -21,6 +21,7 @@ on:
       - ".sops.yaml"
       - "infra/flake.nix"
       - "infra/flake.lock"
+      - "infra/secrets/olympus.yaml"
       - "tofu/**"
       - "infra/secrets/ci.yaml"
       - ".github/scripts/ci-secrets.sh"
@@ -53,6 +54,7 @@ jobs:
               - 'infra/nixos/**'
               - 'infra/flake.nix'
               - 'infra/flake.lock'
+              - 'infra/secrets/olympus.yaml'
               - '.github/workflows/deploy.yml'
             # Router changes only; OpenWrt has its own flake and lock, updated
             # daily because OpenWrt republishes package indexes often.
