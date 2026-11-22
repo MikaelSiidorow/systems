@@ -21,6 +21,7 @@ on:
       - ".sops.yaml"
       - "infra/flake.nix"
       - "infra/flake.lock"
+      - "infra/secrets/olympus.yaml"
       - "tofu/**"
       - "infra/secrets/ci.yaml"
       - ".github/scripts/ci-secrets.sh"
@@ -53,6 +54,7 @@ jobs:
               - 'infra/nixos/**'
               - 'infra/flake.nix'
               - 'infra/flake.lock'
+              - 'infra/secrets/olympus.yaml'
               - '.github/workflows/deploy.yml'
             # Router changes only; OpenWrt has its own flake and lock, updated
             # daily because OpenWrt republishes package indexes often.
@@ -70,6 +72,8 @@ jobs:
               - 'tofu/mail.tf'
               - 'tofu/outputs.tf'
               - 'infra/secrets/ci.yaml'
+              # A rotation changes this file and the matching Actions secret.
+              - 'infra/secrets/olympus.yaml'
               - '.github/scripts/ci-secrets.sh'
               - '.github/workflows/deploy.yml'
               - '.github/scripts/reconcile-wger.sh'
@@ -664,26 +668,11 @@ jobs:
           TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
           TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
         run: tofu apply -auto-approve -lock-timeout=10m tfplan
-      # NixOS creates the zero role without a password; match the one Terraform
-      # just put in refinery-secrets. SQL goes over stdin to keep it out of argv.
-      - name: Set zero database role password
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        env:
-          ZERO_POSTGRES_PASSWORD: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
-        run: |
-          if [[ ! "$ZERO_POSTGRES_PASSWORD" =~ ^[A-Za-z0-9_-]{32,}$ ]]; then
-            echo "REFINERY_ZERO_POSTGRES_PASSWORD must be at least 32 URL-safe characters." >&2
-            exit 1
-          fi
-          printf "ALTER ROLE zero PASSWORD '%s';\n" "$ZERO_POSTGRES_PASSWORD" |
-            ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} sudo -u postgres psql --set=ON_ERROR_STOP=1
       - name: Reconcile changed wger credentials
         if: |
           github.ref == 'refs/heads/main' &&
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
           steps.wger-changes.outputs.changed == 'true'
-        env:
-          WGER_POSTGRES_PASSWORD: ${{ secrets.WGER_POSTGRES_PASSWORD }}
         run: ../../.github/scripts/reconcile-wger.sh "${{ env.K3S_HOST }}"
   smoke:
     needs: [tofu, nixos, k8s-tofu]
