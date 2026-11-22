@@ -103,6 +103,51 @@ wait_for "$sync_timeout" "Argo CD to sync $sha" argo_synced
 kubectl -n argocd get applications
 echo "::endgroup::"
 
+# FluxInstance and every Flux Kustomization must be Ready at this commit or
+# newer (including SOPS decryption).
+flux_synced() {
+  local flux_ready ks bad=0
+  flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
+    jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
+  if [ "$flux_ready" != True ]; then
+    echo "FluxInstance/flux: Ready=$flux_ready"
+    return 1
+  fi
+  ks=$(kubectl -n flux-system get kustomizations.kustomize.toolkit.fluxcd.io -o json 2>/dev/null |
+    jq -r '.items[] | [
+      .metadata.name,
+      ((.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"),
+      (.status.lastAppliedRevision // ""),
+      ((.status.conditions // [] | map(select(.type == "Ready")) | .[0].message) // "")
+    ] | @tsv') || return 1
+  if [ -z "$ks" ]; then
+    echo "Flux: no Kustomizations yet"
+    return 1
+  fi
+  while IFS=$'\t' read -r name ready revision message; do
+    local rev=${revision##*@sha1:}
+    if [ "$ready" != True ]; then
+      echo "$name: Ready=$ready ($message)"
+      bad=1
+    elif [[ "$rev" =~ ^[0-9a-f]{40}$ ]]; then
+      git cat-file -e "$rev^{commit}" 2>/dev/null || git fetch -q origin main || true
+      if ! git merge-base --is-ancestor "$sha" "$rev" 2>/dev/null; then
+        echo "$name: at ${rev:0:7}"
+        bad=1
+      fi
+    else
+      echo "$name: unexpected revision ${revision:-empty}"
+      bad=1
+    fi
+  done <<<"$ks"
+  return "$bad"
+}
+
+echo "::group::Flux"
+wait_for "$sync_timeout" "Flux to sync $sha" flux_synced
+kubectl -n flux-system get fluxinstance,gitrepository,kustomizations.kustomize.toolkit.fluxcd.io
+echo "::endgroup::"
+
 rolled_out() {
   local pending
   pending=$(kubectl get deployments,statefulsets,daemonsets -A -o json | jq -r '
