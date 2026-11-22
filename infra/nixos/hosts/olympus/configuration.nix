@@ -11,6 +11,7 @@ let
     "zero"
     "wger"
   ];
+  passwordFile = role: config.sops.secrets."postgres-${role}-password".path;
 in
 {
   imports = [
@@ -274,9 +275,17 @@ in
     # psql reads each file itself and quotes the value, so a password never
     # appears in a command line.
     script = ''
+      # Given an empty value, psql clears the password and carries on.
+      for file in ${toString (map passwordFile passwordRoles)}; do
+        if [ ! -s "$file" ]; then
+          echo "$file is missing or empty; was olympus.yaml decrypted?" >&2
+          exit 1
+        fi
+      done
+
       ${config.services.postgresql.package}/bin/psql --set=ON_ERROR_STOP=1 <<'SQL'
       ${lib.concatMapStrings (role: ''
-        \set password `cat ${config.sops.secrets."postgres-${role}-password".path}`
+        \set password `cat ${passwordFile role}`
         ALTER ROLE ${role} PASSWORD :'password';
       '') passwordRoles}
       SQL
