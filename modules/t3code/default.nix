@@ -13,6 +13,33 @@
 }:
 let
   upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.t3code;
+  # 0.1.11 signs Antigravity in on headless hosts like Hestia, and llm-agents
+  # still has 0.1.10. This builds from source on each host (the bundle
+  # patches target 0.1.11, so the Mac needs it too). Drop it once
+  # llm-agents ships 0.1.11 (numtide/llm-agents.nix#12578). The Rust helpers
+  # stay on llm-agents' source.
+  unwrapped =
+    if pkgs.lib.versionAtLeast upstream.version "0.1.11" then
+      upstream.unwrapped
+    else
+      upstream.unwrapped.overrideAttrs (old: rec {
+        version = "0.1.11";
+        src = pkgs.fetchFromGitHub {
+          owner = "pingdotgg";
+          repo = "t3code";
+          tag = "v${version}";
+          hash = "sha256-oI8gyTWFgtTmVK+0cVQaEcfO8EzxUUOW5s8JFG/z/U8=";
+        };
+        pnpmDeps = old.pnpmDeps.overrideAttrs {
+          inherit src;
+          outputHash = "sha256-bq+hxFjUgRk0NYaMkz7rtpyQtQ3ora5J2efi9fiRk9k=";
+        };
+        preBuild =
+          builtins.replaceStrings
+            [ "update-release-package-versions.ts ${old.version}" ]
+            [ "update-release-package-versions.ts ${version}" ]
+            old.preBuild;
+      });
   runtimePkgs = inputs.llm-agents.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
   telemetryFlags = pkgs.lib.escapeShellArgs (
     [
@@ -31,7 +58,7 @@ let
   );
   # Patch cached build outputs so Electron and the web/server bundle need no rebuild.
   patched =
-    pkgs.runCommand "t3code-${upstream.version}"
+    pkgs.runCommand "t3code-${unwrapped.version}"
       {
         outputs = [
           "out"
@@ -39,7 +66,7 @@ let
         ];
         nativeBuildInputs = [ pkgs.makeBinaryWrapper ];
         passthru = {
-          inherit (upstream.unwrapped)
+          inherit (unwrapped)
             version
             appName
             src
@@ -51,8 +78,8 @@ let
       }
       ''
         mkdir -p "$out" "$desktop"
-        cp -r --preserve=mode ${upstream.unwrapped}/. "$out/"
-        cp -r --preserve=mode ${upstream.unwrapped.desktop}/. "$desktop/"
+        cp -r --preserve=mode ${unwrapped}/. "$out/"
+        cp -r --preserve=mode ${unwrapped.desktop}/. "$desktop/"
         chmod -R u+w "$out" "$desktop"
 
         ${pkgs.lib.getExe runtimePkgs.nodejs_24} ${./apply-patches.mjs} \
@@ -70,9 +97,8 @@ let
           --inherit-argv0
       '';
   direnvWrapper =
-    name: executable: preamble:
+    name: executable:
     pkgs.writeShellScriptBin name ''
-      ${preamble}
       export DIRENV_LOG_FORMAT=
       # A blocked or broken .envrc makes `direnv exec` exit before the agent
       # starts, which T3 reports only as exit code 1. Run without it instead.
@@ -83,22 +109,12 @@ let
       exec ${executable} "$@"
     '';
   direnvProviders = [
-    (direnvWrapper "codex-direnv" "${codex}/bin/codex" "")
-    (direnvWrapper "claude-direnv" "${claude}/bin/claude" "")
+    (direnvWrapper "codex-direnv" "${codex}/bin/codex")
+    (direnvWrapper "claude-direnv" "${claude}/bin/claude")
   ]
   # T3 runs only an executable named agy or antigravity as `agy acp`, so this
   # wrapper cannot follow the -direnv naming.
-  ++ pkgs.lib.optional (antigravity != null) (
-    direnvWrapper "antigravity" "${antigravity}/bin/agy" ''
-      # T3's sign-in sets BROWSER to a helper that shows the Google link in
-      # its UI. agy opens the link with xdg-open, which hands it to BROWSER,
-      # but only with a display set, so sign-in failed on headless Hestia.
-      if [ -n "''${BROWSER:-}" ] && [ -z "''${DISPLAY:-}''${WAYLAND_DISPLAY:-}" ]; then
-        export DISPLAY=:0
-      fi
-      export PATH="$PATH:${pkgs.xdg-utils}/bin"
-    ''
-  );
+  ++ pkgs.lib.optional (antigravity != null) (direnvWrapper "antigravity" "${antigravity}/bin/agy");
 in
 (upstream.override {
   t3code-unwrapped = patched;
