@@ -23,3 +23,7 @@ Pushing to `main` deploys whatever changed: OpenTofu, then NixOS via deploy-rs, 
 
 - [docs/deploying.md](docs/deploying.md): pipeline order, manual deploys, setting up a new server, kubectl access and secrets.
 - [docs/dependencies.md](docs/dependencies.md): Renovate and flake-lock PRs, what merges itself and how to verify each merge.
+
+## License
+
+MIT, see [LICENSE](LICENSE), unless a directory has its own LICENSE file.
