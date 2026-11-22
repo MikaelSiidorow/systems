@@ -72,6 +72,8 @@ jobs:
               - 'tofu/mail.tf'
               - 'tofu/outputs.tf'
               - 'infra/secrets/ci.yaml'
+              # A rotation changes this file and the matching Actions secret.
+              - 'infra/secrets/olympus.yaml'
               - '.github/scripts/ci-secrets.sh'
               - '.github/workflows/deploy.yml'
               - '.github/scripts/reconcile-wger.sh'
