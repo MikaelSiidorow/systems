@@ -103,7 +103,7 @@ jobs:
       - name: Restore and save Nix store
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
-          primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix') }}
+          primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix', '.github/workflows/workstations.yml') }}
           restore-prefixes-first-match: nix-workstations-${{ runner.os }}-
           save: ${{ github.event_name == 'push' }}
           gc-max-store-size: 3G
@@ -161,7 +161,7 @@ jobs:
       - name: Restore and save Nix store
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
-          primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix') }}
+          primary-key: nix-workstations-${{ runner.os }}-${{ hashFiles('workstations/flake.lock', 'workstations/**/*.nix', 'modules/**/*.nix', '.github/workflows/workstations.yml') }}
           restore-prefixes-first-match: nix-workstations-${{ runner.os }}-
           save: ${{ github.event_name == 'push' }}
           gc-max-store-size: 3G
