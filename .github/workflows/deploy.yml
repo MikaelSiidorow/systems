@@ -35,6 +35,9 @@ permissions:
   pull-requests: write
 env:
   K3S_HOST: ${{ vars.K3S_HOST }}
+  # olympus's SSH host key, pinned so the jobs only talk to the real server.
+  # A rebuilt server has a new one; see docs/deploying.md.
+  K3S_HOST_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIrMag55gL+LvDK1fssChh6eKk1ayS9fBNwbvqPh48da
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -447,7 +450,7 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+          echo "$K3S_HOST $K3S_HOST_KEY" >> ~/.ssh/known_hosts
       # Two switches at once fail on a transient systemd unit, so runs queue on a
       # lock on the host. Runs on main deploy main as it is once the lock is held,
       # so a run that waited never rolls back a newer one. The cost: an older run
@@ -505,7 +508,7 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+          echo "$K3S_HOST $K3S_HOST_KEY" >> ~/.ssh/known_hosts
           ssh -fN -L 6443:127.0.0.1:6443 root@${{ env.K3S_HOST }}
           ssh root@${{ env.K3S_HOST }} cat /etc/rancher/k3s/k3s.yaml > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
@@ -693,7 +696,7 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ env.K3S_HOST }} >> ~/.ssh/known_hosts
+          echo "$K3S_HOST $K3S_HOST_KEY" >> ~/.ssh/known_hosts
       # A tag:ci node, which the Headscale ACL only lets reach olympus:443,
       # checks the tailnet-only hosts. Without the key they are only checked
       # to refuse the public address.

@@ -165,6 +165,7 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 - **olympus's age key**: olympus makes its own post-quantum age key at `/var/lib/sops-nix/key.txt` the first time it boots without one, for sops-nix. The private key never leaves the host. The NixOS deploy job prints the public key as `SOPS recipient:`. A rebuilt server makes a new key: put its public key in `.sops.yaml` and run `sops updatekeys infra/secrets/olympus.yaml`.
 - **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`REFINERY_*`, `WGER_*`)
 - **GitHub Actions variables**: `K3S_HOST`
+- **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
 - **K8s secrets**: managed by `tofu/k8s/`, passed as `TF_VAR_*` env vars in CI. `k8s/**/secrets.yaml` is gitignored.
 
 ## OpenTofu state
