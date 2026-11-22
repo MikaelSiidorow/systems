@@ -71,8 +71,10 @@ if [[ -d k8s/clusters/olympus ]]; then
   while IFS=$'\t' read -r name path; do
     [[ -n "$name" ]] || continue
     path="${path#./}"
-    if [[ -f "$path/kustomization.yaml" ]]; then
-      kustomize build "$path" | yq 'del(.sops)' >"$out/flux-$name.yaml"
+    if [[ ! -f "$path/kustomization.yaml" ]]; then
+      echo "Flux Kustomization '$name' references missing kustomization: $path/kustomization.yaml" >&2
+      exit 1
     fi
+    kustomize build "$path" | yq 'del(.sops)' >"$out/flux-$name.yaml"
   done < <(yq -r 'select(.kind == "Kustomization" and .apiVersion == "kustomize.toolkit.fluxcd.io/v1") | [.metadata.name, .spec.path] | @tsv' "$out/flux-cluster.yaml")
 fi

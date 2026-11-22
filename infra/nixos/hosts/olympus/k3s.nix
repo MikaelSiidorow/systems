@@ -246,33 +246,44 @@ in
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
-      RemainAfterExit = true;
       TimeoutStartSec = 180;
     };
     script = ''
+      set -o pipefail
       key_file=${config.sops.age.keyFile}
       if [ ! -s "$key_file" ]; then
         echo "$key_file is missing or empty" >&2
         exit 1
       fi
 
+      kubectl=${config.services.k3s.package}/bin/k3s
       for _ in $(${pkgs.coreutils}/bin/seq 1 60); do
-        if ${config.services.k3s.package}/bin/k3s kubectl get namespace default >/dev/null 2>&1; then
-          ${config.services.k3s.package}/bin/k3s kubectl get namespace flux-system >/dev/null 2>&1 \
-            || ${config.services.k3s.package}/bin/k3s kubectl create namespace flux-system
-          ${config.services.k3s.package}/bin/k3s kubectl create secret generic sops-age \
-            --namespace=flux-system \
-            --from-file=age.agekey="$key_file" \
-            --dry-run=client -o yaml \
-            | ${config.services.k3s.package}/bin/k3s kubectl apply -f -
+        if (
+          "$kubectl" kubectl get namespace flux-system >/dev/null 2>&1 \
+            || "$kubectl" kubectl create namespace flux-system >/dev/null 2>&1 \
+            || "$kubectl" kubectl get namespace flux-system >/dev/null 2>&1
+        ) && "$kubectl" kubectl create secret generic sops-age \
+          --namespace=flux-system \
+          --from-file=age.agekey="$key_file" \
+          --dry-run=client -o yaml \
+          | "$kubectl" kubectl apply -f -; then
           exit 0
         fi
         ${pkgs.coreutils}/bin/sleep 2
       done
 
-      echo "Timed out waiting for the k3s API" >&2
+      echo "Timed out syncing flux-system/sops-age" >&2
       exit 1
     '';
+  };
+
+  systemd.paths.flux-sops-age = {
+    description = "Watch olympus's age key for changes and re-sync flux-system/sops-age";
+    wantedBy = [ "multi-user.target" ];
+    pathConfig = {
+      PathChanged = config.sops.age.keyFile;
+      Unit = "flux-sops-age.service";
+    };
   };
 
   # Ensure k3s can manage iptables

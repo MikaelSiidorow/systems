@@ -103,10 +103,10 @@ wait_for "$sync_timeout" "Argo CD to sync $sha" argo_synced
 kubectl -n argocd get applications
 echo "::endgroup::"
 
-# FluxInstance and every Flux Kustomization must be Ready at this commit or
-# newer (including SOPS decryption).
+# FluxInstance and every expected Flux Kustomization must be Ready at this
+# commit or newer (including SOPS decryption).
 flux_synced() {
-  local flux_ready ks bad=0
+  local flux_ready ks expected name ready revision message rev bad=0
   flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
     jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
   if [ "$flux_ready" != True ]; then
@@ -124,8 +124,22 @@ flux_synced() {
     echo "Flux: no Kustomizations yet"
     return 1
   fi
+  expected=$(
+    printf '%s\n' flux-system
+    awk 'FNR == 1 || /^---/ { flux = 0; k = 0 }
+         /^apiVersion: kustomize\.toolkit\.fluxcd\.io\// { flux = 1 }
+         flux && /^kind: Kustomization$/ { k = 1 }
+         k && /^  name: / { print $2; k = 0 }' k8s/clusters/olympus/*.yaml
+  )
+  while read -r name; do
+    [ -n "$name" ] || continue
+    if ! awk -F '\t' -v n="$name" '$1 == n { found = 1 } END { exit !found }' <<<"$ks"; then
+      echo "$name: missing from cluster"
+      bad=1
+    fi
+  done <<<"$expected"
   while IFS=$'\t' read -r name ready revision message; do
-    local rev=${revision##*@sha1:}
+    rev=${revision##*@sha1:}
     if [ "$ready" != True ]; then
       echo "$name: Ready=$ready ($message)"
       bad=1
@@ -140,6 +154,13 @@ flux_synced() {
       bad=1
     fi
   done <<<"$ks"
+  if grep -qx 'sops-canary' <<<"$expected"; then
+    if ! kubectl -n flux-system get secret sops-canary -o json 2>/dev/null |
+      jq -e '(.data.probe // "" | length) > 0' >/dev/null; then
+      echo "sops-canary: Secret missing or probe key empty"
+      bad=1
+    fi
+  fi
   return "$bad"
 }
 
