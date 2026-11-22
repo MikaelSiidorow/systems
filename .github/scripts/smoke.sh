@@ -106,20 +106,20 @@ echo "::endgroup::"
 # FluxInstance and every expected Flux Kustomization must be Ready at this
 # commit or newer (including SOPS decryption).
 flux_synced() {
-  local flux_ready ks root_rev expected name ready revision message rev bad=0
+  local flux_ready ks_json ks root_rev expected name ready revision message rev bad=0
   flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
     jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
   if [ "$flux_ready" != True ]; then
     echo "FluxInstance/flux: Ready=$flux_ready"
     return 1
   fi
-  ks=$(kubectl -n flux-system get kustomizations.kustomize.toolkit.fluxcd.io -o json 2>/dev/null |
-    jq -r '.items[] | [
+  ks_json=$(kubectl -n flux-system get kustomizations.kustomize.toolkit.fluxcd.io -o json 2>/dev/null) || return 1
+  ks=$(jq -r '.items[] | [
       .metadata.name,
       ((.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"),
       (.status.lastAppliedRevision // ""),
       ((.status.conditions // [] | map(select(.type == "Ready")) | .[0].message) // "")
-    ] | @tsv') || return 1
+    ] | @tsv' <<<"$ks_json") || return 1
   if [ -z "$ks" ]; then
     echo "Flux: no Kustomizations yet"
     return 1
@@ -134,20 +134,19 @@ flux_synced() {
     echo "flux-system: at ${root_rev:0:7}"
     return 1
   fi
-  # Read the expected children from the reconciled revision, not the workflow's
-  # checkout, so a newer commit removing a child (like sops-canary) does not
-  # make an overlapping older smoke run fail.
-  expected=$(
-    printf '%s\n' flux-system
-    while IFS= read -r file; do
-      [ -n "$file" ] || continue
-      git show "$root_rev:$file" |
-        awk '/^---/ { flux = 0; k = 0 }
-             /^apiVersion: kustomize\.toolkit\.fluxcd\.io\// { flux = 1 }
-             flux && /^kind: Kustomization$/ { k = 1 }
-             k && /^  name: / { print $2; k = 0 }'
-    done < <(git ls-tree --name-only "$root_rev" -- k8s/clusters/olympus/ | grep -E '\.ya?ml$' || true)
-  )
+  # Every child Kustomization in flux-system's reconciled inventory must exist
+  # and be Ready at this commit or newer.
+  expected=$(jq -r '
+    .items[]
+    | select(.metadata.name == "flux-system")
+    | .status.inventory.entries[]?.id
+    | select(startswith("flux-system_") and endswith("_kustomize.toolkit.fluxcd.io_Kustomization"))
+    | ltrimstr("flux-system_")
+    | rtrimstr("_kustomize.toolkit.fluxcd.io_Kustomization")' <<<"$ks_json") || return 1
+  if [ -z "$expected" ]; then
+    echo "flux-system: inventory lists no child Kustomizations"
+    return 1
+  fi
   while read -r name; do
     [ -n "$name" ] || continue
     if ! awk -F '\t' -v n="$name" '$1 == n { found = 1 } END { exit !found }' <<<"$ks"; then
