@@ -266,7 +266,7 @@ in
           --namespace=flux-system \
           --from-file=age.agekey="$key_file" \
           --dry-run=client -o yaml \
-          | "$kubectl" kubectl apply -f -; then
+          | "$kubectl" kubectl apply --server-side --force-conflicts --field-manager=flux-sops-age -f -; then
           exit 0
         fi
         ${pkgs.coreutils}/bin/sleep 2

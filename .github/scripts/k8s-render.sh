@@ -64,10 +64,13 @@ for file in infra/nixos/hosts/olympus/*-helmchart.yaml; do
     "$(yq '.spec.valuesContent // ""' "$file")"
 done
 
-# Render Flux cluster kustomizations and each path they reconcile. SOPS
-# metadata is stripped because Flux removes it when decrypting Secrets.
+# Render Flux cluster kustomizations and each path they reconcile, applying
+# any spec.patches declared on the Flux Kustomization. SOPS metadata is
+# stripped because Flux removes it when decrypting Secrets.
 if [[ -d k8s/clusters/olympus ]]; then
   kustomize build k8s/clusters/olympus | yq 'del(.sops)' >"$out/flux-cluster.yaml"
+  overlay="$(mktemp -d)"
+  trap 'rm -rf "$overlay"' EXIT
   while IFS=$'\t' read -r name path; do
     [[ -n "$name" ]] || continue
     path="${path#./}"
@@ -75,6 +78,13 @@ if [[ -d k8s/clusters/olympus ]]; then
       echo "Flux Kustomization '$name' references missing kustomization: $path/kustomization.yaml" >&2
       exit 1
     fi
-    kustomize build "$path" | yq 'del(.sops)' >"$out/flux-$name.yaml"
+    rm -f "$overlay/base.yaml" "$overlay/kustomization.yaml"
+    kustomize build "$path" >"$overlay/base.yaml"
+    if [[ "$(NAME="$name" yq 'select(.kind == "Kustomization" and .apiVersion == "kustomize.toolkit.fluxcd.io/v1" and .metadata.name == strenv(NAME)) | (.spec.patches // []) | length' "$out/flux-cluster.yaml")" != 0 ]]; then
+      NAME="$name" yq 'select(.kind == "Kustomization" and .apiVersion == "kustomize.toolkit.fluxcd.io/v1" and .metadata.name == strenv(NAME)) | {"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": ["base.yaml"], "patches": .spec.patches}' "$out/flux-cluster.yaml" >"$overlay/kustomization.yaml"
+      kustomize build "$overlay" | yq 'del(.sops)' >"$out/flux-$name.yaml"
+    else
+      yq 'del(.sops)' "$overlay/base.yaml" >"$out/flux-$name.yaml"
+    fi
   done < <(yq -r 'select(.kind == "Kustomization" and .apiVersion == "kustomize.toolkit.fluxcd.io/v1") | [.metadata.name, .spec.path] | @tsv' "$out/flux-cluster.yaml")
 fi

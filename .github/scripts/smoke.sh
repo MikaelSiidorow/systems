@@ -106,7 +106,7 @@ echo "::endgroup::"
 # FluxInstance and every expected Flux Kustomization must be Ready at this
 # commit or newer (including SOPS decryption).
 flux_synced() {
-  local flux_ready ks expected name ready revision message rev bad=0
+  local flux_ready ks root_rev expected name ready revision message rev bad=0
   flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
     jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
   if [ "$flux_ready" != True ]; then
@@ -124,12 +124,29 @@ flux_synced() {
     echo "Flux: no Kustomizations yet"
     return 1
   fi
+  root_rev=$(awk -F '\t' '$1 == "flux-system" && $2 == "True" { sub(/^.*@sha1:/, "", $3); print $3 }' <<<"$ks")
+  if [[ ! "$root_rev" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "flux-system: not ready at a commit revision yet"
+    return 1
+  fi
+  git cat-file -e "$root_rev^{commit}" 2>/dev/null || git fetch -q origin main || true
+  if ! git merge-base --is-ancestor "$sha" "$root_rev" 2>/dev/null; then
+    echo "flux-system: at ${root_rev:0:7}"
+    return 1
+  fi
+  # Read the expected children from the reconciled revision, not the workflow's
+  # checkout, so a newer commit removing a child (like sops-canary) does not
+  # make an overlapping older smoke run fail.
   expected=$(
     printf '%s\n' flux-system
-    awk 'FNR == 1 || /^---/ { flux = 0; k = 0 }
-         /^apiVersion: kustomize\.toolkit\.fluxcd\.io\// { flux = 1 }
-         flux && /^kind: Kustomization$/ { k = 1 }
-         k && /^  name: / { print $2; k = 0 }' k8s/clusters/olympus/*.yaml
+    while IFS= read -r file; do
+      [ -n "$file" ] || continue
+      git show "$root_rev:$file" |
+        awk '/^---/ { flux = 0; k = 0 }
+             /^apiVersion: kustomize\.toolkit\.fluxcd\.io\// { flux = 1 }
+             flux && /^kind: Kustomization$/ { k = 1 }
+             k && /^  name: / { print $2; k = 0 }'
+    done < <(git ls-tree --name-only "$root_rev" -- k8s/clusters/olympus/ | grep -E '\.ya?ml$' || true)
   )
   while read -r name; do
     [ -n "$name" ] || continue
