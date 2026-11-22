@@ -45,6 +45,15 @@
         "chart: (?<depName>\\S+)\\s+repo: (?<registryUrl>\\S+)[\\s\\S]*?version: (?<currentValue>\\S+)"
       ],
       "datasourceTemplate": "helm"
+    },
+    {
+      "description": "OCI k3s HelmCharts that the olympus NixOS config installs",
+      "customType": "regex",
+      "managerFilePatterns": ["/^infra/nixos/hosts/olympus/[^/]+-helmchart\\.yaml$/"],
+      "matchStrings": [
+        "chart: oci://(?<depName>\\S+)[\\s\\S]*?version: (?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [

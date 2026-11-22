@@ -301,6 +301,7 @@ in
     curl
     wget
     jq
+    fluxcd
     k9s
     kubectl
     kubernetes-helm

@@ -89,6 +89,11 @@ in
             value = "100.64.0.1";
           }
           {
+            name = "flux.miksu.app";
+            type = "A";
+            value = "100.64.0.1";
+          }
+          {
             name = "grafana.miksu.app";
             type = "A";
             value = "100.64.0.1";

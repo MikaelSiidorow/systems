@@ -103,6 +103,88 @@ wait_for "$sync_timeout" "Argo CD to sync $sha" argo_synced
 kubectl -n argocd get applications
 echo "::endgroup::"
 
+# FluxInstance and every expected Flux Kustomization must be Ready at this
+# commit or newer (including SOPS decryption).
+flux_synced() {
+  local flux_ready ks_json ks root_rev expected name ready revision message rev bad=0
+  flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
+    jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
+  if [ "$flux_ready" != True ]; then
+    echo "FluxInstance/flux: Ready=$flux_ready"
+    return 1
+  fi
+  ks_json=$(kubectl -n flux-system get kustomizations.kustomize.toolkit.fluxcd.io -o json 2>/dev/null) || return 1
+  ks=$(jq -r '.items[] | [
+      .metadata.name,
+      ((.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"),
+      (.status.lastAppliedRevision // ""),
+      ((.status.conditions // [] | map(select(.type == "Ready")) | .[0].message) // "")
+    ] | @tsv' <<<"$ks_json") || return 1
+  if [ -z "$ks" ]; then
+    echo "Flux: no Kustomizations yet"
+    return 1
+  fi
+  root_rev=$(awk -F '\t' '$1 == "flux-system" && $2 == "True" { sub(/^.*@sha1:/, "", $3); print $3 }' <<<"$ks")
+  if [[ ! "$root_rev" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "flux-system: not ready at a commit revision yet"
+    return 1
+  fi
+  git cat-file -e "$root_rev^{commit}" 2>/dev/null || git fetch -q origin main || true
+  if ! git merge-base --is-ancestor "$sha" "$root_rev" 2>/dev/null; then
+    echo "flux-system: at ${root_rev:0:7}"
+    return 1
+  fi
+  # Every child Kustomization in flux-system's reconciled inventory must exist
+  # and be Ready at this commit or newer.
+  expected=$(jq -r '
+    .items[]
+    | select(.metadata.name == "flux-system")
+    | .status.inventory.entries[]?.id
+    | select(startswith("flux-system_") and endswith("_kustomize.toolkit.fluxcd.io_Kustomization"))
+    | ltrimstr("flux-system_")
+    | rtrimstr("_kustomize.toolkit.fluxcd.io_Kustomization")' <<<"$ks_json") || return 1
+  if [ -z "$expected" ]; then
+    echo "flux-system: inventory lists no child Kustomizations"
+    return 1
+  fi
+  while read -r name; do
+    [ -n "$name" ] || continue
+    if ! awk -F '\t' -v n="$name" '$1 == n { found = 1 } END { exit !found }' <<<"$ks"; then
+      echo "$name: missing from cluster"
+      bad=1
+    fi
+  done <<<"$expected"
+  while IFS=$'\t' read -r name ready revision message; do
+    rev=${revision##*@sha1:}
+    if [ "$ready" != True ]; then
+      echo "$name: Ready=$ready ($message)"
+      bad=1
+    elif [[ "$rev" =~ ^[0-9a-f]{40}$ ]]; then
+      git cat-file -e "$rev^{commit}" 2>/dev/null || git fetch -q origin main || true
+      if ! git merge-base --is-ancestor "$sha" "$rev" 2>/dev/null; then
+        echo "$name: at ${rev:0:7}"
+        bad=1
+      fi
+    else
+      echo "$name: unexpected revision ${revision:-empty}"
+      bad=1
+    fi
+  done <<<"$ks"
+  if grep -qx 'sops-canary' <<<"$expected"; then
+    if ! kubectl -n flux-system get secret sops-canary -o json 2>/dev/null |
+      jq -e '(.data.probe // "" | length) > 0' >/dev/null; then
+      echo "sops-canary: Secret missing or probe key empty"
+      bad=1
+    fi
+  fi
+  return "$bad"
+}
+
+echo "::group::Flux"
+wait_for "$sync_timeout" "Flux to sync $sha" flux_synced
+kubectl -n flux-system get fluxinstance,gitrepository,kustomizations.kustomize.toolkit.fluxcd.io
+echo "::endgroup::"
+
 rolled_out() {
   local pending
   pending=$(kubectl get deployments,statefulsets,daemonsets -A -o json | jq -r '

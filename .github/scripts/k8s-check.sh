@@ -12,6 +12,11 @@ trap 'rm -rf "$out"' EXIT
 
 .github/scripts/k8s-render.sh "$out"
 
+manifests=(k8s/apps infra/nixos/hosts/olympus/*-helmchart.yaml)
+if [[ -f infra/nixos/hosts/olympus/flux-instance.yaml ]]; then
+  manifests+=(infra/nixos/hosts/olympus/flux-instance.yaml)
+fi
+
 # The Kubernetes version matches k8s-render.sh. Charts' own CRD definitions
 # have no published schema; their custom resources are still checked against
 # the CRD catalog.
@@ -20,4 +25,4 @@ kubeconform -strict -summary \
   -skip CustomResourceDefinition \
   -schema-location default \
   -schema-location "$crd_schemas" \
-  k8s/apps infra/nixos/hosts/olympus/*-helmchart.yaml "$out"/*.yaml
+  "${manifests[@]}" "$out"/*.yaml

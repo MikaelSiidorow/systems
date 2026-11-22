@@ -40,9 +40,9 @@ build-router-firmware:
 # Kubernetes manifests (tools come from the infra dev shell; see .envrc)
 .PHONY: k8s-check
 k8s-check:
-	oxfmt --check k8s infra/nixos/hosts/olympus/*-helmchart.yaml
+	oxfmt --check k8s infra/nixos/hosts/olympus/*-helmchart.yaml infra/nixos/hosts/olympus/flux-instance.yaml
 	.github/scripts/k8s-check.sh
 
 .PHONY: k8s-fmt
 k8s-fmt:
-	oxfmt --write k8s infra/nixos/hosts/olympus/*-helmchart.yaml
+	oxfmt --write k8s infra/nixos/hosts/olympus/*-helmchart.yaml infra/nixos/hosts/olympus/flux-instance.yaml

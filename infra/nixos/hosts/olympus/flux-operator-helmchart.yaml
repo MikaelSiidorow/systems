@@ -1,0 +1,10 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: flux-operator
+  namespace: kube-system
+spec:
+  chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
+  targetNamespace: flux-system
+  createNamespace: true
+  version: 0.63.1

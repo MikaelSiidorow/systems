@@ -223,12 +223,68 @@ in
     "L+ ${manifestDir}/cluster-issuer.yaml - - - - ${clusterIssuer}"
     "L+ ${manifestDir}/argocd-helmchart.yaml - - - - ${./argocd-helmchart.yaml}"
     "L+ ${manifestDir}/argocd-bootstrap.yaml - - - - ${argocdBootstrap}"
+    "L+ ${manifestDir}/flux-operator-helmchart.yaml - - - - ${./flux-operator-helmchart.yaml}"
+    "L+ ${manifestDir}/flux-instance.yaml - - - - ${./flux-instance.yaml}"
     "L+ ${manifestDir}/headscale-service.yaml - - - - ${headscaleService}"
     "L+ ${manifestDir}/refinery-db-service.yaml - - - - ${refineryDbService}"
     # wger's namespace and database service are managed by Kubernetes Terraform.
     "r ${manifestDir}/wger-db-service.yaml - - - -"
     "L+ ${manifestDir}/ci-deploy-rbac.yaml - - - - ${ciDeployRbac}"
   ];
+
+  # Hand olympus's host age key to Flux so kustomize-controller can decrypt
+  # SOPS-encrypted Secrets in k8s/. The key stays on disk and never enters
+  # the Nix store.
+  systemd.services.flux-sops-age = {
+    description = "Sync olympus's age key into the flux-system sops-age Secret";
+    after = [
+      "k3s.service"
+      "sops-age-key.service"
+    ];
+    requires = [ "k3s.service" ];
+    wants = [ "sops-age-key.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      TimeoutStartSec = 180;
+    };
+    script = ''
+      set -o pipefail
+      key_file=${config.sops.age.keyFile}
+      if [ ! -s "$key_file" ]; then
+        echo "$key_file is missing or empty" >&2
+        exit 1
+      fi
+
+      kubectl=${config.services.k3s.package}/bin/k3s
+      for _ in $(${pkgs.coreutils}/bin/seq 1 60); do
+        if (
+          "$kubectl" kubectl get namespace flux-system >/dev/null 2>&1 \
+            || "$kubectl" kubectl create namespace flux-system >/dev/null 2>&1 \
+            || "$kubectl" kubectl get namespace flux-system >/dev/null 2>&1
+        ) && "$kubectl" kubectl create secret generic sops-age \
+          --namespace=flux-system \
+          --from-file=age.agekey="$key_file" \
+          --dry-run=client -o yaml \
+          | "$kubectl" kubectl apply --server-side --force-conflicts --field-manager=flux-sops-age -f -; then
+          exit 0
+        fi
+        ${pkgs.coreutils}/bin/sleep 2
+      done
+
+      echo "Timed out syncing flux-system/sops-age" >&2
+      exit 1
+    '';
+  };
+
+  systemd.paths.flux-sops-age = {
+    description = "Watch olympus's age key for changes and re-sync flux-system/sops-age";
+    wantedBy = [ "multi-user.target" ];
+    pathConfig = {
+      PathChanged = config.sops.age.keyFile;
+      Unit = "flux-sops-age.service";
+    };
+  };
 
   # Ensure k3s can manage iptables
   boot.kernel.sysctl = {

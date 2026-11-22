@@ -11,7 +11,7 @@ Configuration for my machines, servers and the services on them: workstations, c
 ## Infrastructure
 
 - [`infra/`](infra/): NixOS flake for the Hetzner K3s host (`olympus`) and [Hestia](infra/nixos/hosts/hestia/README.md), the home server running Home Assistant and the Tailscale subnet router. Host secrets are SOPS-encrypted.
-- [`k8s/`](k8s/): manifests that ArgoCD syncs from Git: Refinery, [wger](docs/wger.md), Headscale ingress and the [observability stack](docs/observability.md).
+- [`k8s/`](k8s/): manifests synced from Git — ArgoCD (`k8s/apps/`) currently manages Refinery, [wger](docs/wger.md), Headscale ingress and the [observability stack](docs/observability.md), while Flux (`k8s/clusters/olympus/`) runs alongside it for the migration and manages the Flux Operator status UI (`k8s/flux-ui/`).
 - [`tofu/`](tofu/): OpenTofu for the Hetzner server and Cloudflare DNS; `tofu/k8s/` manages cluster secrets, the part that can't live in Git.
 - [`openwrt/`](openwrt/): firmware builds and UCI config for the [Cerberus router](openwrt/r6220/README.md) and the [Hermes access point](openwrt/archer-c6-v2/README.md).
 
@@ -19,7 +19,7 @@ The tailnet and network layout are in [docs/headscale-network-diagram.md](docs/h
 
 ## Deploying
 
-Pushing to `main` deploys whatever changed: OpenTofu, then NixOS via deploy-rs, then the K8s secrets. ArgoCD syncs `k8s/` within about 3 minutes and a smoke job checks the rollout. Hestia and the routers are deployed by hand.
+Pushing to `main` deploys whatever changed: OpenTofu, then NixOS via deploy-rs, then the K8s secrets. ArgoCD and Flux sync `k8s/` automatically and a smoke job checks the rollout. Hestia and the routers are deployed by hand.
 
 - [docs/deploying.md](docs/deploying.md): pipeline order, manual deploys, setting up a new server, kubectl access and secrets.
 - [docs/dependencies.md](docs/dependencies.md): Renovate and flake-lock PRs, what merges itself and how to verify each merge.

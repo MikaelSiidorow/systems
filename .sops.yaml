@@ -14,6 +14,12 @@ creation_rules:
       - age:
           - *mikael_pq
           - *ci
+  - path_regex: ^k8s/.*\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    key_groups:
+      - age:
+          - *mikael_pq
+          - *olympus
   - path_regex: ^infra/secrets/olympus\.yaml$
     key_groups:
       - age:
