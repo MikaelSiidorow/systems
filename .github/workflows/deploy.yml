@@ -542,7 +542,6 @@ jobs:
           TF_VAR_refinery_zero_postgres_password: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
           TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-          TF_VAR_brawl_stars_api_key: ${{ secrets.BRAWL_STARS_API_KEY }}
           TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
           TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
           TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
@@ -664,7 +663,6 @@ jobs:
           TF_VAR_refinery_zero_postgres_password: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
           TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-          TF_VAR_brawl_stars_api_key: ${{ secrets.BRAWL_STARS_API_KEY }}
           TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
           TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
           TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}

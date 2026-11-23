@@ -10,6 +10,8 @@ spec:
       app: gatus
   template:
     metadata:
+      annotations:
+        checksum/config: fc070d90ef7dff70
       labels:
         app: gatus
         app.kubernetes.io/name: gatus

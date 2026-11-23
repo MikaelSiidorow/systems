@@ -49,21 +49,6 @@ data:
             failure-threshold: 3
             success-threshold: 2
 
-      - name: Brawl Draft
-        group: Apps
-        url: https://brawl.miksu.app/api/health
-        interval: 60s
-        conditions:
-          - "[STATUS] == 200"
-          - "[BODY].status == ok"
-          - "[RESPONSE_TIME] < 5000"
-          - "[CERTIFICATE_EXPIRATION] > 168h"
-        alerts:
-          - type: telegram
-            enabled: true
-            failure-threshold: 3
-            success-threshold: 2
-
       - name: Wger
         group: Apps
         url: https://wger.miksu.app/api/v2/
