@@ -3,8 +3,6 @@ kind: PersistentVolumeClaim
 metadata:
   name: zero-replica-data
   namespace: refinery
-  annotations:
-    argocd.argoproj.io/sync-options: Delete=false
 spec:
   accessModes:
     - ReadWriteOnce
