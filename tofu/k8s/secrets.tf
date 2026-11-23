@@ -41,20 +41,12 @@ removed {
   }
 }
 
-resource "kubernetes_secret_v1" "refinery_secrets" {
-  metadata {
-    name      = "refinery-secrets"
-    namespace = "refinery"
-  }
+# Managed by Flux (k8s/refinery/refinery-secrets.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.refinery_secrets
 
-  data = {
-    POSTGRES_PASSWORD      = var.refinery_postgres_password
-    DATABASE_URL           = "postgresql://refinery:${var.refinery_postgres_password}@refinery-db:5432/refinery"
-    ENCRYPTION_KEY         = var.refinery_encryption_key
-    GITHUB_CLIENT_SECRET   = var.refinery_github_client_secret
-    LINKEDIN_CLIENT_SECRET = var.refinery_linkedin_client_secret
-    ZERO_ADMIN_PASSWORD    = var.refinery_zero_admin_password
-    ZERO_UPSTREAM_DB       = "postgresql://zero:${var.refinery_zero_postgres_password}@refinery-db:5432/refinery"
+  lifecycle {
+    destroy = false
   }
 }
 

@@ -106,7 +106,7 @@ echo "::endgroup::"
 # FluxInstance and every expected Flux Kustomization must be Ready at this
 # commit or newer (including SOPS decryption).
 flux_synced() {
-  local flux_ready ks_json ks root_rev expected name ready revision message rev bad=0
+  local flux_ready ks_json ks root_rev expected name ready revision message rev secret_ids secrets_json secret_problems bad=0
   flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
     jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
   if [ "$flux_ready" != True ]; then
@@ -170,11 +170,25 @@ flux_synced() {
       bad=1
     fi
   done <<<"$ks"
-  if grep -qx 'gatus' <<<"$expected"; then
-    if ! kubectl -n gatus get secret gatus-telegram-token -o json 2>/dev/null |
-      jq -r '.data["bot-token"] // ""' | base64 -d 2>/dev/null |
-      awk 'BEGIN { ok = 0 } NR == 1 && length($0) > 0 && $0 !~ /^ENC\[/ { ok = 1 } END { exit !ok }'; then
-      echo "gatus-telegram-token: missing, empty, or still encrypted"
+  # Every Secret a Kustomization applied must exist with every value set and
+  # decrypted. Only names and keys are printed, never values.
+  secret_ids=$(jq -r '
+    .items[].status.inventory.entries[]?.id
+    | select(endswith("__Secret"))' <<<"$ks_json") || return 1
+  if [ -n "$secret_ids" ]; then
+    secrets_json=$(kubectl get secrets -A -o json 2>/dev/null) || return 1
+    secret_problems=$(jq -r --arg ids "$secret_ids" '
+      ($ids | split("\n") | map(select(length > 0))) as $wanted
+      | (.items | map({key: "\(.metadata.namespace)_\(.metadata.name)__Secret", value: .}) | from_entries) as $have
+      | $wanted[]
+      | . as $id
+      | if $have[$id] == null then "\($id | rtrimstr("__Secret") | sub("_"; "/")): missing"
+        else $have[$id].data // {} | to_entries[]
+          | select((.value | @base64d) as $v | ($v | length) == 0 or ($v | startswith("ENC[")))
+          | "\($id | rtrimstr("__Secret") | sub("_"; "/")): \(.key) is empty or still encrypted"
+        end' <<<"$secrets_json") || return 1
+    if [ -n "$secret_problems" ]; then
+      echo "$secret_problems"
       bad=1
     fi
   fi
