@@ -25,7 +25,7 @@ graph TB
                 INGRESS["Ingress: hs.miksu.app"]
                 SVC["K8s Service: headscale:8080"]
                 EP["EndpointSlice → 10.42.0.1"]
-                ARGOCD["ArgoCD<br/>argocd.miksu.app<br/>100.64.0.1 only"]
+                FLUXUI["Flux status page<br/>flux.miksu.app<br/>100.64.0.1 only"]
             end
 
             subgraph NixOS["NixOS Host Services"]
@@ -63,7 +63,7 @@ graph TB
     CLIENT_B -.- TS_CLIENT_B
     TS_CLIENT_A <-->|WireGuard| TS_CLIENT_B
     TS_CLIENT_A <-->|WireGuard| TS_SERVER
-    TS_SERVER --> ARGOCD
+    TS_SERVER --> FLUXUI
 ```
 
 ## HTTPS Control Plane Flow
@@ -90,7 +90,7 @@ flowchart TD
     AUTH -->|Not approved| DENY([Registration denied])
 
     REGISTER --> PEERLIST[Distribute peer list<br/>+ WireGuard public keys]
-    PEERLIST --> DNSCONFIG[Push DNS config<br/>MagicDNS: *.vpn.miksu.app<br/>Extra: argocd.miksu.app → 100.64.0.1]
+    PEERLIST --> DNSCONFIG[Push DNS config<br/>MagicDNS: *.vpn.miksu.app<br/>Extra: flux.miksu.app, grafana.miksu.app → 100.64.0.1]
     DNSCONFIG --> DERP_MAP[Push DERP map<br/>Region 999: hs.miksu.app]
     DERP_MAP --> CONNECTED([Client connected to control plane])
 
@@ -129,20 +129,20 @@ flowchart TD
     style RELAYED fill:#f39c12,color:#fff
 ```
 
-## Client-to-ArgoCD Access Flow
+## Client-to-tailnet-only service Access Flow
 
-ArgoCD and Grafana are only reachable through the Tailscale VPN: they have no public DNS record, and a Traefik `tailnet-only` middleware refuses clients outside 100.64.0.0/10 (olympus disables Tailscale subnet SNAT and gives Traefik the tailnet address as an external IP, so Traefik sees real client addresses).
+The Flux status page and Grafana are only reachable through the Tailscale VPN: they have no public DNS record, and a Traefik `tailnet-only` middleware refuses clients outside 100.64.0.0/10 (olympus disables Tailscale subnet SNAT and gives Traefik the tailnet address as an external IP, so Traefik sees real client addresses).
 
 ```mermaid
 flowchart LR
-    CLIENT[VPN Client] -->|Query argocd.miksu.app| TS_DNS[Tailscale DNS<br/>intercepted locally]
+    CLIENT[VPN Client] -->|Query flux.miksu.app| TS_DNS[Tailscale DNS<br/>intercepted locally]
     TS_DNS -->|MagicDNS lookup| HS_DNS[Headscale DNS<br/>extra_records]
     HS_DNS -->|100.64.0.1| RESOLVE[Resolved to<br/>Tailscale IP]
     RESOLVE -->|WireGuard tunnel<br/>to 100.64.0.1| SERVER[K3s Server<br/>tailscale0 interface]
-    SERVER -->|Local traffic| ARGOCD[ArgoCD<br/>Internal K8s service]
+    SERVER -->|Local traffic| FLUXUI[Flux status page<br/>Internal K8s service]
 
     style CLIENT fill:#4a9eff,color:#fff
-    style ARGOCD fill:#2ecc71,color:#fff
+    style FLUXUI fill:#2ecc71,color:#fff
 ```
 
 ## Network Layers Summary
@@ -168,7 +168,7 @@ flowchart LR
 │  CGNAT: 100.64.0.0/10  │  IPv6: fd7a:115c:a1e0::/48              │
 │  MagicDNS: *.vpn.miksu.app                                        │
 │  Server: 100.64.0.1  │  Clients: 100.64.0.x                      │
-│  ArgoCD reachable at argocd.miksu.app → 100.64.0.1                │
+│  Flux UI and Grafana at flux./grafana.miksu.app → 100.64.0.1     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

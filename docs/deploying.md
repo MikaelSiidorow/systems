@@ -5,17 +5,18 @@ Operational reference: how changes reach each machine, first-time setup, cluster
 ## Architecture
 
 ```
-NixOS (k3s.nix)                              OpenTofu (tofu/k8s/)
-  |                                             |
-  |-- Traefik (ingress)                         |-- refinery namespace
-  |-- cert-manager (TLS)                        |-- refinery-secrets
-  |-- ArgoCD (GitOps)
-  |-- Bootstrap Application
+NixOS (k3s.nix)
+  |
+  |-- Traefik (ingress)
+  |-- cert-manager (TLS)
+  |-- Flux Operator + FluxInstance (GitOps)
+  |-- flux-system/sops-age (olympus's age key, for SOPS)
   |
   v
 Flux (k8s/clusters/olympus/) syncs from git
   |
   |-- k8s/refinery, k8s/wger, k8s/monitoring, k8s/gatus, ...
+  |-- decrypts k8s/**/*.sops.yaml Secrets with olympus's age key
 ```
 
 **Separation of concerns:**
@@ -23,15 +24,13 @@ Flux (k8s/clusters/olympus/) syncs from git
 - **OpenTofu** (`tofu/`) provisions cloud infrastructure (Hetzner server, Cloudflare DNS)
 - **NixOS** (`infra/nixos/`) manages the Hetzner cluster host and the Hestia home server
 - **OpenWrt** (`openwrt/`, own flake and lock) manages the Cerberus router and Hermes access point
-- **OpenTofu K8s** (`tofu/k8s/`) manages application secrets (the part that can't be in Git)
-- **ArgoCD** syncs application manifests from `k8s/` in Git to the cluster
+- **Flux** syncs application manifests and SOPS-encrypted Secrets from `k8s/` in Git to the cluster
 
 ## Structure
 
 ```
 systems/
 ├── tofu/                    # Cloud resources (Hetzner, Cloudflare)
-│   └── k8s/                 # K8s secrets (OpenTofu + kubernetes provider)
 ├── workstations/            # nix-darwin + home-manager flake (own flake.lock)
 ├── modules/home/            # Shared home-manager modules: core (shell, CLI tools), agents
 ├── openwrt/                 # Router firmware + UCI config flake (own flake.lock, updated daily)
@@ -41,12 +40,15 @@ systems/
 │   │   └── hestia/          # Home Assistant and home-network services
 │   └── secrets/             # SOPS-encrypted host secrets
 ├── k8s/
-│   ├── apps/                # ArgoCD Application manifests
+│   ├── clusters/olympus/    # Flux Kustomizations: what Flux syncs, in which order
 │   ├── refinery/            # Refinery K8s manifests
 │   ├── wger/                # wger workout manager manifests
 │   ├── wger-ingress/        # wger public Ingress, applied after its bootstrap Job
-│   ├── headscale/           # Headscale ingress
-│   └── argocd-ingress/      # ArgoCD ingress
+│   ├── monitoring/          # Observability HelmReleases
+│   ├── gatus/               # Status page
+│   ├── cert-manager/        # DNS-01 token for cert-manager
+│   ├── flux-ui/             # Flux Operator status page (tailnet only)
+│   └── headscale/           # Headscale ingress
 ├── docs/                    # Architecture & observability docs
 ├── bin/                     # Utility scripts (ssh)
 └── .github/workflows/
@@ -60,25 +62,21 @@ systems/
 
 ## Pipeline
 
-Push to `main` triggers deploys automatically based on changed paths. Manual deploys via workflow dispatch (select component: `tofu`, `nixos`, `k8s-tofu`, or `all`).
+Push to `main` triggers deploys automatically based on changed paths. Manual deploys via workflow dispatch (select component: `tofu`, `nixos`, or `all`).
 
 ### Deploy pipeline ordering
 
 ```
-tofu  →  nixos  →  k8s-tofu
-(infra)  (OS)     (app secrets)
-                     ↓
-               ArgoCD auto-syncs
-               (app manifests from git)
-                     ↓
-                   smoke
+tofu  →  nixos  →  smoke
+(infra)  (OS)       ↑
+                 Flux syncs k8s/ from git
+                 (apps and their Secrets)
 ```
 
 1. **`tofu`** — creates/updates cloud resources (server, DNS)
-2. **`nixos`** — builds the olympus NixOS config in CI, copies it to olympus and switches to it (installs K3s, ArgoCD, etc.). olympus never builds its own system: it has too little memory. A run on main that waited behind a newer one skips if olympus runs that newer commit as its deploy switched it, and fails otherwise; the host keeps its records in `/var/lib/nixos-deploy`. If main is ever force-pushed, let queued deploys finish, then delete that directory.
-3. **`k8s-tofu`** — creates namespaces and secrets via SSH tunnel to K3s API
-4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
-5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
+2. **`nixos`** — builds the olympus NixOS config in CI, copies it to olympus and switches to it (installs K3s, the Flux Operator, etc.). olympus never builds its own system: it has too little memory. A run on main that waited behind a newer one skips if olympus runs that newer commit as its deploy switched it, and fails otherwise; the host keeps its records in `/var/lib/nixos-deploy`. If main is ever force-pushed, let queued deploys finish, then delete that directory.
+3. **Flux** — automatically syncs `k8s/clusters/olympus/` and everything it references (no CI needed)
+4. **`smoke`** — waits for Flux to apply the commit (every Kustomization and HelmRelease Ready, every Secret decrypted) and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
 
 K8s manifest changes are deployed by Flux within a few minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
 
@@ -122,22 +120,11 @@ Refinery application releases do not require per-build image tag commits in this
      --flake ./infra#olympus --target-host root@<IP>
    ```
 
-4. Wait for ArgoCD to start:
+4. The new server makes a new age key, so Flux can't decrypt the Secrets yet. Read its public key with `ssh root@<IP> age-keygen -y /var/lib/sops-nix/key.txt`, put it into `.sops.yaml` as `&olympus`, run `sops updatekeys` on `infra/secrets/olympus.yaml` and every `k8s/**/*.sops.yaml`, and push.
 
+5. Verify Flux synced the apps:
    ```bash
-   ssh root@<IP> "kubectl get pods -n argocd"
-   ```
-
-5. Apply K8s secrets via OpenTofu:
-
-   ```bash
-   cd tofu/k8s
-   sops exec-env ../../infra/secrets/ci.yaml 'tofu init && tofu apply'
-   ```
-
-6. Verify ArgoCD synced the apps:
-   ```bash
-   ssh root@<IP> "kubectl get applications -n argocd"
+   ssh root@<IP> "kubectl -n flux-system get kustomizations,helmreleases"
    ```
 
 ### Local kubectl access
@@ -166,15 +153,15 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 - **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App and the Headscale auth key. The `REFINERY_*`, `WGER_*`, `GRAFANA_ADMIN_PASSWORD`, `TELEGRAM_BOT_TOKEN` and `BRAWL_STARS_API_KEY` ones are unused since the apps moved to Flux and can be deleted.
 - **GitHub Actions variables**: `K3S_HOST`
 - **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
-- **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (all have moved; `tofu/k8s/` only holds `removed` blocks until it is deleted; rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/cert-manager/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
+- **K8s secrets**: SOPS-encrypted `k8s/**/*.sops.yaml` manifests, encrypted to your post-quantum age key and olympus's and decrypted by Flux. Edit one with `sops <file>`; Flux applies the change, and Deployments that read the Secret as environment variables need a `kubectl rollout restart` to pick it up (rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/cert-manager/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
 
 ## OpenTofu state
 
-Both roots keep their state in the `terraform-state` R2 bucket, encrypted with `TF_VAR_state_passphrase` from `infra/secrets/ci.yaml`. Every `tofu` command that touches state needs it, so run them through SOPS: the `make tf-*` targets do, and anything else goes inside `sops exec-env infra/secrets/ci.yaml '<command>'`. Losing the passphrase loses the state, so it lives only in that file, which your age key (backed up in Bitwarden) decrypts.
+The `tofu/` root keeps its state in the `terraform-state` R2 bucket, encrypted with `TF_VAR_state_passphrase` from `infra/secrets/ci.yaml`. Every `tofu` command that touches state needs it, so run them through SOPS: the `make tf-*` targets do, and anything else goes inside `sops exec-env infra/secrets/ci.yaml '<command>'`. Losing the passphrase loses the state, so it lives only in that file, which your age key (backed up in Bitwarden) decrypts.
 
 A run that dies mid-apply can leave its lock behind, and later runs then wait ten minutes and fail with `Error acquiring the state lock`. Check that no deploy is running, then release it with the lock ID from that error:
 
 ```bash
-cd tofu   # or tofu/k8s
+cd tofu
 sops exec-env "$(git rev-parse --show-toplevel)/infra/secrets/ci.yaml" 'tofu force-unlock <lock-id>'
 ```

@@ -9,7 +9,6 @@ on:
         options:
           - all
           - nixos
-          - k8s-tofu
           - tofu
   # Pull requests run this through ci.yml, which owns the required CI Summary;
   # the changes job below picks which checks apply.
@@ -26,7 +25,7 @@ on:
       - "infra/secrets/ci.yaml"
       - ".github/scripts/ci-secrets.sh"
       - ".github/workflows/deploy.yml"
-      # Argo CD deploys these; the smoke job checks the result.
+      # Flux deploys these; the smoke job checks the result.
       - "k8s/**"
       - ".github/scripts/smoke.sh"
 permissions:
@@ -44,7 +43,6 @@ jobs:
       nixos: ${{ steps.filter.outputs.nixos }}
       openwrt: ${{ steps.filter.outputs.openwrt }}
       tofu: ${{ steps.filter.outputs.tofu }}
-      k8s_tofu: ${{ steps.filter.outputs.k8s_tofu }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -63,19 +61,10 @@ jobs:
             openwrt:
               - 'openwrt/**'
             tofu:
-              # Top-level files only; tofu/k8s/ is k8s_tofu. A '!' entry
-              # would match every other path, since the patterns are OR'd.
+              # Top-level files only. A '!' entry would match every other
+              # path, since the patterns are OR'd.
               - 'tofu/*'
               - 'infra/secrets/ci.yaml'
-              - '.github/scripts/ci-secrets.sh'
-              - '.github/workflows/deploy.yml'
-            k8s_tofu:
-              - 'tofu/k8s/**'
-              - 'tofu/mail.tf'
-              - 'tofu/outputs.tf'
-              - 'infra/secrets/ci.yaml'
-              # A rotation changes this file and the matching Actions secret.
-              - 'infra/secrets/olympus.yaml'
               - '.github/scripts/ci-secrets.sh'
               - '.github/workflows/deploy.yml'
   nixos-preview:
@@ -436,7 +425,7 @@ jobs:
   nixos:
     needs: [changes, tofu, nix-cache]
     # nix-cache only warms the store: when it fails, this job still builds, so
-    # a broken config fails here and holds back k8s-tofu.
+    # a broken config fails here and holds back the smoke test.
     if: |
       always() &&
       (needs.tofu.result == 'success' || needs.tofu.result == 'skipped') &&
@@ -493,8 +482,8 @@ jobs:
       # the host records the last commit it started deploying from main, and the
       # last one that switched successfully. Using GitHub's compare API, it skips
       # a commit that is behind the started one, but only succeeds once that
-      # newer commit has switched; until then k8s-tofu must not run. Re-runs of
-      # the same commit deploy again. A manual dispatch of another branch always
+      # newer commit has switched; until then the smoke test must not run.
+      # Re-runs of the same commit deploy again. A manual dispatch of another branch always
       # deploys and clears the switched record, so older main runs fail until a
       # main run switches again. If main is ever rewritten, let queued runs
       # finish, then delete /var/lib/nixos-deploy on olympus.
@@ -560,141 +549,8 @@ jobs:
       - name: Remove the GC root
         if: always() && (steps.copy.outcome == 'success' || steps.copy.outcome == 'failure')
         run: ssh "root@$K3S_HOST" rm -f "/nix/var/nix/gcroots/ci-deploy/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-  k8s-tofu:
-    needs: [changes, tofu, nixos]
-    if: |
-      always() &&
-      (needs.tofu.result == 'success' || needs.tofu.result == 'skipped') &&
-      (needs.nixos.result == 'success' || needs.nixos.result == 'skipped') &&
-      ((github.event_name == 'pull_request' && needs.changes.outputs.k8s_tofu == 'true' &&
-        github.event.pull_request.user.login != 'dependabot[bot]') ||
-      (github.event_name == 'push' && needs.changes.outputs.k8s_tofu == 'true') ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["k8s-tofu", "all"]'), github.event.inputs.component)))
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tofu/k8s
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
-        with:
-          tofu_version: ~1.13
-      - name: Load CI secrets
-        env:
-          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-        run: '"$GITHUB_WORKSPACE/.github/scripts/ci-secrets.sh"'
-      - name: Setup SSH and K8s access
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo "$K3S_HOST $K3S_HOST_KEY" >> ~/.ssh/known_hosts
-          ssh -fN -L 6443:127.0.0.1:6443 root@${{ env.K3S_HOST }}
-          ssh root@${{ env.K3S_HOST }} cat /etc/rancher/k3s/k3s.yaml > /tmp/kubeconfig
-          chmod 600 /tmp/kubeconfig
-      - name: Tofu Format Check
-        id: fmt
-        run: tofu fmt -check -recursive
-        continue-on-error: true
-      - name: Tofu Init
-        id: init
-        run: tofu init
-      - name: Tofu Validate
-        id: validate
-        run: tofu validate -no-color
-      - name: Tofu Plan
-        id: plan
-        run: tofu plan -no-color -lock-timeout=10m -out=tfplan
-        continue-on-error: true
-        env:
-          KUBE_CONFIG_PATH: /tmp/kubeconfig
-      - name: Check for infrastructure changes
-        id: plan-changes
-        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
-        run: |
-          if tofu show -json tfplan | jq -e '
-            ([.resource_changes[]? | select(.change.actions != ["no-op"])] | length == 0) and
-            ([(.output_changes // {})[] | select(.actions != ["no-op"])] | length == 0)' >/dev/null; then
-            echo "none=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Write CI report section
-        if: always() && github.event_name == 'pull_request'
-        env:
-          FMT: ${{ steps.fmt.outcome }}
-          INIT: ${{ steps.init.outcome }}
-          VALIDATE: ${{ steps.validate.outcome }}
-          PLAN: ${{ steps.plan.outcome }}
-          PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
-          NO_CHANGES: ${{ steps.plan-changes.outputs.none }}
-        run: |
-          mark() { case "$1" in success) echo ✅ ;; skipped | "") echo ⏭️ ;; *) echo ❌ ;; esac; }
-          if [ "$INIT" != success ] || [ "$VALIDATE" != success ] || [ "$PLAN" != success ]; then
-            status=failure summary="init, validate or plan failed"
-          elif [ "$FMT" != success ]; then
-            status=failure summary="tofu fmt found unformatted files"
-          elif [ "$NO_CHANGES" = true ]; then
-            status=success summary="no changes"
-          else
-            status=changes
-            summary=$(printf '%s\n' "$PLAN_OUTPUT" | grep -oE '[0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy' | head -1)
-            summary=${summary:-changes}
-          fi
-          {
-            echo "| Step | Result |"
-            echo "|---|---|"
-            echo "| Format | $(mark "$FMT") |"
-            echo "| Init | $(mark "$INIT") |"
-            echo "| Validate | $(mark "$VALIDATE") |"
-            echo "| Plan | $(mark "$PLAN") |"
-            echo
-            # Long enough that no plan line can close it early.
-            echo '``````````terraform'
-            echo "${PLAN_OUTPUT:-No plan output.}"
-            echo '``````````'
-          } >"$RUNNER_TEMP/details.md"
-          "$GITHUB_WORKSPACE/.github/scripts/report-section.sh" k8s-tofu 50 "k8s OpenTofu" "$status" "$summary" "$RUNNER_TEMP/details.md"
-      - name: Upload CI report section
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: pr-report-k8s-tofu
-          path: ${{ runner.temp }}/report/k8s-tofu.json
-      - name: Fail on format or plan error
-        if: steps.fmt.outcome == 'failure' || steps.plan.outcome == 'failure'
-        run: exit 1
-      # Renovate updates that change no infrastructure merge themselves once
-      # CI Summary passes. The app token makes that merge trigger the deploy.
-      - name: Create GitHub App token
-        id: app-token
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.user.login == 'mikael-systems-bot[bot]' &&
-          steps.plan-changes.outputs.none == 'true'
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-      - name: Enable auto-merge for a no-op update
-        if: steps.app-token.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          # Only when every changed file belongs to this OpenTofu root.
-          files=$(gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only)
-          if grep -qvE '^tofu/k8s/[^/]+$' <<<"$files"; then
-            echo "The PR changes files outside this OpenTofu root; leaving it for review."
-            exit 0
-          fi
-          gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
-      - name: Tofu Apply
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        env:
-          KUBE_CONFIG_PATH: /tmp/kubeconfig
-        run: tofu apply -auto-approve -lock-timeout=10m tfplan
   smoke:
-    needs: [tofu, nixos, k8s-tofu]
+    needs: [tofu, nixos]
     # Failed or cancelled deploy jobs already fail the run.
     if: |
       always() && github.ref == 'refs/heads/main' &&
@@ -704,7 +560,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Argo CD may already be on a newer commit; the script checks ancestry.
+          # Flux may already be on a newer commit; the script checks ancestry.
           fetch-depth: 0
       - name: Setup SSH
         run: |

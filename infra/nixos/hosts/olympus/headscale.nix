@@ -84,11 +84,6 @@ in
         ];
         extra_records = [
           {
-            name = "argocd.miksu.app";
-            type = "A";
-            value = "100.64.0.1";
-          }
-          {
             name = "flux.miksu.app";
             type = "A";
             value = "100.64.0.1";
