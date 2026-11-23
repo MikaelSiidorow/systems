@@ -512,7 +512,7 @@ jobs:
           switched=/var/lib/nixos-deploy/main-switched
           record() {
             mkdir -p "$(dirname "$1")"
-            echo "$rev" > "$1.tmp"
+            echo "$2" > "$1.tmp"
             mv "$1.tmp" "$1"
           }
           if [ "$on_main" = true ] && [ -f "$started" ]; then
@@ -526,8 +526,9 @@ jobs:
               case $status in
                 ahead) ;;
                 behind)
-                  if [ "$(cat "$switched" 2>/dev/null)" != "$last" ]; then
-                    echo "The newer $last started deploying but has not switched; fix or re-run it." >&2
+                  # Also check olympus still runs it, not a rollback or a branch.
+                  if [ "$(cat "$switched" 2>/dev/null)" != "$last $(readlink -f /run/current-system)" ]; then
+                    echo "olympus is not running the newer $last as switched by its deploy; fix or re-run that deploy." >&2
                     exit 1
                   fi
                   echo "olympus already runs the newer $last; skipping $rev. If main was force-pushed back to $rev, delete /var/lib/nixos-deploy on olympus and re-run."
@@ -546,12 +547,12 @@ jobs:
           # over this one, even if this switch fails partway.
           # Cleared before any switch, so a failed one never counts as switched.
           rm -f "$switched"
-          if [ "$on_main" = true ]; then record "$started"; fi
+          if [ "$on_main" = true ]; then record "$started" "$rev"; fi
           nix-env --profile /nix/var/nix/profiles/system --set "$system"
           systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password \
             --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration \
             "$system/bin/switch-to-configuration" switch
-          if [ "$on_main" = true ]; then record "$switched"; fi
+          if [ "$on_main" = true ]; then record "$switched" "$rev $system"; fi
           # The public half of the host's age key, for .sops.yaml.
           recipient=$(age-keygen -y /var/lib/sops-nix/key.txt)
           echo "SOPS recipient: $recipient"
