@@ -1,6 +1,6 @@
 # Local Alloy, Loki, Tempo, Prometheus and Grafana for agent telemetry. Work
 # sessions stay on this Mac: every listener is on loopback, nothing exports
-# anywhere else. Alloy repeats the cluster pipeline (k8s/apps/alloy.yaml), so
+# anywhere else. Alloy repeats the cluster pipeline (k8s/monitoring/alloy.yaml), so
 # labels and metric names match what the agent-traces skill expects.
 {
   config,

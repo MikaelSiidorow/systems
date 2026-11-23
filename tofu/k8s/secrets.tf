@@ -1,34 +1,27 @@
-resource "kubernetes_secret_v1" "cloudflare_api_token" {
-  metadata {
-    name      = "cloudflare-api-token"
-    namespace = "cert-manager"
-  }
+# Managed by Flux (k8s/cert-manager/cloudflare-api-token.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.cloudflare_api_token
 
-  data = {
-    api-token = var.cloudflare_api_token
+  lifecycle {
+    destroy = false
   }
 }
 
-resource "kubernetes_secret_v1" "grafana_admin" {
-  metadata {
-    name      = "grafana-admin"
-    namespace = "monitoring"
-  }
+# Managed by Flux (k8s/monitoring/grafana-admin.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.grafana_admin
 
-  data = {
-    admin-user     = "admin"
-    admin-password = var.grafana_admin_password
+  lifecycle {
+    destroy = false
   }
 }
 
-resource "kubernetes_secret_v1" "alertmanager_telegram_token" {
-  metadata {
-    name      = "alertmanager-telegram-token"
-    namespace = "monitoring"
-  }
+# Managed by Flux (k8s/monitoring/alertmanager-telegram-token.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.alertmanager_telegram_token
 
-  data = {
-    bot-token = var.telegram_bot_token
+  lifecycle {
+    destroy = false
   }
 }
 

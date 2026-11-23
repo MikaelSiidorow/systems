@@ -7,9 +7,12 @@
   "labels": ["dependencies"],
   "dependencyDashboard": true,
   "prHourlyLimit": 0,
-  "enabledManagers": ["github-actions", "argocd", "kubernetes", "terraform", "custom.regex", "nix"],
+  "enabledManagers": ["github-actions", "argocd", "flux", "kubernetes", "terraform", "custom.regex", "nix"],
   "argocd": {
     "managerFilePatterns": ["/^k8s/apps/.+\\.ya?ml$/"]
+  },
+  "flux": {
+    "managerFilePatterns": ["/^k8s/.+\\.ya?ml$/"]
   },
   "kubernetes": {
     "managerFilePatterns": ["/^k8s/.+\\.ya?ml$/"]
@@ -108,7 +111,7 @@
       "automerge": false
     },
     {
-      "description": "Argo CD app minor/patch chart and image updates auto-merge after three days, so a broken or pulled release is caught upstream first; CI renders and schema-checks them, and the container health alerts catch the rest. Majors and 0.x stay manual",
+      "description": "Argo CD and Flux minor/patch chart and image updates auto-merge after three days, so a broken or pulled release is caught upstream first; CI renders and schema-checks them, and the container health alerts catch the rest. Majors and 0.x stay manual",
       "matchFileNames": ["k8s/**"],
       "matchUpdateTypes": ["minor", "patch"],
       "matchCurrentVersion": "!/^v?0\\./",
@@ -123,10 +126,7 @@
     {
       "description": "The monitoring stack reports on the other updates, so review its own",
       "matchFileNames": [
-        "k8s/apps/alloy.yaml",
-        "k8s/apps/kube-prometheus-stack.yaml",
-        "k8s/apps/loki.yaml",
-        "k8s/apps/tempo.yaml"
+        "k8s/monitoring/**"
       ],
       "automerge": false
     }

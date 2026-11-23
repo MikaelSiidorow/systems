@@ -5,3 +5,5 @@ resources:
   - gatus.yaml
   - headscale.yaml
   - refinery.yaml
+  - cert-manager.yaml
+  - monitoring.yaml

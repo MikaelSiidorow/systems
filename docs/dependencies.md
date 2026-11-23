@@ -36,6 +36,7 @@ Low-risk first, then `infra/` flake bumps, then majors one at a time, the ingres
 ## Verify after each merge (`ssh root@89.167.124.71`)
 
 - Argo CD: every app `Synced`/`Healthy` and at the new revision (`kubectl -n argocd get app`).
+- Flux: every Kustomization and HelmRelease Ready at the new revision (`kubectl -n flux-system get kustomizations,helmreleases`); a failed chart upgrade rolls back and shows in the HelmRelease's events.
 - Pods: nothing outside `Running`/`Completed`; note new restarts. A k3s upgrade restarts the DNS, so pods that resolve a DB on startup restart once.
 - Memory: for each upgraded container, compare `container_memory_working_set_bytes` with its limit, and check `anon` vs `file` in the cgroup's `memory.stat`. A container with almost no `file` left sits at its limit and thrashes; raise the limit in a follow-up PR with the numbers.
 - k3s HelmCharts (argocd, traefik, cert-manager): `kubectl -n kube-system get helmchart <name>` and the `helm-install-<name>` job logs. The Argo CD chart is named `argocd`.
