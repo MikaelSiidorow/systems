@@ -3,6 +3,10 @@ kind: Deployment
 metadata:
   name: gatus
   namespace: gatus
+  annotations:
+    # Allow Flux to recreate the Deployment when an SSA dry-run returns Invalid
+    # (needed to switch the live RollingUpdate Deployment to Recreate).
+    kustomize.toolkit.fluxcd.io/force: enabled
 spec:
   replicas: 1
   strategy:
