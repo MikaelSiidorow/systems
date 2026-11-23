@@ -1,4 +1,4 @@
-# Hourly copy of the full Claude and Codex transcripts to Hestia's archive
+# Hourly copy of the full Claude, Codex and Antigravity transcripts to Hestia's archive
 # (~/agent-transcripts/tpad). The key only reaches rrsync there, which can
 # write into that folder and nothing else.
 { config, pkgs, ... }:
@@ -24,6 +24,21 @@ let
       if [ -d "$HOME/.codex/sessions" ]; then
         rsync -a "$HOME/.codex/sessions/" mikaelsiidorow@hestia.vpn.miksu.app:codex/
       fi
+      # Antigravity keeps a home for the agy CLI and one per T3 provider
+      # instance. Copy only the conversations, never its OAuth token. Flat
+      # names, since rsync creates only the last folder of the target.
+      agy() {
+        [ -d "$1" ] || return 0
+        rsync -a \
+          --include='/brain/***' --include='/conversations/***' \
+          --include='/annotations/***' --include='/conversation_summaries.db' \
+          --exclude='*' \
+          "$1/" "mikaelsiidorow@hestia.vpn.miksu.app:antigravity-$2/"
+      }
+      agy "$HOME/.gemini/antigravity-cli" cli
+      for home in "$HOME"/.t3/*/providers/antigravity/*/antigravity-acp; do
+        agy "$home" "t3-$(basename "$(dirname "$home")")"
+      done
     '';
   };
 in
