@@ -9,7 +9,7 @@ The user is not watching; they read your final message later. Own the work from 
 
 "full stop" grants, for this task only:
 
-- pushing and `--force-with-lease` on the task's branch, marking the PR ready, requesting the reviewers the repo's docs name;
+- pushing and `--force-with-lease` on the task's branches, its stack included, marking the PR ready, requesting the reviewers the repo's docs name;
 - the test methods Proof needs (running the app, browser, simulators, screenshots), even where repo docs say to ask first. Rules on *how* to test still apply; harness approval prompts still apply.
 
 Never merge, enable auto-merge, enter a merge queue or push to the default branch. If auto-merge is already on, turn it off and say so.
@@ -20,11 +20,12 @@ Never merge, enable auto-merge, enter a merge queue or push to the default branc
 2. **Prove it** (see Proof).
 3. **Draft PR**: `file-pr` if none exists; its Proof carries step 2. Handle existing comments with `address-review`.
 4. **Review while draft**: `review-rounds`, then push its fixes.
-5. **Ready**: `rebase` if behind, `gh pr ready`, request the reviewers the repo's docs name.
-6. **Bots and CI**: `babysit-pr` until green, skipping its review rounds. Prove each fix before pushing it.
-7. **Gate, then hand off** (see Gate and Report).
+5. **Draft hold**, only when the user asked to keep it a draft, meaning they will read it first: `rebase` if behind, then `babysit-pr`, skipping its review rounds, until the draft is green; checks that run only on ready PRs show on the card as deferred. Hand off the card (see Report) with the verdict **ready for your read** and end the turn. Continue when the user approves; if the diff has changed since their card, hand off a new one first.
+6. **Ready**: `rebase` if behind (after a hold, a rebase that changes the diff goes back to step 5), `gh pr ready`, request the reviewers the repo's docs name.
+7. **Bots and CI**: `babysit-pr` until green, skipping its review rounds. Prove each fix before pushing it.
+8. **Gate, then hand off** (see Gate and Report).
 
-Stay active from 1 to 7: ending the turn while something is pending stops the work. In T3, `babysit-pr`'s watch wakes you.
+End the turn only at the draft hold's hand-off; anywhere else, ending the turn while something is pending stops the work. In T3, `babysit-pr`'s watch wakes you.
 
 ## Proof
 
@@ -42,4 +43,13 @@ Use the harness's question tool (`AskUserQuestion`, `request_user_input`) with t
 
 ## Report
 
-Call `unwatch_pull_request` first. Then: PR link, final HEAD, verdict (**ready**, **waiting on approval** or **blocked** and why), proof, reviewers and rounds, and the decisions you made.
+Call `unwatch_pull_request` first. Then hand off with one card that lets the user trust the PR without opening it:
+
+- title, link, final HEAD, and the verdict: **ready for your read**, **ready**, **waiting on approval** or **blocked** and why;
+- size (`+/-` lines, files) and the PR's Risk line;
+- **Scope**: the ask in one line, and whether the PR does exactly that, naming anything left out or added;
+- **Proof**, shown rather than told: the recording or screenshots for UI, before → after output or numbers otherwise. Inline a short code excerpt only when nothing observable can show the change;
+- **Review council**: each reviewer, human or bot, and each `review-rounds` model, with its rounds, findings fixed or dismissed, and its verdict on the final HEAD: **clean**, **open**, **pending**, **skipped on draft** or **stale**;
+- the decisions you made, and the open `- [ ]` items the user owns.
+
+In T3, render it with `html_preview` and `html_render`, embedding screenshots and colouring the Risk line (two-way green, one-way amber) and each verdict (clean green, anything else amber). Write it as Markdown when those tools are missing or fail.

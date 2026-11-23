@@ -17,7 +17,7 @@ Each skill in [`skills/`](skills/) is installed for Claude Code, Codex and, outs
 
 | Skill | What it does |
 | --- | --- |
-| [ticket-kickoff](skills/ticket-kickoff/SKILL.md) | Start work from a Linear or GitHub ticket |
+| [ticket-kickoff](skills/ticket-kickoff/SKILL.md) | Start or plan work from a Linear or GitHub ticket, slicing big changes into a stack |
 | [file-pr](skills/file-pr/SKILL.md) | Open a draft PR in the repo's format |
 | [file-ticket](skills/file-ticket/SKILL.md) | File a ticket in the right team, project and queue |
 | [review-rounds](skills/review-rounds/SKILL.md) | Codex reviews a branch in a loop, fixing until clean; Claude only on escalation |
