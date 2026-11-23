@@ -20,11 +20,12 @@ Never merge, enable auto-merge, enter a merge queue or push to the default branc
 2. **Prove it** (see Proof).
 3. **Draft PR**: `file-pr` if none exists; its Proof carries step 2. Handle existing comments with `address-review`.
 4. **Review while draft**: `review-rounds`, then push its fixes.
-5. **Ready**: `rebase` if behind, `gh pr ready`, request the reviewers the repo's docs name.
-6. **Bots and CI**: `babysit-pr` until green, skipping its review rounds. Prove each fix before pushing it.
-7. **Gate, then hand off** (see Gate and Report).
+5. **Draft hold**, only when the user asked to keep it a draft, meaning they will read it first: `babysit-pr` until the draft's required checks are green, then hand off the card (see Report) with the verdict **ready for your read** and end the turn. When the user approves that HEAD, continue.
+6. **Ready**: `rebase` if behind, `gh pr ready`, request the reviewers the repo's docs name.
+7. **Bots and CI**: `babysit-pr` until green, skipping its review rounds. Prove each fix before pushing it.
+8. **Gate, then hand off** (see Gate and Report).
 
-Stay active from 1 to 7: ending the turn while something is pending stops the work. In T3, `babysit-pr`'s watch wakes you.
+Stay active through every step but the draft hold: ending the turn while something is pending stops the work. In T3, `babysit-pr`'s watch wakes you.
 
 ## Proof
 
@@ -42,4 +43,13 @@ Use the harness's question tool (`AskUserQuestion`, `request_user_input`) with t
 
 ## Report
 
-Call `unwatch_pull_request` first. Then: PR link, final HEAD, verdict (**ready**, **waiting on approval** or **blocked** and why), proof, reviewers and rounds, and the decisions you made.
+Call `unwatch_pull_request` first. Then hand off with one card, so the user can pick what to read next without opening the PR:
+
+- title, link and final HEAD;
+- verdict: **ready for your read**, **ready**, **waiting on approval** or **blocked** and why;
+- size (`+/-` lines, files) and the PR's Risk line;
+- **Read first**: the one to three files or hunks to start at, in reading order;
+- the strongest proof: a screenshot or a before → after number;
+- reviewers and rounds, the decisions you made, and the open `- [ ]` items the user owns.
+
+In T3, render it with `html_preview` and `html_render`, embedding screenshots and colouring the door call (two-way green, one-way amber); elsewhere, write it as Markdown.
