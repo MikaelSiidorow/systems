@@ -41,6 +41,9 @@ let
           GIT_CONFIG_COUNT = "1";
           GIT_CONFIG_KEY_0 = "core.fsmonitor";
           GIT_CONFIG_VALUE_0 = "false";
+          # Experimental: Claude scripts its tool calls in JavaScript. Only user
+          # settings can turn it on; -p sessions fall back to plain tools.
+          CLAUDE_CODE_EXPERIMENTAL_CODE_MODE = "1";
         }
         // lib.optionalAttrs (telemetry != null) {
           CLAUDE_CODE_ENABLE_TELEMETRY = "1";
