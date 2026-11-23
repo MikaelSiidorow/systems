@@ -3,29 +3,7 @@
 let
   manifestDir = "/var/lib/rancher/k3s/server/manifests";
 
-  argocdBootstrap = pkgs.writeText "argocd-bootstrap.yaml" ''
-    apiVersion: argoproj.io/v1alpha1
-    kind: Application
-    metadata:
-      name: bootstrap
-      namespace: argocd
-    spec:
-      project: default
-      source:
-        repoURL: https://github.com/MikaelSiidorow/systems.git
-        targetRevision: main
-        path: k8s/apps
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: argocd
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-  '';
-
-  # Host service endpoints — managed by NixOS instead of ArgoCD because
-  # ArgoCD excludes Endpoints/EndpointSlice resources by default.
+  # Host service endpoints for services that run on olympus itself.
   headscaleService = pkgs.writeText "headscale-service.yaml" ''
     apiVersion: v1
     kind: Namespace
@@ -221,13 +199,15 @@ in
     "L+ ${manifestDir}/traefik-helmchart.yaml - - - - ${./traefik-helmchart.yaml}"
     "L+ ${manifestDir}/cert-manager-helmchart.yaml - - - - ${./cert-manager-helmchart.yaml}"
     "L+ ${manifestDir}/cluster-issuer.yaml - - - - ${clusterIssuer}"
-    "L+ ${manifestDir}/argocd-helmchart.yaml - - - - ${./argocd-helmchart.yaml}"
-    "L+ ${manifestDir}/argocd-bootstrap.yaml - - - - ${argocdBootstrap}"
+    # Argo CD is gone; Flux deploys k8s/. Removing a file leaves what k3s
+    # applied from it, so the release was uninstalled by hand.
+    "r ${manifestDir}/argocd-helmchart.yaml - - - -"
+    "r ${manifestDir}/argocd-bootstrap.yaml - - - -"
     "L+ ${manifestDir}/flux-operator-helmchart.yaml - - - - ${./flux-operator-helmchart.yaml}"
     "L+ ${manifestDir}/flux-instance.yaml - - - - ${./flux-instance.yaml}"
     "L+ ${manifestDir}/headscale-service.yaml - - - - ${headscaleService}"
     "L+ ${manifestDir}/refinery-db-service.yaml - - - - ${refineryDbService}"
-    # wger's namespace and database service are managed by Kubernetes Terraform.
+    # wger's namespace and database service are in k8s/wger, deployed by Flux.
     "r ${manifestDir}/wger-db-service.yaml - - - -"
     "L+ ${manifestDir}/ci-deploy-rbac.yaml - - - - ${ciDeployRbac}"
   ];

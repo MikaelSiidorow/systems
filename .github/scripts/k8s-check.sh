@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Validate the rendered Argo CD apps and k3s HelmCharts, plus the Application
-# and HelmChart manifests themselves, against the Kubernetes and CRD schemas.
+# Validate the rendered Flux Kustomizations and HelmReleases and k3s
+# HelmCharts, plus the HelmChart and FluxInstance manifests themselves,
+# against the Kubernetes and CRD schemas.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -12,7 +13,7 @@ trap 'rm -rf "$out"' EXIT
 
 .github/scripts/k8s-render.sh "$out"
 
-manifests=(k8s/apps infra/nixos/hosts/olympus/*-helmchart.yaml)
+manifests=(infra/nixos/hosts/olympus/*-helmchart.yaml)
 if [[ -f infra/nixos/hosts/olympus/flux-instance.yaml ]]; then
   manifests+=(infra/nixos/hosts/olympus/flux-instance.yaml)
 fi

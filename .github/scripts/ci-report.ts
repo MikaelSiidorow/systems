@@ -42,7 +42,6 @@ const EXPECTED: Omit<Section, "status" | "summary" | "details">[] = [
   { key: "nixos", order: 20, title: "Olympus + Hestia" },
   { key: "openwrt", order: 30, title: "OpenWrt routers" },
   { key: "tofu", order: 40, title: "OpenTofu" },
-  { key: "k8s-tofu", order: 50, title: "k8s OpenTofu" },
 ];
 // Per-check comments from before this report existed.
 const LEGACY = ["### NixOS Preview", "### Terraform Results", "### K8s Terraform Results"];

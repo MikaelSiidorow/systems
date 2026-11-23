@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Post-deploy smoke test for olympus: the host is up, Argo CD has synced
-# the deployed commit, every workload has rolled out and stays up, and every
-# Ingress host answers.
+# Post-deploy smoke test for olympus: the host is up, Flux has applied the
+# deployed commit and decrypted its Secrets, every workload has rolled out
+# and stays up, and every Ingress host answers.
 set -euo pipefail
 
 readonly k3s_host="${1:?usage: smoke.sh K3S_HOST SHA}"
 readonly sha="${2:?usage: smoke.sh K3S_HOST SHA}"
 readonly -a ssh_options=(-o ServerAliveInterval=30 -o ServerAliveCountMax=20)
-# Argo CD polls the repository every 120 s.
+# Flux polls the repository every minute; HelmReleases can take minutes.
 readonly host_timeout=300
 # A HelmRelease upgrade alone may take 10 minutes.
 readonly sync_timeout=1200
@@ -69,41 +69,6 @@ if [ "${NIXOS_DEPLOYED:-}" = true ]; then
   fi
   echo "olympus runs $running."
 fi
-echo "::endgroup::"
-
-# Apps that track the repository must reach this commit or a newer one. Chart
-# apps report their chart version; the bootstrap app syncs their pins.
-argo_synced() {
-  local apps bad=0
-  apps=$(kubectl -n argocd get applications -o json |
-    jq -r '.items[] | [.metadata.name, .status.sync.status, .status.health.status, (.status.sync.revision // "")] | @tsv') || return 1
-  while IFS=$'\t' read -r name sync health revision; do
-    if [ "$sync" != Synced ]; then
-      echo "$name: $sync"
-      bad=1
-    elif [[ "$revision" =~ ^[0-9a-f]{40}$ ]]; then
-      # Argo CD may have synced a commit pushed after the checkout.
-      git cat-file -e "$revision^{commit}" 2>/dev/null || git fetch -q origin main || true
-      if ! git merge-base --is-ancestor "$sha" "$revision" 2>/dev/null; then
-        echo "$name: at ${revision:0:7}"
-        bad=1
-      fi
-    fi
-    # Progressing is left to the rollout check below. Missing and Degraded
-    # can flicker while a sync applies.
-    case "$health" in
-      Degraded | Missing | Unknown)
-        echo "$name: $health"
-        bad=1
-        ;;
-    esac
-  done <<<"$apps"
-  return "$bad"
-}
-
-echo "::group::Argo CD"
-wait_for "$sync_timeout" "Argo CD to sync $sha" argo_synced
-kubectl -n argocd get applications
 echo "::endgroup::"
 
 # FluxInstance and every expected Flux Kustomization must be Ready at this

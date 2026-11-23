@@ -91,20 +91,6 @@ data:
             failure-threshold: 3
             success-threshold: 2
 
-      - name: Argo CD
-        group: Infrastructure
-        url: http://argocd-server.argocd.svc.cluster.local/healthz
-        interval: 60s
-        conditions:
-          - "[STATUS] == 200"
-          - "[BODY] == ok"
-          - "[RESPONSE_TIME] < 5000"
-        alerts:
-          - type: telegram
-            enabled: true
-            failure-threshold: 3
-            success-threshold: 2
-
       - name: Grafana
         group: Infrastructure
         url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local/api/health
