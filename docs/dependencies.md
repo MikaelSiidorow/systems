@@ -15,11 +15,11 @@ Everything else waits for review: majors, the monitoring stack, other `infra/**`
 ## What a merge deploys
 
 - `k8s/**`: Argo CD syncs it; there is no workflow run, so wait for the app to reach the new revision.
-- `infra/**`: `nixos-rebuild switch` on olympus through `deploy.yml`. Hestia is never deployed by CI; tell the user to deploy it.
+- `infra/**`: `deploy.yml` builds olympus's system in CI, copies it over and switches to it. Hestia is never deployed by CI; tell the user to deploy it.
 - `tofu/*`, `tofu/k8s/*`: `tofu apply`. Read the plan in the PR's CI report comment.
 - `openwrt/**`: builds only; router deploys are manual.
 
-`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus and deploy `main` as it is, so a run can include later merges.
+`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus. Each deploys the commit that triggered it, and a run that waited behind a newer commit skips if olympus runs it, and fails otherwise.
 
 ## Known failures
 

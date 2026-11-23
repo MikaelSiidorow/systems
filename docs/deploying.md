@@ -75,7 +75,7 @@ tofu  →  nixos  →  k8s-tofu
 ```
 
 1. **`tofu`** — creates/updates cloud resources (server, DNS)
-2. **`nixos`** — deploys NixOS config via deploy-rs (installs K3s, ArgoCD, etc.)
+2. **`nixos`** — builds the olympus NixOS config in CI, copies it to olympus and switches to it (installs K3s, ArgoCD, etc.). olympus never builds its own system: it has too little memory. A run on main that waited behind a newer one skips if olympus runs that newer commit as its deploy switched it, and fails otherwise; the host keeps its records in `/var/lib/nixos-deploy`. If main is ever force-pushed, let queued deploys finish, then delete that directory.
 3. **`k8s-tofu`** — creates namespaces and secrets via SSH tunnel to K3s API
 4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
 5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
