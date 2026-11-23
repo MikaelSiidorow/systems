@@ -5,7 +5,7 @@ description: Take the work end to end to a merged PR. Use when the user says "fu
 
 # Full send
 
-Do everything in [full-stop](../full-stop/SKILL.md): its grant, steps, proof, gate and asking rules. "full send" adds the permission to merge this PR, so its no-merge rule does not apply; it also skips the draft hold. Instead of handing off at the gate, merge.
+Do everything in [full-stop](../full-stop/SKILL.md): its grant, steps, proof, gate and asking rules. "full send" adds the permission to merge this PR, so its no-merge rule does not apply; it also skips the draft hold unless the user asked for a draft. Instead of handing off at the gate, merge.
 
 ## Merge
 
