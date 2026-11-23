@@ -43,13 +43,13 @@ Use the harness's question tool (`AskUserQuestion`, `request_user_input`) with t
 
 ## Report
 
-Call `unwatch_pull_request` first. Then hand off with one card, so the user can pick what to read next without opening the PR:
+Call `unwatch_pull_request` first. Then hand off with one card that lets the user trust the PR without opening it:
 
-- title, link and final HEAD;
-- verdict: **ready for your read**, **ready**, **waiting on approval** or **blocked** and why;
+- title, link, final HEAD, and the verdict: **ready for your read**, **ready**, **waiting on approval** or **blocked** and why;
 - size (`+/-` lines, files) and the PR's Risk line;
-- **Read first**: the one to three files or hunks to start at, in reading order;
-- the strongest proof: a screenshot or a before → after number;
-- reviewers and rounds, the decisions you made, and the open `- [ ]` items the user owns.
+- **Scope**: the ask in one line, and whether the PR does exactly that, naming anything left out or added;
+- **Proof**, shown rather than told: the recording or screenshots for UI, before → after output or numbers otherwise. Inline a short code excerpt only when nothing observable can show the change;
+- **Review council**: each reviewer, human or bot, and each `review-rounds` model, with its rounds, findings fixed or dismissed, and final verdict;
+- the decisions you made, and the open `- [ ]` items the user owns.
 
-In T3, render it with `html_preview` and `html_render`, embedding screenshots and colouring the door call (two-way green, one-way amber); elsewhere, write it as Markdown.
+In T3, render it with `html_preview` and `html_render`, embedding screenshots and colouring the door call and each reviewer's verdict (green clean, amber open); elsewhere, write it as Markdown.
