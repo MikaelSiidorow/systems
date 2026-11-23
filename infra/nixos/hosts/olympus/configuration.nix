@@ -292,6 +292,13 @@ in
     '';
   };
 
+  # Compressed swap in RAM gives the kernel somewhere to put cold pages, so a
+  # memory spike pages out idle memory instead of thrashing the page cache.
+  zramSwap = {
+    enable = true;
+    memoryPercent = 25;
+  };
+
   # Basic packages
   environment.systemPackages = with pkgs; [
     age # the deploy prints the host's SOPS recipient with age-keygen
