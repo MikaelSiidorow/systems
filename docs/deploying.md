@@ -166,7 +166,7 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 - **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`REFINERY_*`, `WGER_*`)
 - **GitHub Actions variables**: `K3S_HOST`
 - **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
-- **K8s secrets**: managed by `tofu/k8s/`, passed as `TF_VAR_*` env vars in CI. `k8s/**/secrets.yaml` is gitignored.
+- **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (`gatus-telegram-token` has moved; rotating the shared Telegram bot token currently updates `k8s/gatus/gatus-telegram-token.sops.yaml` followed by a `gatus` rollout, plus the `TELEGRAM_BOT_TOKEN` Actions secret followed by dispatching the **Deploy** workflow with component `k8s-tofu` for Alertmanager). `k8s/**/secrets.yaml` is gitignored.
 
 ## OpenTofu state
 

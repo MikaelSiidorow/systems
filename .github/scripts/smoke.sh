@@ -170,10 +170,11 @@ flux_synced() {
       bad=1
     fi
   done <<<"$ks"
-  if grep -qx 'sops-canary' <<<"$expected"; then
-    if ! kubectl -n flux-system get secret sops-canary -o json 2>/dev/null |
-      jq -e '(.data.probe // "" | length) > 0' >/dev/null; then
-      echo "sops-canary: Secret missing or probe key empty"
+  if grep -qx 'gatus' <<<"$expected"; then
+    if ! kubectl -n gatus get secret gatus-telegram-token -o json 2>/dev/null |
+      jq -r '.data["bot-token"] // ""' | base64 -d 2>/dev/null |
+      awk 'BEGIN { ok = 0 } NR == 1 && length($0) > 0 && $0 !~ /^ENC\[/ { ok = 1 } END { exit !ok }'; then
+      echo "gatus-telegram-token: missing, empty, or still encrypted"
       bad=1
     fi
   fi

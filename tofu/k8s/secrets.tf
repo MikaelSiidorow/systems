@@ -32,14 +32,12 @@ resource "kubernetes_secret_v1" "alertmanager_telegram_token" {
   }
 }
 
-resource "kubernetes_secret_v1" "gatus_telegram_token" {
-  metadata {
-    name      = "gatus-telegram-token"
-    namespace = "gatus"
-  }
+# Managed by Flux (k8s/gatus/gatus-telegram-token.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.gatus_telegram_token
 
-  data = {
-    bot-token = var.telegram_bot_token
+  lifecycle {
+    destroy = false
   }
 }
 

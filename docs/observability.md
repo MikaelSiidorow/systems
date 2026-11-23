@@ -100,7 +100,7 @@ To change retention, edit the relevant `k8s/apps/*.yaml` file and push — ArgoC
 
 Alerts are routed to Telegram via Alertmanager.
 
-- **Bot token**: Stored as K8s secret `alertmanager-telegram-token` in `monitoring` namespace (managed by Terraform, `tofu/k8s/secrets.tf`)
+- **Bot token**: Stored as K8s secret `alertmanager-telegram-token` in `monitoring` namespace (managed by Terraform, `tofu/k8s/secrets.tf`). Gatus uses the same bot token from `k8s/gatus/gatus-telegram-token.sops.yaml`, so rotating it currently requires updating both places, dispatching the **Deploy** workflow with component `k8s-tofu` for Alertmanager, and rolling `gatus` to reload its env var.
 - **Chat ID**: Configured in `k8s/apps/kube-prometheus-stack.yaml` > `alertmanager.config.receivers`
 - **Routing**: All alerts go to Telegram except `Watchdog` and `InfoInhibitor` (silenced)
 - **Repeat interval**: 4h (won't spam)
