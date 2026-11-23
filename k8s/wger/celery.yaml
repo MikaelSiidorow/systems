@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: wger-celery-worker
   namespace: wger
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   strategy:
@@ -52,8 +50,6 @@ kind: Deployment
 metadata:
   name: wger-celery-beat
   namespace: wger
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   strategy:

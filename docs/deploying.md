@@ -13,10 +13,9 @@ NixOS (k3s.nix)                              OpenTofu (tofu/k8s/)
   |-- Bootstrap Application
   |
   v
-ArgoCD auto-syncs from git
+Flux (k8s/clusters/olympus/) syncs from git
   |
-  |-- k8s/apps/wger.yaml      -->  k8s/wger/*.yaml
-Flux (k8s/clusters/olympus/) syncs k8s/refinery, k8s/gatus, k8s/headscale, ...
+  |-- k8s/refinery, k8s/wger, k8s/monitoring, k8s/gatus, ...
 ```
 
 **Separation of concerns:**
@@ -45,6 +44,7 @@ systems/
 │   ├── apps/                # ArgoCD Application manifests
 │   ├── refinery/            # Refinery K8s manifests
 │   ├── wger/                # wger workout manager manifests
+│   ├── wger-ingress/        # wger public Ingress, applied after its bootstrap Job
 │   ├── headscale/           # Headscale ingress
 │   └── argocd-ingress/      # ArgoCD ingress
 ├── docs/                    # Architecture & observability docs
@@ -80,7 +80,7 @@ tofu  →  nixos  →  k8s-tofu
 4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
 5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
 
-K8s manifest changes are deployed by Flux (`k8s/refinery/`, `k8s/gatus/`, `k8s/headscale/`, `k8s/monitoring/`) or ArgoCD (`k8s/wger/`) within a few minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
+K8s manifest changes are deployed by Flux within a few minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
 
 Hestia is deployed independently from a machine that can resolve and reach
 `hestia.home.arpa`. Deployment uses the normal user and prompts for sudo:
@@ -161,12 +161,12 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 ## Secrets
 
 - **`infra/secrets/ci.yaml`** (SOPS): secrets that CI and you both need, one environment variable per key: the OpenTofu state passphrase, the provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `SCW_SECRET_KEY`) and the R2 state credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Values must be single-line and free of `%`. Encrypted to your post-quantum age key and to CI's, whose private half is the `SOPS_AGE_KEY` Actions secret. `.github/scripts/ci-secrets.sh` loads it into a job. Edit with `sops infra/secrets/ci.yaml`.
-- **`infra/secrets/olympus.yaml`** (SOPS): secrets olympus itself needs: the passwords of the `refinery`, `zero` and `wger` database roles. sops-nix decrypts it on the host and a unit sets the role passwords whenever the file changes. Encrypted to your post-quantum age key and to olympus's. The cluster's Secrets carry the same passwords (`k8s/refinery/refinery-secrets.sops.yaml` for `refinery` and `zero`, the `WGER_POSTGRES_PASSWORD` Actions secret for `wger`), so rotating one means changing both places.
+- **`infra/secrets/olympus.yaml`** (SOPS): secrets olympus itself needs: the passwords of the `refinery`, `zero` and `wger` database roles. sops-nix decrypts it on the host and a unit sets the role passwords whenever the file changes. Encrypted to your post-quantum age key and to olympus's. The cluster's Secrets carry the same passwords (`k8s/refinery/refinery-secrets.sops.yaml` for `refinery` and `zero`, `k8s/wger/wger-secrets.sops.yaml` for `wger`), so rotating one means changing both places.
 - **olympus's age key**: olympus makes its own post-quantum age key at `/var/lib/sops-nix/key.txt` the first time it boots without one, for sops-nix and Flux (`flux-sops-age.service` and `flux-sops-age.path` sync it into `flux-system/sops-age` at boot and whenever the file changes). The key stays on olympus, though the `flux-system/sops-age` copy is readable by cluster-admin controllers; give Flux a separate age key if `olympus.yaml` ever holds host-only secrets that cluster workloads should not share. The NixOS deploy job prints the public key as `SOPS recipient:`. A rebuilt server makes a new key: put its public key in `.sops.yaml` and run `sops updatekeys infra/secrets/olympus.yaml` plus `sops updatekeys` on every `k8s/**/*.sops.yaml` file.
-- **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`WGER_*`; the `REFINERY_*`, `GRAFANA_ADMIN_PASSWORD` and `TELEGRAM_BOT_TOKEN` ones are unused since those apps moved to Flux and can be deleted)
+- **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App and the Headscale auth key. The `REFINERY_*`, `WGER_*`, `GRAFANA_ADMIN_PASSWORD`, `TELEGRAM_BOT_TOKEN` and `BRAWL_STARS_API_KEY` ones are unused since the apps moved to Flux and can be deleted.
 - **GitHub Actions variables**: `K3S_HOST`
 - **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
-- **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (only wger's are left in `tofu/k8s/`; rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/cert-manager/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
+- **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (all have moved; `tofu/k8s/` only holds `removed` blocks until it is deleted; rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/cert-manager/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
 
 ## OpenTofu state
 

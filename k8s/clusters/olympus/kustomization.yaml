@@ -7,3 +7,5 @@ resources:
   - refinery.yaml
   - cert-manager.yaml
   - monitoring.yaml
+  - wger.yaml
+  - wger-ingress.yaml

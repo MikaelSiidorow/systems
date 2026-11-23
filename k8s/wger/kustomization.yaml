@@ -1,7 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: wger
+# The public Ingress is in k8s/wger-ingress, which Flux applies only once
+# everything here, including the bootstrap Job that replaces wger's default
+# admin password, is ready.
 resources:
+  - namespace.yaml
+  - wger-secrets.sops.yaml
+  - wger-admin-bootstrap.sops.yaml
+  - wger-email.sops.yaml
+  - db.yaml
   - storage.yaml
   - services.yaml
   - redis.yaml
@@ -11,7 +19,6 @@ resources:
   - powersync.yaml
   - fineli-import.yaml
   - monitoring.yaml
-  - ingress.yaml
 configMapGenerator:
   - name: wger-config
     envs:
