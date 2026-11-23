@@ -9,7 +9,8 @@ readonly sha="${2:?usage: smoke.sh K3S_HOST SHA}"
 readonly -a ssh_options=(-o ServerAliveInterval=30 -o ServerAliveCountMax=20)
 # Argo CD polls the repository every 120 s.
 readonly host_timeout=300
-readonly sync_timeout=600
+# A HelmRelease upgrade alone may take 10 minutes.
+readonly sync_timeout=1200
 readonly rollout_timeout=600
 # Crash-looping containers restart within this window.
 readonly watch_seconds=120

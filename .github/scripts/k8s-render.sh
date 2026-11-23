@@ -92,14 +92,23 @@ if [[ -d k8s/clusters/olympus ]]; then
   # Render each Flux HelmRelease's chart with its values, the way
   # helm-controller installs it.
   flux_files=("$out"/flux-*.yaml)
-  while IFS=$'\t' read -r name release chart version repo namespace; do
+  # A separate assignment, so a yq failure stops the script instead of
+  # silently rendering nothing.
+  releases="$(yq -r 'select(.kind == "HelmRelease") | [.metadata.name, (.spec.releaseName // ""), .spec.chart.spec.chart, .spec.chart.spec.version, .spec.chart.spec.sourceRef.kind, .spec.chart.spec.sourceRef.name, (.spec.targetNamespace // ""), .metadata.namespace] | @tsv' "${flux_files[@]}")"
+  while IFS=$'\t' read -r name release chart version repo_kind repo target_ns own_ns; do
     [[ -n "$name" ]] || continue
+    if [[ "$repo_kind" != HelmRepository ]]; then
+      echo "HelmRelease '$name' uses a $repo_kind source, which this script cannot render" >&2
+      exit 1
+    fi
+    # Flux's default release name is <targetNamespace>-<name>.
+    release="${release:-${target_ns:+$target_ns-}$name}"
     url="$(REPO="$repo" yq -r 'select(.kind == "HelmRepository" and .metadata.name == strenv(REPO)) | .spec.url' "${flux_files[@]}" | head -n 1)"
     if [[ -z "$url" ]]; then
       echo "HelmRelease '$name' references missing HelmRepository: $repo" >&2
       exit 1
     fi
-    render_chart "helm-$name" "$release" "$chart" "$url" "$version" "$namespace" \
+    render_chart "helm-$name" "$release" "$chart" "$url" "$version" "${target_ns:-$own_ns}" \
       "$(NAME="$name" yq 'select(.kind == "HelmRelease" and .metadata.name == strenv(NAME)) | .spec.values // {}' "${flux_files[@]}")"
-  done < <(yq -r 'select(.kind == "HelmRelease") | [.metadata.name, (.spec.releaseName // .metadata.name), .spec.chart.spec.chart, .spec.chart.spec.version, .spec.chart.spec.sourceRef.name, (.spec.targetNamespace // .metadata.namespace)] | @tsv' "${flux_files[@]}")
+  done <<<"$releases"
 fi

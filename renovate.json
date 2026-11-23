@@ -126,10 +126,7 @@
     {
       "description": "The monitoring stack reports on the other updates, so review its own",
       "matchFileNames": [
-        "k8s/monitoring/alloy.yaml",
-        "k8s/monitoring/kube-prometheus-stack.yaml",
-        "k8s/monitoring/loki.yaml",
-        "k8s/monitoring/tempo.yaml"
+        "k8s/monitoring/**"
       ],
       "automerge": false
     }

@@ -6,8 +6,9 @@ metadata:
 spec:
   interval: 10m
   retryInterval: 1m
-  # kube-prometheus-stack can take a while to roll out.
-  timeout: 15m
+  # Each HelmRelease may take its own 10m timeout, and loki, tempo and alloy
+  # wait for kube-prometheus-stack.
+  timeout: 30m
   sourceRef:
     kind: GitRepository
     name: flux-system
