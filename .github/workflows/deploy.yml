@@ -617,12 +617,6 @@ jobs:
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
           TF_VAR_cloudflare_api_token: ${{ env.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_refinery_postgres_password: ${{ secrets.REFINERY_POSTGRES_PASSWORD }}
-          TF_VAR_refinery_encryption_key: ${{ secrets.REFINERY_ENCRYPTION_KEY }}
-          TF_VAR_refinery_github_client_secret: ${{ secrets.REFINERY_GITHUB_CLIENT_SECRET }}
-          TF_VAR_refinery_linkedin_client_secret: ${{ secrets.REFINERY_LINKEDIN_CLIENT_SECRET }}
-          TF_VAR_refinery_zero_admin_password: ${{ secrets.REFINERY_ZERO_ADMIN_PASSWORD }}
-          TF_VAR_refinery_zero_postgres_password: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
           TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
@@ -738,12 +732,6 @@ jobs:
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
           TF_VAR_cloudflare_api_token: ${{ env.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_refinery_postgres_password: ${{ secrets.REFINERY_POSTGRES_PASSWORD }}
-          TF_VAR_refinery_encryption_key: ${{ secrets.REFINERY_ENCRYPTION_KEY }}
-          TF_VAR_refinery_github_client_secret: ${{ secrets.REFINERY_GITHUB_CLIENT_SECRET }}
-          TF_VAR_refinery_linkedin_client_secret: ${{ secrets.REFINERY_LINKEDIN_CLIENT_SECRET }}
-          TF_VAR_refinery_zero_admin_password: ${{ secrets.REFINERY_ZERO_ADMIN_PASSWORD }}
-          TF_VAR_refinery_zero_postgres_password: ${{ secrets.REFINERY_ZERO_POSTGRES_PASSWORD }}
           TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}

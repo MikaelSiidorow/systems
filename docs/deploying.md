@@ -15,8 +15,8 @@ NixOS (k3s.nix)                              OpenTofu (tofu/k8s/)
   v
 ArgoCD auto-syncs from git
   |
-  |-- k8s/apps/refinery.yaml  -->  k8s/refinery/*.yaml
   |-- k8s/apps/wger.yaml      -->  k8s/wger/*.yaml
+Flux (k8s/clusters/olympus/) syncs k8s/refinery, k8s/gatus, k8s/headscale, ...
 ```
 
 **Separation of concerns:**
@@ -80,7 +80,7 @@ tofu  →  nixos  →  k8s-tofu
 4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
 5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
 
-K8s manifest changes (`k8s/refinery/`, `k8s/wger/`) are deployed by ArgoCD within ~3 minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
+K8s manifest changes are deployed by Flux (`k8s/refinery/`, `k8s/gatus/`, `k8s/headscale/`) or ArgoCD (`k8s/wger/`) within a few minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
 
 Hestia is deployed independently from a machine that can resolve and reach
 `hestia.home.arpa`. Deployment uses the normal user and prompts for sudo:
@@ -163,7 +163,7 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 - **`infra/secrets/ci.yaml`** (SOPS): secrets that CI and you both need, one environment variable per key: the OpenTofu state passphrase, the provider tokens (`HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `SCW_SECRET_KEY`) and the R2 state credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Values must be single-line and free of `%`. Encrypted to your post-quantum age key and to CI's, whose private half is the `SOPS_AGE_KEY` Actions secret. `.github/scripts/ci-secrets.sh` loads it into a job. Edit with `sops infra/secrets/ci.yaml`.
 - **`infra/secrets/olympus.yaml`** (SOPS): secrets olympus itself needs: the passwords of the `refinery`, `zero` and `wger` database roles. sops-nix decrypts it on the host and a unit sets the role passwords whenever the file changes. Encrypted to your post-quantum age key and to olympus's. The cluster's Secrets carry the same passwords (`k8s/refinery/refinery-secrets.sops.yaml` for `refinery` and `zero`, the `WGER_POSTGRES_PASSWORD` Actions secret for `wger`), so rotating one means changing both places.
 - **olympus's age key**: olympus makes its own post-quantum age key at `/var/lib/sops-nix/key.txt` the first time it boots without one, for sops-nix and Flux (`flux-sops-age.service` and `flux-sops-age.path` sync it into `flux-system/sops-age` at boot and whenever the file changes). The key stays on olympus, though the `flux-system/sops-age` copy is readable by cluster-admin controllers; give Flux a separate age key if `olympus.yaml` ever holds host-only secrets that cluster workloads should not share. The NixOS deploy job prints the public key as `SOPS recipient:`. A rebuilt server makes a new key: put its public key in `.sops.yaml` and run `sops updatekeys infra/secrets/olympus.yaml` plus `sops updatekeys` on every `k8s/**/*.sops.yaml` file.
-- **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`REFINERY_*`, `WGER_*`)
+- **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`WGER_*`; the `REFINERY_*` ones are unused since refinery moved to Flux and can be deleted)
 - **GitHub Actions variables**: `K3S_HOST`
 - **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
 - **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (`gatus-telegram-token` and `refinery-secrets` have moved; rotating the shared Telegram bot token currently updates `k8s/gatus/gatus-telegram-token.sops.yaml` followed by a `gatus` rollout, plus the `TELEGRAM_BOT_TOKEN` Actions secret followed by dispatching the **Deploy** workflow with component `k8s-tofu` for Alertmanager). `k8s/**/secrets.yaml` is gitignored.

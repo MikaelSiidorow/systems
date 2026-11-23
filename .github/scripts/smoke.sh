@@ -13,6 +13,8 @@ readonly sync_timeout=600
 readonly rollout_timeout=600
 # Crash-looping containers restart within this window.
 readonly watch_seconds=120
+# Prints the keys of a Secret whose value is empty or still SOPS ciphertext.
+readonly secret_template='{{range $k, $v := .data}}{{$d := base64decode $v}}{{if or (eq (len $d) 0) (eq (printf "%.4s" $d) "ENC[")}}{{$k}}{{"\n"}}{{end}}{{end}}'
 
 if [[ ! "$k3s_host" =~ ^[A-Za-z0-9.:-]+$ ]]; then
   echo "K3S_HOST contains unsupported characters." >&2
@@ -106,7 +108,7 @@ echo "::endgroup::"
 # FluxInstance and every expected Flux Kustomization must be Ready at this
 # commit or newer (including SOPS decryption).
 flux_synced() {
-  local flux_ready ks_json ks root_rev expected name ready revision message rev secret_ids secrets_json secret_problems bad=0
+  local flux_ready ks_json ks root_rev expected name ready revision message rev secret_ids ns secret_name secret_problems bad=0
   flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
     jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
   if [ "$flux_ready" != True ]; then
@@ -171,27 +173,26 @@ flux_synced() {
     fi
   done <<<"$ks"
   # Every Secret a Kustomization applied must exist with every value set and
-  # decrypted. Only names and keys are printed, never values.
+  # decrypted. olympus checks the values itself, so they never leave the host;
+  # only names and keys are printed.
   secret_ids=$(jq -r '
     .items[].status.inventory.entries[]?.id
-    | select(endswith("__Secret"))' <<<"$ks_json") || return 1
-  if [ -n "$secret_ids" ]; then
-    secrets_json=$(kubectl get secrets -A -o json 2>/dev/null) || return 1
-    secret_problems=$(jq -r --arg ids "$secret_ids" '
-      ($ids | split("\n") | map(select(length > 0))) as $wanted
-      | (.items | map({key: "\(.metadata.namespace)_\(.metadata.name)__Secret", value: .}) | from_entries) as $have
-      | $wanted[]
-      | . as $id
-      | if $have[$id] == null then "\($id | rtrimstr("__Secret") | sub("_"; "/")): missing"
-        else $have[$id].data // {} | to_entries[]
-          | select((.value | @base64d) as $v | ($v | length) == 0 or ($v | startswith("ENC[")))
-          | "\($id | rtrimstr("__Secret") | sub("_"; "/")): \(.key) is empty or still encrypted"
-        end' <<<"$secrets_json") || return 1
-    if [ -n "$secret_problems" ]; then
-      echo "$secret_problems"
+    | select(endswith("__Secret"))
+    | rtrimstr("__Secret")' <<<"$ks_json") || return 1
+  while IFS=_ read -r ns secret_name; do
+    [ -n "$ns" ] || continue
+    # Kubernetes names hold no spaces or quotes, but quote them for the remote
+    # shell anyway.
+    # shellcheck disable=SC2029
+    if ! secret_problems=$(ssh "${ssh_options[@]}" "root@$k3s_host" \
+      "k3s kubectl -n $(printf %q "$ns") get secret $(printf %q "$secret_name") -o go-template=$(printf %q "$secret_template")"); then
+      echo "$ns/$secret_name: missing"
+      bad=1
+    elif [ -n "$secret_problems" ]; then
+      echo "$secret_problems" | sed "s|^|$ns/$secret_name: |; s|\$| is empty or still encrypted|"
       bad=1
     fi
-  fi
+  done <<<"$secret_ids"
   return "$bad"
 }
 

@@ -6,7 +6,8 @@ metadata:
 spec:
   interval: 10m
   retryInterval: 1m
-  timeout: 5m
+  # refinery-app's startup probe alone allows 5 minutes.
+  timeout: 10m
   sourceRef:
     kind: GitRepository
     name: flux-system
