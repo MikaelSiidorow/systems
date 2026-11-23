@@ -29,7 +29,7 @@ Open the description with the problem, from the user's original ask, then the fi
 
 Run the title and body through `unslop`, count the prose outside `<details>` (`wc -w`) and cut to the budget, then check them and every capture you attach for secrets, customer data and private details.
 
-Open it as a draft: `gh pr create --draft`, with `--attach './before.png#alt text'` for each embedded file (`gh pr edit` takes it too); if it exits non-zero, check for a printed PR URL before retrying. If GraphQL is rate-limited, use `gh api repos/<owner>/<repo>/pulls -f title=… -f head=… -f base=… -F draft=true -F body=@<file>`, then add the images with `gh pr edit --attach`. Report the URL and any template section only the user can fill.
+Open it as a draft: `gh pr create --draft`, with `--attach './before.png#alt text'` for each embedded file (`gh pr edit` takes it too); if it exits non-zero, check for a printed PR URL before retrying. If GraphQL is rate-limited, use `gh api repos/<owner>/<repo>/pulls -f title=… -f head=… -f base=… -F draft=true -F body=@<file>`, with each image reference as a placeholder until GraphQL recovers and `gh pr edit --attach` can add it. Report the URL and any template section only the user can fill.
 
 ---
 
