@@ -19,7 +19,7 @@ Everything else waits for review: majors, the monitoring stack, other `infra/**`
 - `tofu/*`, `tofu/k8s/*`: `tofu apply`. Read the plan in the PR's CI report comment.
 - `openwrt/**`: builds only; router deploys are manual.
 
-`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus and deploy `main` as it is, so a run can include later merges.
+`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `deploy.yml` itself or `.github/scripts/reconcile-wger.sh`, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus. Each deploys the commit that triggered it, and a run that waited behind a newer commit skips.
 
 ## Known failures
 

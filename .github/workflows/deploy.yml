@@ -530,7 +530,7 @@ jobs:
                     echo "The newer $last started deploying but has not switched; fix or re-run it." >&2
                     exit 1
                   fi
-                  echo "olympus already runs the newer $last; skipping $rev"
+                  echo "olympus already runs the newer $last; skipping $rev. If main was force-pushed back to $rev, delete /var/lib/nixos-deploy on olympus and re-run."
                   exit 0
                   ;;
                 *)
@@ -544,7 +544,9 @@ jobs:
           echo "Deploying $rev"
           # Recorded before switching, so a waiting older run never switches
           # over this one, even if this switch fails partway.
-          if [ "$on_main" = true ]; then record "$started"; else rm -f "$switched"; fi
+          # Cleared before any switch, so a failed one never counts as switched.
+          rm -f "$switched"
+          if [ "$on_main" = true ]; then record "$started"; fi
           nix-env --profile /nix/var/nix/profiles/system --set "$system"
           systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password \
             --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration \
