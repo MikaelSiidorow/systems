@@ -27,13 +27,21 @@ olympus's. Edit them with `sops <file>`:
   copied from the main OpenTofu root's `wger_email` output; if Scaleway's SMTP
   credentials change there, update this file too.
 
-After changing `wger-secrets`, restart its consumers and rerun the PowerSync
-setup, which Flux otherwise runs only when the Job's spec changes:
+Pods read these Secrets as environment variables, so a change needs a
+restart. After changing `wger-secrets`, rerun the PowerSync setup first, which
+applies the new `powersync_storage` credentials and which Flux otherwise runs
+only when the Job's spec changes, then restart PowerSync:
 
 ```bash
-kubectl -n wger rollout restart deployment/wger-web deployment/wger-celery-worker deployment/wger-celery-beat deployment/wger-powersync
-kubectl -n wger delete job wger-powersync-setup   # Flux recreates and reruns it
+kubectl -n wger rollout restart deployment/wger-web deployment/wger-celery-worker deployment/wger-celery-beat
+kubectl -n wger delete job wger-powersync-setup
+flux reconcile kustomization wger   # recreates and reruns the Job
+kubectl -n wger wait --for=condition=complete job/wger-powersync-setup --timeout=10m
+kubectl -n wger rollout restart deployment/wger-powersync
 ```
+
+After changing only `wger-email`, restart `wger-web`, `wger-celery-worker` and
+`wger-celery-beat`.
 
 For a new deployment, generate the passwords and Django key locally:
 
@@ -55,11 +63,13 @@ decoding them into `wger-secrets`.
 
 ## Rollout
 
-The main-branch workflow applies the components in this order:
+Pushing to `main` brings wger up in this order:
 
-1. Terraform creates the DNS record.
-2. NixOS creates the `wger` database and role and sets the role's password.
-3. Flux applies `k8s/wger`: the namespace, database Service, Secrets and
+1. The deploy workflow's Terraform creates the DNS record.
+2. Its NixOS deploy creates the `wger` database and role and sets the role's
+   password.
+3. Flux, independently, applies `k8s/wger`; its Jobs keep retrying until step 2
+   is done: the namespace, database Service, Secrets and
    workloads, plus two Jobs that wait for wger-web's migrations, then configure
    PowerSync and replace wger's known bootstrap administrator password. The
    `wger` Kustomization is Ready only once both Jobs have completed.
@@ -68,7 +78,11 @@ The main-branch workflow applies the components in this order:
 
 Kustomize adds a content hash to `wger-config`. Any environment, nginx, Redis,
 or PowerSync configuration change therefore updates pod templates and rolls
-all consumers automatically.
+all consumers automatically, and makes Flux recreate and rerun both Jobs.
+
+If a Job fails for good (its retries or its hour run out), `wger` stays not
+Ready and Flux leaves the Job alone. Fix the cause, then
+`kubectl -n wger delete job <name>` and Flux runs it again.
 
 The first sync can take several minutes while wger runs migrations, collects
 static files, and schedules reference-data imports.

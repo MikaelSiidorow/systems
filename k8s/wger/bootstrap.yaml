@@ -23,7 +23,7 @@ spec:
             - /bin/sh
             - -c
           args:
-            - until python3 manage.py migrate --check >/dev/null 2>&1; do sleep 10; done
+            - until python3 manage.py migrate --check >/dev/null; do echo "Waiting for wger-web's migrations"; sleep 10; done
           envFrom:
             - configMapRef:
                 name: wger-config
