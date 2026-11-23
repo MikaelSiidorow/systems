@@ -120,7 +120,7 @@ Refinery application releases do not require per-build image tag commits in this
      --flake ./infra#olympus --target-host root@<IP>
    ```
 
-4. The new server makes a new age key, so Flux can't decrypt the Secrets yet. Put the `SOPS recipient:` the NixOS deploy printed into `.sops.yaml` as `&olympus`, run `sops updatekeys` on `infra/secrets/olympus.yaml` and every `k8s/**/*.sops.yaml`, and push.
+4. The new server makes a new age key, so Flux can't decrypt the Secrets yet. Read its public key with `ssh root@<IP> age-keygen -y /var/lib/sops-nix/key.txt`, put it into `.sops.yaml` as `&olympus`, run `sops updatekeys` on `infra/secrets/olympus.yaml` and every `k8s/**/*.sops.yaml`, and push.
 
 5. Verify Flux synced the apps:
    ```bash

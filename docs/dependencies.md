@@ -19,7 +19,7 @@ Everything else waits for review: majors, the monitoring stack, other `infra/**`
 - `tofu/*`: `tofu apply`. Read the plan in the PR's CI report comment.
 - `openwrt/**`: builds only; router deploys are manual.
 
-`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, or `deploy.yml` itself, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus. Each deploys the commit that triggered it, and a run that waited behind a newer commit skips if olympus runs it, and fails otherwise.
+`deploy.yml` runs on pushes touching `infra/nixos/**`, `infra/flake.*`, `tofu/**`, `.sops.yaml`, `k8s/**` (smoke only) or `deploy.yml` itself, so an Actions bump to `deploy.yml` redeploys NixOS. NixOS deploys queue on a lock on olympus. Each deploys the commit that triggered it, and a run that waited behind a newer commit skips if olympus runs it, and fails otherwise.
 
 ## Known failures
 
