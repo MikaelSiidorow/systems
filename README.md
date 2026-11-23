@@ -11,7 +11,7 @@ Configuration for my machines, servers and the services on them: workstations, c
 ## Infrastructure
 
 - [`infra/`](infra/): NixOS flake for the Hetzner K3s host (`olympus`) and [Hestia](infra/nixos/hosts/hestia/README.md), the home server running Home Assistant and the Tailscale subnet router. Host secrets are SOPS-encrypted.
-- [`k8s/`](k8s/): manifests synced from Git — ArgoCD (`k8s/apps/`) currently manages Refinery, [wger](docs/wger.md), Headscale ingress and the [observability stack](docs/observability.md), while Flux (`k8s/clusters/olympus/`) runs alongside it for the migration and manages the Flux Operator status UI (`k8s/flux-ui/`).
+- [`k8s/`](k8s/): manifests synced from Git — ArgoCD (`k8s/apps/`) currently manages Refinery, [wger](docs/wger.md), Headscale ingress and the [observability stack](docs/observability.md), while Flux (`k8s/clusters/olympus/`) runs alongside it and manages the Flux Operator status UI (`k8s/flux-ui/`) and Gatus (`k8s/gatus/`).
 - [`tofu/`](tofu/): OpenTofu for the Hetzner server and Cloudflare DNS; `tofu/k8s/` manages cluster secrets, the part that can't live in Git.
 - [`openwrt/`](openwrt/): firmware builds and UCI config for the [Cerberus router](openwrt/r6220/README.md) and the [Hermes access point](openwrt/archer-c6-v2/README.md).
 

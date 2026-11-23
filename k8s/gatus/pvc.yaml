@@ -3,8 +3,6 @@ kind: PersistentVolumeClaim
 metadata:
   name: gatus-data
   namespace: gatus
-  annotations:
-    argocd.argoproj.io/sync-options: Delete=false
 spec:
   accessModes:
     - ReadWriteOnce

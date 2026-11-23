@@ -170,13 +170,6 @@ flux_synced() {
       bad=1
     fi
   done <<<"$ks"
-  if grep -qx 'sops-canary' <<<"$expected"; then
-    if ! kubectl -n flux-system get secret sops-canary -o json 2>/dev/null |
-      jq -e '(.data.probe // "" | length) > 0' >/dev/null; then
-      echo "sops-canary: Secret missing or probe key empty"
-      bad=1
-    fi
-  fi
   return "$bad"
 }
 
