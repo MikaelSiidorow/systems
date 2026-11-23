@@ -479,13 +479,15 @@ jobs:
       # such as sops-install-secrets, from here. A GC root keeps the copy alive
       # while the deploy below waits for the lock, and the last step removes it.
       # Should GC win the race before the root exists, realising it fails here.
+      # CI's own builds are unsigned; olympus accepts them because root is a
+      # trusted user there.
       - name: Copy config to olympus
         id: copy
         env:
           NIX_SSHOPTS: -o ServerAliveInterval=30
           SYSTEM: ${{ steps.build.outputs.system }}
         run: |
-          nix copy --to "ssh-ng://root@$K3S_HOST" --substitute-on-destination "$SYSTEM"
+          nix copy --to "ssh-ng://root@$K3S_HOST" --substitute-on-destination --no-check-sigs "$SYSTEM"
           ssh "root@$K3S_HOST" mkdir -p /nix/var/nix/gcroots/ci-deploy '&&' \
             nix-store --realise "$SYSTEM" --add-root "/nix/var/nix/gcroots/ci-deploy/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" '>' /dev/null
       # Two switches at once fail on a transient systemd unit, so runs queue on a
