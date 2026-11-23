@@ -90,7 +90,7 @@ spec:
                       - alert: ApplicationError
                         expr: |
                           sum by (namespace, app, level) (
-                            count_over_time({namespace=~"refinery|brawl-draft"} | json | level=~"error|fatal" [1m])
+                            count_over_time({namespace="refinery"} | json | level=~"error|fatal" [1m])
                           ) > 0
                         for: 0m
                         labels:
