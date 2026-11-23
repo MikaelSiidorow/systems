@@ -436,14 +436,36 @@ jobs:
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         run: tofu apply -auto-approve -lock-timeout=10m tfplan
   nixos:
-    needs: [changes, tofu]
+    needs: [changes, tofu, nix-cache]
     if: |
       always() &&
       (needs.tofu.result == 'success' || needs.tofu.result == 'skipped') &&
+      (needs.nix-cache.result == 'success' || needs.nix-cache.result == 'skipped') &&
       ((github.event_name == 'push' && needs.changes.outputs.nixos == 'true') ||
       (github.event_name == 'workflow_dispatch' && contains(fromJSON('["nixos", "all"]'), github.event.inputs.component)))
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+      # nix-cache saved this store for the same commit, so the build below
+      # mostly finds everything already there.
+      - name: Restore Nix store
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          save: false
+      # olympus has too little memory to build its own system: compiling
+      # sops-install-secrets there on 2026-11-23 thrashed it for 25 minutes.
+      - name: Build olympus config
+        id: build
+        run: |
+          system=$(nix build ./infra#nixosConfigurations.olympus.config.system.build.toplevel --no-link --print-out-paths)
+          echo "system=$system" >> "$GITHUB_OUTPUT"
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -451,30 +473,41 @@ jobs:
           echo "${{ secrets.K3S_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           echo "$K3S_HOST $K3S_HOST_KEY" >> ~/.ssh/known_hosts
+      # olympus fetches what it can from its own caches and takes the rest,
+      # such as sops-install-secrets, from here.
+      - name: Copy config to olympus
+        env:
+          NIX_SSHOPTS: -o ServerAliveInterval=30
+          SYSTEM: ${{ steps.build.outputs.system }}
+        run: nix copy --to "ssh-ng://root@$K3S_HOST" --substitute-on-destination "$SYSTEM"
       # Two switches at once fail on a transient systemd unit, so runs queue on a
-      # lock on the host. Runs on main deploy main as it is once the lock is held,
-      # so a run that waited never rolls back a newer one. The cost: an older run
-      # can deploy a newer commit's NixOS change before that commit's tofu
-      # job has applied; the newer run's own deploy follows once it has.
-      # Resolve main to a commit with git: when the GitHub API fails, Nix falls
-      # back to its cached resolution of github:...main and redeploys an
-      # older commit without failing.
+      # lock on the host. The host records the commit time of what it last
+      # deployed, and a run that waited behind a newer commit skips rather than
+      # roll it back; main is linear, so the newer system includes its change.
+      # systemd-run, as nixos-rebuild does, lets the switch finish if SSH drops.
       - name: Deploy NixOS
         env:
-          REF: ${{ github.ref == 'refs/heads/main' && 'main' || github.sha }}
+          SYSTEM: ${{ steps.build.outputs.system }}
         run: |
-          ssh -o ServerAliveInterval=30 root@${{ env.K3S_HOST }} flock -w 1800 /run/nixos-deploy.lock bash -s -- "$REF" <<'EOF'
+          committed=$(git log -1 --format=%ct HEAD)
+          ssh -o ServerAliveInterval=30 "root@$K3S_HOST" flock -w 1800 /run/nixos-deploy.lock bash -s -- "$SYSTEM" "$GITHUB_SHA" "$committed" <<'EOF'
           set -euo pipefail
-          rev=$1
-          if [ "$rev" = main ]; then
-            rev=$(git ls-remote https://github.com/MikaelSiidorow/systems refs/heads/main | cut -f1)
-          fi
-          if [[ ! "$rev" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Could not resolve main: $rev" >&2
-            exit 1
+          system=$1 rev=$2 committed=$3
+          state=/var/lib/nixos-deploy/last
+          if [ -f "$state" ]; then
+            read -r last_committed last_rev < "$state"
+            if [ "$committed" -lt "$last_committed" ]; then
+              echo "olympus already runs the newer $last_rev; skipping $rev"
+              exit 0
+            fi
           fi
           echo "Deploying $rev"
-          nixos-rebuild switch --flake "github:MikaelSiidorow/systems/$rev?dir=infra#olympus"
+          nix-env --profile /nix/var/nix/profiles/system --set "$system"
+          systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password \
+            --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration \
+            "$system/bin/switch-to-configuration" switch
+          mkdir -p "$(dirname "$state")"
+          echo "$committed $rev" > "$state"
           # The public half of the host's age key, for .sops.yaml.
           recipient=$(age-keygen -y /var/lib/sops-nix/key.txt)
           echo "SOPS recipient: $recipient"

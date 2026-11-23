@@ -15,7 +15,7 @@ Everything else waits for review: majors, the monitoring stack, other `infra/**`
 ## What a merge deploys
 
 - `k8s/**`: Argo CD syncs it; there is no workflow run, so wait for the app to reach the new revision.
-- `infra/**`: `nixos-rebuild switch` on olympus through `deploy.yml`. Hestia is never deployed by CI; tell the user to deploy it.
+- `infra/**`: `deploy.yml` builds olympus's system in CI, copies it over and switches to it. Hestia is never deployed by CI; tell the user to deploy it.
 - `tofu/*`, `tofu/k8s/*`: `tofu apply`. Read the plan in the PR's CI report comment.
 - `openwrt/**`: builds only; router deploys are manual.
 
