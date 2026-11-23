@@ -453,7 +453,8 @@ jobs:
           nix_conf: |
             experimental-features = nix-command flakes
       # The store nix-cache saved holds the same inputs, so the build below
-      # mostly reuses it. The toplevel itself embeds the commit and is rebuilt.
+      # mostly reuses it. The toplevel embeds the commit, so a store from another
+      # commit rebuilds it.
       - name: Restore Nix store
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
@@ -476,7 +477,8 @@ jobs:
           echo "$K3S_HOST $K3S_HOST_KEY" >> ~/.ssh/known_hosts
       # olympus fetches what it can from its own caches and takes the rest,
       # such as sops-install-secrets, from here. A GC root keeps the copy alive
-      # while the deploy below waits for the lock; the deploy removes it.
+      # while the deploy below waits for the lock, and the last step removes it.
+      # Should GC win the race before the root exists, realising it fails here.
       - name: Copy config to olympus
         env:
           NIX_SSHOPTS: -o ServerAliveInterval=30
@@ -484,13 +486,15 @@ jobs:
         run: |
           nix copy --to "ssh-ng://root@$K3S_HOST" --substitute-on-destination "$SYSTEM"
           ssh "root@$K3S_HOST" mkdir -p /nix/var/nix/gcroots/ci-deploy '&&' \
-            ln -sfn "$SYSTEM" "/nix/var/nix/gcroots/ci-deploy/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            nix-store --realise "$SYSTEM" --add-root "/nix/var/nix/gcroots/ci-deploy/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" '>' /dev/null
       # Two switches at once fail on a transient systemd unit, so runs queue on a
       # lock on the host. Runs on main must not roll back a newer main deploy:
-      # the host records the last commit it started deploying from main and, using
-      # GitHub's compare API, skips a commit that is behind it. Re-runs of the
-      # same commit deploy again. A manual dispatch of another branch always
-      # deploys and leaves the record alone, so the next main run restores main.
+      # the host records the last commit it started deploying from main, and the
+      # last one that switched successfully. Using GitHub's compare API, it skips
+      # a commit that is behind the started one, but only succeeds once that
+      # newer commit has switched; until then k8s-tofu must not run. Re-runs of
+      # the same commit deploy again. A manual dispatch of another branch always
+      # deploys and leaves the records alone, so the next main run restores main.
       # systemd-run, as nixos-rebuild does, lets the switch finish if SSH drops.
       - name: Deploy NixOS
         env:
@@ -498,23 +502,36 @@ jobs:
           ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
         run: |
           ssh -o ServerAliveInterval=30 "root@$K3S_HOST" flock -w 1800 /run/nixos-deploy.lock bash -s -- \
-            "$SYSTEM" "$GITHUB_SHA" "$ON_MAIN" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" <<'EOF'
+            "$SYSTEM" "$GITHUB_SHA" "$ON_MAIN" "$GITHUB_REPOSITORY" <<'EOF'
           set -euo pipefail
-          system=$1 rev=$2 on_main=$3 repo=$4 run=$5
-          trap 'rm -f "/nix/var/nix/gcroots/ci-deploy/$run"' EXIT
-          state=/var/lib/nixos-deploy/main
-          if [ "$on_main" = true ] && [ -f "$state" ]; then
-            last=$(cat "$state")
+          system=$1 rev=$2 on_main=$3 repo=$4
+          started=/var/lib/nixos-deploy/main-started
+          switched=/var/lib/nixos-deploy/main-switched
+          record() {
+            mkdir -p "$(dirname "$1")"
+            echo "$rev" > "$1.tmp"
+            mv "$1.tmp" "$1"
+          }
+          if [ "$on_main" = true ] && [ -f "$started" ]; then
+            last=$(cat "$started")
             if [ "$last" != "$rev" ]; then
-              status=$(curl -fsS --retry 3 "https://api.github.com/repos/$repo/compare/$last...$rev" | jq -r .status)
+              if ! status=$(curl -fsS --max-time 20 --retry 3 --retry-max-time 60 \
+                "https://api.github.com/repos/$repo/compare/$last...$rev" | jq -er .status); then
+                echo "Could not ask GitHub how $rev relates to the last deploy, $last; re-run later." >&2
+                exit 1
+              fi
               case $status in
                 ahead) ;;
                 behind)
-                  echo "olympus already deployed the newer $last; skipping $rev"
+                  if [ "$(cat "$switched" 2>/dev/null)" != "$last" ]; then
+                    echo "The newer $last started deploying but has not switched; fix or re-run it." >&2
+                    exit 1
+                  fi
+                  echo "olympus already runs the newer $last; skipping $rev"
                   exit 0
                   ;;
                 *)
-                  echo "$rev is $status relative to the last deploy, $last. If main was rewritten, delete $state on olympus and re-run." >&2
+                  echo "$rev is $status relative to the last deploy, $last. If main was rewritten, delete $started on olympus and re-run." >&2
                   exit 1
                   ;;
               esac
@@ -522,21 +539,21 @@ jobs:
           fi
           test -x "$system/bin/switch-to-configuration"
           echo "Deploying $rev"
-          # Record before switching, so a waiting older run skips even if this
-          # switch fails partway.
-          if [ "$on_main" = true ]; then
-            mkdir -p "$(dirname "$state")"
-            echo "$rev" > "$state.tmp"
-            mv "$state.tmp" "$state"
-          fi
+          # Recorded before switching, so a waiting older run never switches
+          # over this one, even if this switch fails partway.
+          if [ "$on_main" = true ]; then record "$started"; fi
           nix-env --profile /nix/var/nix/profiles/system --set "$system"
           systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password \
             --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration \
             "$system/bin/switch-to-configuration" switch
+          if [ "$on_main" = true ]; then record "$switched"; fi
           # The public half of the host's age key, for .sops.yaml.
           recipient=$(age-keygen -y /var/lib/sops-nix/key.txt)
           echo "SOPS recipient: $recipient"
           EOF
+      - name: Remove the GC root
+        if: always() && steps.build.outputs.system != ''
+        run: ssh "root@$K3S_HOST" rm -f "/nix/var/nix/gcroots/ci-deploy/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
   k8s-tofu:
     needs: [changes, tofu, nixos]
     if: |
