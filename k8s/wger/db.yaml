@@ -1,0 +1,22 @@
+# PostgreSQL runs on the host (NixOS), listening on the k3s bridge address.
+# wger reaches it as db.wger.svc.
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: wger
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: db
+  namespace: wger
+subsets:
+  - addresses:
+      - ip: 10.42.0.1
+    ports:
+      - port: 5432

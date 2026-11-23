@@ -13,7 +13,7 @@ output "k3s_ssh_host" {
 }
 
 output "wger_email" {
-  description = "SMTP settings projected into the wger-email Kubernetes Secret."
+  description = "SMTP settings; k8s/wger/wger-email.sops.yaml holds a copy for wger."
   sensitive   = true
   # Keep the handoff atomic during a partial apply: until the API key exists,
   # the whole output is unknown instead of exposing a partially known map.

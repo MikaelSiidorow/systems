@@ -4,14 +4,38 @@ metadata:
   name: wger-powersync-setup
   namespace: wger
   annotations:
-    argocd.argoproj.io/hook: Sync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
-    argocd.argoproj.io/sync-wave: "1"
+    # Jobs are immutable: Flux recreates, and so reruns, this one whenever its
+    # spec changes. Delete it to rerun it with the same spec.
+    kustomize.toolkit.fluxcd.io/force: enabled
 spec:
   backoffLimit: 5
+  activeDeadlineSeconds: 3600
   template:
     spec:
       restartPolicy: OnFailure
+      # wger-web migrates the database when it starts; Argo CD used to run
+      # this Job only after wger-web was healthy. Wait for the migrations here.
+      initContainers:
+        - name: wait-for-migrations
+          image: ghcr.io/mikaelsiidorow/wger:production
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - until python3 manage.py migrate --check >/dev/null; do echo "Waiting for wger-web's migrations"; sleep 10; done
+          envFrom:
+            - configMapRef:
+                name: wger-config
+            - secretRef:
+                name: wger-secrets
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 384Mi
       containers:
         - name: setup
           image: ghcr.io/mikaelsiidorow/wger:production
@@ -35,8 +59,6 @@ kind: Deployment
 metadata:
   name: wger-powersync
   namespace: wger
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   replicas: 1
   strategy:
@@ -118,8 +140,6 @@ kind: CronJob
 metadata:
   name: wger-powersync-compact
   namespace: wger
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   schedule: "0 3 * * *"
   timeZone: Europe/Helsinki

@@ -4,7 +4,6 @@ metadata:
   name: wger
   namespace: wger
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik

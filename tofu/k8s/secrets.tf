@@ -43,79 +43,65 @@ removed {
   }
 }
 
-resource "kubernetes_namespace_v1" "wger" {
-  metadata {
-    name = "wger"
-  }
+# Managed by Flux (k8s/wger/namespace.yaml).
+removed {
+  from = kubernetes_namespace_v1.wger
 
   lifecycle {
-    prevent_destroy = true
+    destroy = false
   }
 }
 
-import {
-  to = kubernetes_namespace_v1.wger
-  id = "wger"
-}
+# Managed by Flux (k8s/wger/db.yaml).
+removed {
+  from = kubernetes_service_v1.wger_db
 
-resource "kubernetes_service_v1" "wger_db" {
-  metadata {
-    name      = "db"
-    namespace = kubernetes_namespace_v1.wger.metadata[0].name
-  }
-
-  spec {
-    port {
-      port        = 5432
-      target_port = 5432
-    }
+  lifecycle {
+    destroy = false
   }
 }
 
-resource "kubernetes_endpoints_v1" "wger_db" {
-  metadata {
-    name      = kubernetes_service_v1.wger_db.metadata[0].name
-    namespace = kubernetes_namespace_v1.wger.metadata[0].name
-  }
+# Managed by Flux (k8s/wger/db.yaml).
+removed {
+  from = kubernetes_endpoints_v1.wger_db
 
-  subset {
-    address {
-      ip = "10.42.0.1"
-    }
-
-    port {
-      port = 5432
-    }
+  lifecycle {
+    destroy = false
   }
 }
 
-resource "random_password" "wger_admin" {
-  length  = 32
-  special = false
-}
+# No longer generated; its value is in k8s/wger/wger-admin-bootstrap.sops.yaml.
+removed {
+  from = random_password.wger_admin
 
-resource "kubernetes_secret_v1" "wger_admin_bootstrap" {
-  metadata {
-    name      = "wger-admin-bootstrap"
-    namespace = kubernetes_namespace_v1.wger.metadata[0].name
-  }
-
-  data = {
-    ADMIN_PASSWORD = random_password.wger_admin.result
+  lifecycle {
+    destroy = false
   }
 }
 
-resource "kubernetes_secret_v1" "wger_secrets" {
-  metadata {
-    name      = "wger-secrets"
-    namespace = kubernetes_namespace_v1.wger.metadata[0].name
-  }
+# Managed by Flux (k8s/wger/wger-admin-bootstrap.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.wger_admin_bootstrap
 
-  data = {
-    SECRET_KEY        = var.wger_secret_key
-    JWT_PUBLIC_KEY    = var.wger_jwt_public_key
-    JWT_PRIVATE_KEY   = var.wger_jwt_private_key
-    PS_DATABASE_URI   = "postgresql://wger:${urlencode(var.wger_postgres_password)}@db:5432/wger"
-    PS_STORAGE_PG_URI = "postgresql://powersync_storage:${urlencode(var.wger_powersync_password)}@db:5432/wger"
+  lifecycle {
+    destroy = false
+  }
+}
+
+# Managed by Flux (k8s/wger/wger-secrets.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.wger_secrets
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+# Managed by Flux (k8s/wger/wger-email.sops.yaml).
+removed {
+  from = kubernetes_secret_v1.wger_email
+
+  lifecycle {
+    destroy = false
   }
 }

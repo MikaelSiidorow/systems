@@ -26,7 +26,6 @@ on:
       - "infra/secrets/ci.yaml"
       - ".github/scripts/ci-secrets.sh"
       - ".github/workflows/deploy.yml"
-      - ".github/scripts/reconcile-wger.sh"
       # Argo CD deploys these; the smoke job checks the result.
       - "k8s/**"
       - ".github/scripts/smoke.sh"
@@ -79,7 +78,6 @@ jobs:
               - 'infra/secrets/olympus.yaml'
               - '.github/scripts/ci-secrets.sh'
               - '.github/workflows/deploy.yml'
-              - '.github/scripts/reconcile-wger.sh'
   nixos-preview:
     needs: changes
     if: |
@@ -595,11 +593,6 @@ jobs:
           ssh -fN -L 6443:127.0.0.1:6443 root@${{ env.K3S_HOST }}
           ssh root@${{ env.K3S_HOST }} cat /etc/rancher/k3s/k3s.yaml > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
-      - name: Ensure wger namespace exists
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: |
-          ssh root@${{ env.K3S_HOST }} \
-            "k3s kubectl create namespace wger --dry-run=client -o yaml | k3s kubectl apply -f -"
       - name: Tofu Format Check
         id: fmt
         run: tofu fmt -check -recursive
@@ -616,11 +609,6 @@ jobs:
         continue-on-error: true
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
-          TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
-          TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
-          TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
-          TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
-          TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
       - name: Check for infrastructure changes
         id: plan-changes
         if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
@@ -630,28 +618,6 @@ jobs:
             ([(.output_changes // {})[] | select(.actions != ["no-op"])] | length == 0)' >/dev/null; then
             echo "none=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Detect Wger credential changes
-        id: wger-changes
-        if: steps.plan.outcome == 'success'
-        run: |
-          set -o pipefail
-          changed="$(
-            tofu show -json tfplan |
-              jq -r '
-                any(
-                  .resource_changes[]?;
-                  (
-                    .address == "kubernetes_secret_v1.wger_secrets" or
-                    (.address | startswith("kubernetes_secret_v1.wger_email"))
-                  ) and .change.actions != ["no-op"]
-                )
-              '
-          )"
-          if [[ "$changed" != "true" && "$changed" != "false" ]]; then
-            echo "Unexpected Wger change result: $changed" >&2
-            exit 1
-          fi
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
       - name: Write CI report section
         if: always() && github.event_name == 'pull_request'
         env:
@@ -661,7 +627,6 @@ jobs:
           PLAN: ${{ steps.plan.outcome }}
           PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
           NO_CHANGES: ${{ steps.plan-changes.outputs.none }}
-          WGER_CHANGED: ${{ steps.wger-changes.outputs.changed }}
         run: |
           mark() { case "$1" in success) echo ✅ ;; skipped | "") echo ⏭️ ;; *) echo ❌ ;; esac; }
           if [ "$INIT" != success ] || [ "$VALIDATE" != success ] || [ "$PLAN" != success ]; then
@@ -675,7 +640,6 @@ jobs:
             summary=$(printf '%s\n' "$PLAN_OUTPUT" | grep -oE '[0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy' | head -1)
             summary=${summary:-changes}
           fi
-          if [ "$WGER_CHANGED" = true ]; then summary="$summary; wger credentials change"; fi
           {
             echo "| Step | Result |"
             echo "|---|---|"
@@ -728,18 +692,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
-          TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
-          TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
-          TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
-          TF_VAR_wger_jwt_public_key: ${{ secrets.WGER_JWT_PUBLIC_KEY }}
-          TF_VAR_wger_jwt_private_key: ${{ secrets.WGER_JWT_PRIVATE_KEY }}
         run: tofu apply -auto-approve -lock-timeout=10m tfplan
-      - name: Reconcile changed wger credentials
-        if: |
-          github.ref == 'refs/heads/main' &&
-          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-          steps.wger-changes.outputs.changed == 'true'
-        run: ../../.github/scripts/reconcile-wger.sh "${{ env.K3S_HOST }}"
   smoke:
     needs: [tofu, nixos, k8s-tofu]
     # Failed or cancelled deploy jobs already fail the run.

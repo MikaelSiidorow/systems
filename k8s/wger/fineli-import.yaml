@@ -3,8 +3,6 @@ kind: CronJob
 metadata:
   name: wger-fineli-import
   namespace: wger
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   # This object is an inert template for an explicitly triggered one-off Job.
   schedule: "0 0 1 1 *"
