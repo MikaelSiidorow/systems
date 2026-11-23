@@ -4,21 +4,6 @@ variable "state_passphrase" {
   description = "Passphrase that encrypts the OpenTofu state and plan files."
 }
 
-variable "cloudflare_api_token" {
-  type      = string
-  sensitive = true
-}
-
-variable "telegram_bot_token" {
-  type      = string
-  sensitive = true
-}
-
-variable "grafana_admin_password" {
-  type      = string
-  sensitive = true
-}
-
 variable "wger_postgres_password" {
   type      = string
   sensitive = true

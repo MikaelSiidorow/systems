@@ -80,7 +80,7 @@ tofu  →  nixos  →  k8s-tofu
 4. **ArgoCD** — automatically syncs `k8s/apps/` → application workloads (no CI needed)
 5. **`smoke`** — waits for ArgoCD to sync the commit and the workloads to roll out, then checks that no container restarts and every Ingress host answers (`.github/scripts/smoke.sh`)
 
-K8s manifest changes are deployed by Flux (`k8s/refinery/`, `k8s/gatus/`, `k8s/headscale/`) or ArgoCD (`k8s/wger/`) within a few minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
+K8s manifest changes are deployed by Flux (`k8s/refinery/`, `k8s/gatus/`, `k8s/headscale/`, `k8s/monitoring/`) or ArgoCD (`k8s/wger/`) within a few minutes of pushing to `main`; the deploy workflow runs only the smoke job for these.
 
 Hestia is deployed independently from a machine that can resolve and reach
 `hestia.home.arpa`. Deployment uses the normal user and prompts for sudo:
@@ -166,7 +166,7 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 - **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App, the Headscale auth key, app secrets (`WGER_*`; the `REFINERY_*` ones are unused since refinery moved to Flux and can be deleted)
 - **GitHub Actions variables**: `K3S_HOST`
 - **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
-- **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (`gatus-telegram-token` and `refinery-secrets` have moved; rotating the shared Telegram bot token currently updates `k8s/gatus/gatus-telegram-token.sops.yaml` followed by a `gatus` rollout, plus the `TELEGRAM_BOT_TOKEN` Actions secret followed by dispatching the **Deploy** workflow with component `k8s-tofu` for Alertmanager). `k8s/**/secrets.yaml` is gitignored.
+- **K8s secrets**: migrating from `tofu/k8s/` (passed as `TF_VAR_*` env vars in CI) into SOPS-encrypted `k8s/**/*.sops.yaml` manifests decrypted by Flux (only wger's are left in `tofu/k8s/`; rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/cert-manager/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
 
 ## OpenTofu state
 

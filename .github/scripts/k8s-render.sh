@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Render every Argo CD app the way Argo CD does, and every k3s HelmChart the
+# Render every Argo CD app the way Argo CD does, every Flux Kustomization and
+# HelmRelease the way Flux does, and every k3s HelmChart the
 # way the k3s helm controller does, into one file per app in <out-dir>.
 #
 # Usage: k8s-render.sh <out-dir>   (run from inside the checkout to render)
@@ -87,4 +88,18 @@ if [[ -d k8s/clusters/olympus ]]; then
       yq 'del(.sops)' "$overlay/base.yaml" >"$out/flux-$name.yaml"
     fi
   done < <(yq -r 'select(.kind == "Kustomization" and .apiVersion == "kustomize.toolkit.fluxcd.io/v1") | [.metadata.name, .spec.path] | @tsv' "$out/flux-cluster.yaml")
+
+  # Render each Flux HelmRelease's chart with its values, the way
+  # helm-controller installs it.
+  flux_files=("$out"/flux-*.yaml)
+  while IFS=$'\t' read -r name release chart version repo namespace; do
+    [[ -n "$name" ]] || continue
+    url="$(REPO="$repo" yq -r 'select(.kind == "HelmRepository" and .metadata.name == strenv(REPO)) | .spec.url' "${flux_files[@]}" | head -n 1)"
+    if [[ -z "$url" ]]; then
+      echo "HelmRelease '$name' references missing HelmRepository: $repo" >&2
+      exit 1
+    fi
+    render_chart "helm-$name" "$release" "$chart" "$url" "$version" "$namespace" \
+      "$(NAME="$name" yq 'select(.kind == "HelmRelease" and .metadata.name == strenv(NAME)) | .spec.values // {}' "${flux_files[@]}")"
+  done < <(yq -r 'select(.kind == "HelmRelease") | [.metadata.name, (.spec.releaseName // .metadata.name), .spec.chart.spec.chart, .spec.chart.spec.version, .spec.chart.spec.sourceRef.name, (.spec.targetNamespace // .metadata.namespace)] | @tsv' "${flux_files[@]}")
 fi

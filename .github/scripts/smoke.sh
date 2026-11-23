@@ -108,7 +108,7 @@ echo "::endgroup::"
 # FluxInstance and every expected Flux Kustomization must be Ready at this
 # commit or newer (including SOPS decryption).
 flux_synced() {
-  local flux_ready ks_json ks root_rev expected name ready revision message rev secret_ids ns secret_name secret_problems bad=0
+  local flux_ready ks_json ks root_rev expected name ready revision message rev secret_ids ns secret_name secret_problems helm_problems bad=0
   flux_ready=$(kubectl -n flux-system get fluxinstance flux -o json 2>/dev/null |
     jq -r '(.status.conditions // [] | map(select(.type == "Ready")) | .[0].status) // "Unknown"') || return 1
   if [ "$flux_ready" != True ]; then
@@ -193,12 +193,22 @@ flux_synced() {
       bad=1
     fi
   done <<<"$secret_ids"
+  # Every HelmRelease must be Ready at its current spec.
+  helm_problems=$(kubectl get helmreleases.helm.toolkit.fluxcd.io -A -o json 2>/dev/null | jq -r '
+    .items[]
+    | ((.status.conditions // []) | map(select(.type == "Ready")) | .[0]) as $ready
+    | select(($ready.status // "Unknown") != "True" or ($ready.observedGeneration // 0) < .metadata.generation)
+    | "HelmRelease/\(.metadata.namespace)/\(.metadata.name): Ready=\($ready.status // "Unknown") (\($ready.message // ""))"') || return 1
+  if [ -n "$helm_problems" ]; then
+    echo "$helm_problems"
+    bad=1
+  fi
   return "$bad"
 }
 
 echo "::group::Flux"
 wait_for "$sync_timeout" "Flux to sync $sha" flux_synced
-kubectl -n flux-system get fluxinstance,gitrepository,kustomizations.kustomize.toolkit.fluxcd.io
+kubectl -n flux-system get fluxinstance,gitrepository,kustomizations.kustomize.toolkit.fluxcd.io,helmreleases.helm.toolkit.fluxcd.io
 echo "::endgroup::"
 
 rolled_out() {

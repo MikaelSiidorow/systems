@@ -616,9 +616,6 @@ jobs:
         continue-on-error: true
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
-          TF_VAR_cloudflare_api_token: ${{ env.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
           TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
           TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}
@@ -731,9 +728,6 @@ jobs:
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           KUBE_CONFIG_PATH: /tmp/kubeconfig
-          TF_VAR_cloudflare_api_token: ${{ env.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           TF_VAR_wger_postgres_password: ${{ secrets.WGER_POSTGRES_PASSWORD }}
           TF_VAR_wger_powersync_password: ${{ secrets.WGER_POWERSYNC_PASSWORD }}
           TF_VAR_wger_secret_key: ${{ secrets.WGER_SECRET_KEY }}

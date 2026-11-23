@@ -1,6 +1,6 @@
 # Observability Stack
 
-Metrics, logs, and traces for the K3s cluster, deployed as ArgoCD Applications with Helm chart sources.
+Metrics, logs, and traces for the K3s cluster, deployed as Flux HelmReleases (`k8s/monitoring/`, reconciled by the `monitoring` Kustomization in `k8s/clusters/olympus/`).
 
 ## Architecture
 
@@ -77,31 +77,31 @@ A file maps to a session in telemetry: Claude's file name is its `session.id`, a
 
 - **Grafana**: https://grafana.miksu.app (VPN-only via Headscale MagicDNS)
 - **Credentials**: `admin` / password from `grafana-admin` K8s secret (managed by Terraform)
-- **Anonymous read**: anyone who can reach Grafana views it as a Viewer without logging in (`grafana.ini` `auth.anonymous` in `k8s/apps/kube-prometheus-stack.yaml`). Editing and admin still need the login. Agents query through the datasource proxy, `/api/datasources/proxy/uid/{tempo,loki,prometheus}/...`; the `grafana-datasource-proxy-guard` IngressRoute lets only reads through it and the datasource resource route, because they otherwise reach endpoints like Loki's `/ingester/shutdown` and Prometheus's `/-/quit`.
+- **Anonymous read**: anyone who can reach Grafana views it as a Viewer without logging in (`grafana.ini` `auth.anonymous` in `k8s/monitoring/kube-prometheus-stack.yaml`). Editing and admin still need the login. Agents query through the datasource proxy, `/api/datasources/proxy/uid/{tempo,loki,prometheus}/...`; the `grafana-datasource-proxy-guard` IngressRoute lets only reads through it and the datasource resource route, because they otherwise reach endpoints like Loki's `/ingester/shutdown` and Prometheus's `/-/quit`.
 - **Who reaches it**: personal devices (`mikael@`), CI (`tag:ci`) and Hestia, which carries `tag:telemetry-reader` next to `tag:home-subnet-router` so its agents can read their own telemetry. CI only needs 443 for the deploy smoke test, but anonymous read cannot be limited by source, so its runners can read telemetry too (including agent Bash commands in Loki). Accepted: they join the tailnet only for deploy jobs on main. Tags are set on the server: `sudo headscale nodes list`, then `sudo headscale nodes tag -i <id> -t tag:home-subnet-router -t tag:telemetry-reader` on olympus (list every tag the node keeps).
 - **Revoke**: drop the `tag:telemetry-reader` rule in `infra/nixos/hosts/olympus/headscale.nix`, or retag Hestia with only `tag:home-subnet-router`. Turning `auth.anonymous` off closes it for every client.
 
 ## Retention & Storage
 
-All retention and storage settings are configured in the Helm values within each ArgoCD Application file.
+All retention and storage settings are configured in the Helm values of each HelmRelease.
 
-| Component  | Retention       | PVC Size | Storage Class | Config Location                                                                               |
-| ---------- | --------------- | -------- | ------------- | --------------------------------------------------------------------------------------------- |
-| Prometheus | 7d              | 10Gi     | local-path    | `k8s/apps/kube-prometheus-stack.yaml` > `prometheus.prometheusSpec.retention` / `storageSpec` |
-| Loki       | 7d (168h)       | 10Gi     | local-path    | `k8s/apps/loki.yaml` > `loki.limits_config.retention_period` / `singleBinary.persistence`     |
-| Tempo      | 7d (168h)       | 10Gi     | local-path    | `k8s/apps/tempo.yaml` > `tempo.retention` / `persistence`                                     |
-| Grafana    | N/A (stateless) | None     | -             | Dashboards/datasources come from Helm values, no persistence needed                           |
+| Component  | Retention       | PVC Size | Storage Class | Config Location                                                                                     |
+| ---------- | --------------- | -------- | ------------- | --------------------------------------------------------------------------------------------------- |
+| Prometheus | 7d              | 10Gi     | local-path    | `k8s/monitoring/kube-prometheus-stack.yaml` > `prometheus.prometheusSpec.retention` / `storageSpec` |
+| Loki       | 7d (168h)       | 10Gi     | local-path    | `k8s/monitoring/loki.yaml` > `loki.limits_config.retention_period` / `singleBinary.persistence`     |
+| Tempo      | 7d (168h)       | 10Gi     | local-path    | `k8s/monitoring/tempo.yaml` > `tempo.retention` / `persistence`                                     |
+| Grafana    | N/A (stateless) | None     | -             | Dashboards/datasources come from Helm values, no persistence needed                                 |
 
 **Total storage**: ~30Gi for observability data across all PVCs.
 
-To change retention, edit the relevant `k8s/apps/*.yaml` file and push — ArgoCD will sync automatically.
+To change retention, edit the relevant `k8s/monitoring/*.yaml` file and push — Flux upgrades the release automatically.
 
 ## Alerting
 
 Alerts are routed to Telegram via Alertmanager.
 
-- **Bot token**: Stored as K8s secret `alertmanager-telegram-token` in `monitoring` namespace (managed by Terraform, `tofu/k8s/secrets.tf`). Gatus uses the same bot token from `k8s/gatus/gatus-telegram-token.sops.yaml`, so rotating it currently requires updating both places, dispatching the **Deploy** workflow with component `k8s-tofu` for Alertmanager, and rolling `gatus` to reload its env var.
-- **Chat ID**: Configured in `k8s/apps/kube-prometheus-stack.yaml` > `alertmanager.config.receivers`
+- **Bot token**: Stored as K8s secret `alertmanager-telegram-token` in `monitoring` namespace, from `k8s/monitoring/alertmanager-telegram-token.sops.yaml`. Gatus uses the same bot token from `k8s/gatus/gatus-telegram-token.sops.yaml`, so rotating it means editing both files with `sops`, then rolling `gatus` to reload its env var.
+- **Chat ID**: Configured in `k8s/monitoring/kube-prometheus-stack.yaml` > `alertmanager.config.receivers`
 - **Routing**: All alerts go to Telegram except `Watchdog` and `InfoInhibitor` (silenced)
 - **Repeat interval**: 4h (won't spam)
 - **Inhibition**: Critical alerts suppress matching warnings
@@ -123,19 +123,19 @@ Built-in kube-prometheus-stack alerts cover: pod crashes, node down, OOM kills, 
 | Alloy               | 64Mi           | 128Mi        |
 | **Total**           | **~1.4Gi**     | **~2.7Gi**   |
 
-## Secrets (Terraform-managed)
+## Secrets (SOPS, decrypted by Flux)
 
-| Secret                        | Namespace    | Terraform Variable       | GitHub Actions Secret    |
-| ----------------------------- | ------------ | ------------------------ | ------------------------ |
-| `grafana-admin`               | `monitoring` | `grafana_admin_password` | `GRAFANA_ADMIN_PASSWORD` |
-| `alertmanager-telegram-token` | `monitoring` | `telegram_bot_token`     | `TELEGRAM_BOT_TOKEN`     |
+| Secret                        | Namespace    | File                                                   |
+| ----------------------------- | ------------ | ------------------------------------------------------ |
+| `grafana-admin`               | `monitoring` | `k8s/monitoring/grafana-admin.sops.yaml`               |
+| `alertmanager-telegram-token` | `monitoring` | `k8s/monitoring/alertmanager-telegram-token.sops.yaml` |
 
-Defined in `tofu/k8s/secrets.tf`, variables in `tofu/k8s/variables.tf`.
+Edit with `sops <file>`; both are encrypted to your post-quantum age key and olympus's.
 
 ## K3s-Specific Notes
 
 - `kubeEtcd`, `kubeScheduler`, `kubeControllerManager`, `kubeProxy` scrapers are disabled (K3s doesn't expose these metrics)
-- `ServerSideApply=true` is required for kube-prometheus-stack and Loki (large CRDs)
+- The HelmReleases set `crds: CreateReplace`, so chart upgrades also update the kube-prometheus-stack CRDs
 - `grafana.miksu.app` DNS is via Headscale MagicDNS extra records (`infra/nixos/hosts/olympus/headscale.nix`)
 
 ## Datasource Correlation
@@ -150,19 +150,18 @@ Grafana datasources are pre-configured with cross-linking:
 ## Files
 
 ```
-k8s/apps/
+k8s/clusters/olympus/
+  monitoring.yaml              # Flux Kustomization for k8s/monitoring
+
+k8s/monitoring/
   kube-prometheus-stack.yaml   # Prometheus, Grafana, Alertmanager
   loki.yaml                    # Log aggregation
   tempo.yaml                   # Trace storage
   alloy.yaml                   # Log/trace collector
-
-tofu/k8s/
-  secrets.tf                   # Grafana + Telegram secrets
-  variables.tf                 # Secret variable declarations
+  repositories.yaml            # Helm chart repositories
+  namespaces.yaml              # monitoring, loki, tempo, alloy (never pruned)
+  *.sops.yaml                  # Grafana admin + Telegram token
 
 infra/nixos/hosts/olympus/
   headscale.nix                # grafana.miksu.app MagicDNS record
-
-.github/workflows/
-  deploy.yml                   # CI passes TF_VAR_* secrets
 ```
