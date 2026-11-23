@@ -157,7 +157,7 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 
 ## OpenTofu state
 
-Both roots keep their state in the `terraform-state` R2 bucket, encrypted with `TF_VAR_state_passphrase` from `infra/secrets/ci.yaml`. Every `tofu` command that touches state needs it, so run them through SOPS: the `make tf-*` targets do, and anything else goes inside `sops exec-env infra/secrets/ci.yaml '<command>'`. Losing the passphrase loses the state, so it lives only in that file, which your age key (backed up in Bitwarden) decrypts.
+The `tofu/` root keeps its state in the `terraform-state` R2 bucket, encrypted with `TF_VAR_state_passphrase` from `infra/secrets/ci.yaml`. Every `tofu` command that touches state needs it, so run them through SOPS: the `make tf-*` targets do, and anything else goes inside `sops exec-env infra/secrets/ci.yaml '<command>'`. Losing the passphrase loses the state, so it lives only in that file, which your age key (backed up in Bitwarden) decrypts.
 
 A run that dies mid-apply can leave its lock behind, and later runs then wait ten minutes and fail with `Error acquiring the state lock`. Check that no deploy is running, then release it with the lock ID from that error:
 
