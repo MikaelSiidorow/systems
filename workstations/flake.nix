@@ -62,7 +62,7 @@
     };
 
     # Keep client and server together; Renovate updates both revision pins.
-    llm-agents.url = "github:numtide/llm-agents.nix/a59764a6424689d67c1bd9070fd48afa44a47ee0";
+    llm-agents.url = "github:numtide/llm-agents.nix/45e6e554481f962d4134021d3a63c96d8755f395";
 
     # OpenCode with automatic updates (for NixOS/Linux)
     opencode-nix = {

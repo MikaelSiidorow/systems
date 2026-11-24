@@ -8,7 +8,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     # Keep client and server together; Renovate updates both revision pins.
-    llm-agents.url = "github:numtide/llm-agents.nix/a59764a6424689d67c1bd9070fd48afa44a47ee0";
+    llm-agents.url = "github:numtide/llm-agents.nix/45e6e554481f962d4134021d3a63c96d8755f395";
 
     deploy-rs = {
       url = "github:serokell/deploy-rs";
