@@ -38,6 +38,16 @@
       "versioningTemplate": "semver"
     },
     {
+      "description": "Images pinned in HelmRelease values with a renovate comment",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^k8s/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+tag: (?<currentValue>\\S+)"
+      ]
+    },
+    {
       "description": "k3s HelmCharts that the olympus NixOS config installs",
       "customType": "regex",
       "managerFilePatterns": ["/^infra/nixos/hosts/olympus/[^/]+-helmchart\\.yaml$/"],
