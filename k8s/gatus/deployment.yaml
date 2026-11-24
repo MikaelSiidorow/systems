@@ -12,8 +12,6 @@ spec:
       app: gatus
   template:
     metadata:
-      annotations:
-        checksum/config: fc070d90ef7dff70
       labels:
         app: gatus
         app.kubernetes.io/name: gatus
@@ -32,8 +30,9 @@ spec:
               memory: 128Mi
           volumeMounts:
             - name: config
-              mountPath: /config/config.yaml
-              subPath: config.yaml
+              # A directory mount picks up ConfigMap changes, and Gatus reloads
+              # its config when the file changes.
+              mountPath: /config
               readOnly: true
             - name: data
               mountPath: /data
