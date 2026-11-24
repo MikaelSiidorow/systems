@@ -31,6 +31,10 @@ spec:
       remediateLastFailure: true
   values:
     grafana:
+      # The chart lags Grafana's security releases, so pin the patched image.
+      image:
+        # renovate: datasource=docker depName=grafana/grafana
+        tag: 13.3.2-distroless
       ingress:
         enabled: true
         ingressClassName: traefik
