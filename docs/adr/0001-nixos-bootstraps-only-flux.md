@@ -55,9 +55,9 @@ from NixOS, then run these steps by hand in order:
    ConfigMap carry ownerReferences to the HelmChart, so Kubernetes deletes
    them with it. The ClusterRoleBinding has none and stays.
 
-k3s deletes what a manifest applied only when the manifest is disabled (with
-`--disable` or a `.skip` file). Removing the file or deleting its AddOn object
-leaves the objects in place: k3s records ownership in
+k3s deletes what a manifest applied only when the manifest is disabled with
+`--disable`. Removing the file, adding a `.skip` file or deleting its AddOn
+object leaves the objects in place: k3s records ownership in
 `objectset.rio.cattle.io` annotations, not ownerReferences, so no garbage
 collection follows. Stale AddOn objects can be deleted.
 

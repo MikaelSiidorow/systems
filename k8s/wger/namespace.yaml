@@ -3,5 +3,5 @@ kind: Namespace
 metadata:
   name: wger
   annotations:
-    # Holds the media volume; Flux never prunes it.
+    # Holds the media volume and the ci-deploy token; Flux never prunes it.
     kustomize.toolkit.fluxcd.io/prune: disabled
