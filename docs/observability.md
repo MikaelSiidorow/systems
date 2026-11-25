@@ -51,7 +51,7 @@ To turn telemetry off on a host, unset the option and delete the `OTEL_*`, `CLAU
 
 ### Content
 
-`agents.telemetry.content` (off by default; on for Hestia) makes the agents export content too: Claude's prompts and responses (`OTEL_LOG_USER_PROMPTS`) and tool output (`OTEL_LOG_TOOL_CONTENT`, a `tool.output` span event on the tool span with Bash output, Read and Write contents and diffs, cut at 60 KB), and Codex's prompts (`log_user_prompt`). Claude's settings go in the `env` block of `~/.claude/settings.json`, which overrides the process environment, and turning the option off writes `0`, since the merge never removes a key.
+`agents.telemetry.content` (off by default; on for Hestia and tpad) makes the agents export content too: Claude's prompts and responses (`OTEL_LOG_USER_PROMPTS`) and tool output (`OTEL_LOG_TOOL_CONTENT`, a `tool.output` span event on the tool span with Bash output, Read and Write contents and diffs, cut at 60 KB), and Codex's prompts (`log_user_prompt`). Claude's settings go in the `env` block of `~/.claude/settings.json`, which overrides the process environment, and turning the option off writes `0`, since the merge never removes a key.
 
 Content never reaches the cluster, where Grafana is readable without a login by every tailnet device, CI runners included. Hestia's and tpad's Alloy drop the `tool.output` span events and the `prompt`, `prompt_text`, `user_prompt` and `response` attributes before forwarding (`modules/agent-telemetry-alloy.nix`), whatever the agents send. Commands, tool input, error text and Codex tool output snippets still go to the cluster, as before. Content lives only in the host's archive (below) and the transcripts.
 

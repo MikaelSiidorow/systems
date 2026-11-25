@@ -60,6 +60,8 @@ in
   agents.telemetry = {
     endpoint = "http://127.0.0.1:4318";
     host = "tpad";
+    # Stays in the local archive; Alloy strips it before forwarding.
+    content = true;
   };
 
   systemd.user.services.alloy = {
