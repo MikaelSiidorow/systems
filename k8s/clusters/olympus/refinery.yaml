@@ -8,6 +8,8 @@ spec:
   retryInterval: 1m
   # refinery-app's startup probe alone allows 5 minutes.
   timeout: 10m
+  dependsOn:
+    - name: infrastructure-configs
   sourceRef:
     kind: GitRepository
     name: flux-system

@@ -46,7 +46,7 @@ systems/
 │   ├── wger-ingress/        # wger public Ingress, applied after its bootstrap Job
 │   ├── monitoring/          # Observability HelmReleases
 │   ├── gatus/               # Status page
-│   ├── cert-manager/        # DNS-01 token for cert-manager
+│   ├── infrastructure/      # Shared controllers and their config (ClusterIssuer token)
 │   ├── flux-ui/             # Flux Operator status page (tailnet only)
 │   └── headscale/           # Headscale ingress
 ├── docs/                    # Architecture & observability docs
@@ -153,7 +153,7 @@ KUBECONFIG=~/.kube/k3s-config kubectl get pods -n refinery
 - **GitHub Actions secrets**: `SOPS_AGE_KEY`, SSH keys, the GitHub App and the Headscale auth key. The `REFINERY_*`, `WGER_*`, `GRAFANA_ADMIN_PASSWORD`, `TELEGRAM_BOT_TOKEN` and `BRAWL_STARS_API_KEY` ones are unused since the apps moved to Flux and can be deleted.
 - **GitHub Actions variables**: `K3S_HOST`
 - **olympus's SSH host key**: pinned as `K3S_HOST_KEY` in `.github/workflows/deploy.yml`, so the deploy jobs refuse any other server at that address. A rebuilt server has a new one: replace it with the output of `ssh root@<IP> cat /etc/ssh/ssh_host_ed25519_key.pub`, without the trailing comment.
-- **K8s secrets**: SOPS-encrypted `k8s/**/*.sops.yaml` manifests, encrypted to your post-quantum age key and olympus's and decrypted by Flux. Edit one with `sops <file>`; Flux applies the change, and Deployments that read the Secret as environment variables need a `kubectl rollout restart` to pick it up (rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/cert-manager/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
+- **K8s secrets**: SOPS-encrypted `k8s/**/*.sops.yaml` manifests, encrypted to your post-quantum age key and olympus's and decrypted by Flux. Edit one with `sops <file>`; Flux applies the change, and Deployments that read the Secret as environment variables need a `kubectl rollout restart` to pick it up (rotating the shared Telegram bot token updates `k8s/gatus/gatus-telegram-token.sops.yaml` and `k8s/monitoring/alertmanager-telegram-token.sops.yaml`, followed by a `gatus` rollout; the Cloudflare token lives in both `infra/secrets/ci.yaml` and `k8s/infrastructure/configs/cloudflare-api-token.sops.yaml`). `k8s/**/secrets.yaml` is gitignored.
 
 ## OpenTofu state
 
