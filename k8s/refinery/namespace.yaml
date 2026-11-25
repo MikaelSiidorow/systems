@@ -3,6 +3,6 @@ kind: Namespace
 metadata:
   name: refinery
   annotations:
-    # Holds the zero-replica-data volume and NixOS's ci-deploy and database
-    # objects; Flux never prunes it.
+    # Holds the zero-replica-data volume and the ci-deploy token the refinery
+    # repo's CI uses; Flux never prunes it.
     kustomize.toolkit.fluxcd.io/prune: disabled

@@ -1,0 +1,24 @@
+# Headscale runs on the host (NixOS), listening on the k3s bridge address.
+apiVersion: v1
+kind: Service
+metadata:
+  name: headscale
+  namespace: headscale
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: headscale
+  namespace: headscale
+  labels:
+    kubernetes.io/service-name: headscale
+addressType: IPv4
+ports:
+  - port: 8080
+endpoints:
+  - addresses:
+      - 10.42.0.1
