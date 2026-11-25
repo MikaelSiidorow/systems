@@ -142,40 +142,6 @@ let
       - addresses:
           - 10.42.0.1
   '';
-
-  clusterIssuer = pkgs.writeText "cluster-issuer.yaml" ''
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
-    metadata:
-      name: letsencrypt-prod
-    spec:
-      acme:
-        server: https://acme-v02.api.letsencrypt.org/directory
-        email: mikael@siidorow.com
-        privateKeySecretRef:
-          name: letsencrypt-prod-account-key
-        solvers:
-          - http01:
-              ingress:
-                ingressClassName: traefik
-    ---
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
-    metadata:
-      name: letsencrypt-dns
-    spec:
-      acme:
-        server: https://acme-v02.api.letsencrypt.org/directory
-        email: mikael@siidorow.com
-        privateKeySecretRef:
-          name: letsencrypt-dns-account-key
-        solvers:
-          - dns01:
-              cloudflare:
-                apiTokenSecretRef:
-                  name: cloudflare-api-token
-                  key: api-token
-  '';
 in
 {
   # K3s - Lightweight Kubernetes
@@ -197,8 +163,12 @@ in
     # committed (see .github/scripts/traefik-crds.sh) and applied by k3s.
     "L+ ${manifestDir}/traefik-crds.yaml - - - - ${./traefik-crds.yaml}"
     "L+ ${manifestDir}/traefik-helmchart.yaml - - - - ${./traefik-helmchart.yaml}"
-    "L+ ${manifestDir}/cert-manager-helmchart.yaml - - - - ${./cert-manager-helmchart.yaml}"
-    "L+ ${manifestDir}/cluster-issuer.yaml - - - - ${clusterIssuer}"
+    # Flux installs cert-manager and the ClusterIssuers (k8s/infrastructure/).
+    # Removing a file leaves what k3s applied; the HelmChart was marked
+    # unmanaged and deleted by hand, since deleting a managed one uninstalls
+    # the release (docs/adr/0001-nixos-bootstraps-only-flux.md).
+    "r ${manifestDir}/cert-manager-helmchart.yaml - - - -"
+    "r ${manifestDir}/cluster-issuer.yaml - - - -"
     # Argo CD is gone; Flux deploys k8s/. Removing a file leaves what k3s
     # applied from it, so the release was uninstalled by hand.
     "r ${manifestDir}/argocd-helmchart.yaml - - - -"
