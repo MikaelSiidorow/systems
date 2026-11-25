@@ -5,27 +5,29 @@
 
 ## Context
 
-k3s applies every manifest in its manifests directory. olympus used that to
-install Traefik, its CRDs, cert-manager and the ClusterIssuers before any
-GitOps tool existed, and later Argo CD itself, whose UI needed ingress and TLS
-before it could sync anything.
+k3s applies every manifest in its manifests directory. Before olympus had a
+GitOps tool, NixOS used that directory to install Traefik, Traefik's CRDs,
+cert-manager, and the ClusterIssuers. Later it installed Argo CD the same way.
+Argo CD's UI needed ingress and TLS before it could sync anything.
 
-Flux replaced Argo CD and pulls from Git; it needs neither ingress nor TLS to
-start. Keeping the controllers in NixOS now costs more than it gives:
+Flux has replaced Argo CD. It pulls from Git and does not need ingress or TLS
+to start. Keeping the controllers in NixOS adds extra work:
 
-- A Traefik or cert-manager bump is a NixOS deploy instead of a Flux sync.
-- Helm never upgrades a chart's CRDs, so Traefik's 25 CRDs are committed as a
-  generated 9,400-line file, with a script, a CI check and a Renovate
-  post-upgrade task to keep it current.
-- Renovate, the render script and the dependency docs each carry a special
-  case for k3s HelmCharts.
-- k3s never deletes what a removed manifest applied, and deleting a HelmChart
-  uninstalls its release, so taking anything out of k3s takes a hand-run step.
+- Upgrading Traefik or cert-manager requires a NixOS deploy instead of a Flux
+  sync.
+- Helm does not upgrade a chart's CRDs. Traefik's 25 CRDs are checked in as a
+  generated 9,400-line file. A script, a CI check, and a Renovate post-upgrade
+  task exist just to keep it current.
+- Renovate, the render script, and the dependency docs each need a special case
+  for k3s HelmCharts.
+- k3s leaves applied objects behind when a manifest is removed, and deleting a
+  HelmChart uninstalls its release. Moving anything out of k3s takes manual
+  steps.
 
 ## Decision
 
-NixOS installs the Flux Operator and the `FluxInstance`, syncs the SOPS age
-key into `flux-system`, and nothing else. Flux reconciles the rest in layers:
+NixOS installs only the Flux Operator and the `FluxInstance`, and syncs the
+SOPS age key into `flux-system`. Flux reconciles everything else in layers:
 
 ```
 infrastructure-controllers   Traefik, cert-manager (HelmReleases, CRDs)
@@ -33,50 +35,49 @@ infrastructure-controllers   Traefik, cert-manager (HelmReleases, CRDs)
        └─ each app's own Kustomization (dependsOn infrastructure-configs)
 ```
 
-Apps keep a Kustomization each, so one broken app doesn't hold back the
-others. There is no separate platform layer: monitoring is an app that
-depends on the configs like the rest.
+Each app keeps its own Kustomization so one broken app does not block the
+others. There is no separate platform layer. Monitoring is an app that depends
+on `infrastructure-configs` like the rest.
 
-Moving a k3s HelmChart to Flux detaches it first, then adopts the live
-release with a HelmRelease of the same name and namespace. Detaching removes
-the manifest, then by hand:
+To move a k3s HelmChart to Flux, detach it from k3s first, then adopt the live
+release with a HelmRelease of the same name and namespace. Remove the manifest
+from NixOS, then run these steps by hand in order:
 
-1. Annotates the HelmChart `helmcharts.helm.cattle.io/unmanaged`, so k3s's
-   helm-controller ignores it. Without this, its remove handler puts back the
-   `wrangler.cattle.io/on-helm-chart-remove` finalizer as soon as it is
-   stripped, and deleting the chart runs `helm uninstall`.
-2. Strips that finalizer and deletes the HelmChart. The release stays.
-3. Deletes the chart's install leftovers in `kube-system` (the
-   `helm-install-*` Job, its ServiceAccount, its cluster-admin
-   ClusterRoleBinding and its values Secret). Only the controller's own
-   uninstall would have removed them.
+1. Annotate the HelmChart with `helmcharts.helm.cattle.io/unmanaged` so k3s's
+   helm-controller ignores it. Without this annotation, the controller's remove
+   handler restores the `wrangler.cattle.io/on-helm-chart-remove` finalizer as
+   soon as it is stripped. Deleting the HelmChart then runs `helm uninstall`.
+2. Strip the `wrangler.cattle.io/on-helm-chart-remove` finalizer from the
+   HelmChart.
+3. Delete the HelmChart. The live release stays in place.
+4. Delete the chart's install leftovers in `kube-system`: the `helm-install-*`
+   Job, its ServiceAccount, its cluster-admin ClusterRoleBinding, and its
+   values Secret. Only the controller's own uninstall would remove them.
 
-k3s records ownership in `objectset.rio.cattle.io` annotations, not
-ownerReferences, so no garbage collection follows. AddOn objects stay until
-deleting one is shown to leave its objects alone.
+k3s records ownership in `objectset.rio.cattle.io` annotations instead of
+ownerReferences, so no garbage collection happens. k3s's AddOn objects stay
+until a test shows that deleting one leaves the objects it applied in place.
 
-Flux's HelmReleases skip CRD upgrades by default too, so Traefik's sets
-`install.crds` and `upgrade.crds` to `CreateReplace`; that is what retires
-the committed CRD file. cert-manager templates its CRDs (`crds.enabled`), so
-Helm already upgrades them.
+Flux HelmReleases also skip CRD upgrades by default. Traefik's HelmRelease sets
+`install.crds` and `upgrade.crds` to `CreateReplace`, which retires the
+committed CRD file. cert-manager templates its CRDs via `crds.enabled`, so Helm
+already upgrades them.
 
-`infrastructure-controllers` health-checks only its HelmReleases rather than
-waiting on everything it applies, so a chart repository's index outage
-doesn't count as a failure.
+`infrastructure-controllers` health-checks only its HelmReleases instead of
+waiting on everything it applies. Otherwise, a chart repository index outage
+would count as a failure.
 
-Traefik and cert-manager updates wait for review, like the monitoring stack,
-until dependency triage is automated.
+Until dependency triage is automated, Traefik and cert-manager updates wait for
+review like the monitoring stack.
 
 ## Consequences
 
-- One path for every cluster dependency: Flux applies it and Renovate's flux
-  manager bumps it.
-- A failing controller upgrade, or a config that fails to apply or decrypt,
-  holds back every app's syncs until it is fixed or rolled back. Running
-  workloads keep running. That is the intended order: apps need ingress and
-  TLS.
-- A fresh cluster comes up from NixOS plus Git: Flux installs the controllers,
+- Flux applies every cluster dependency, and Renovate's flux manager updates it.
+- If a controller upgrade fails, or a config fails to apply or decrypt, app
+  syncs wait until the problem is fixed or rolled back. Running workloads keep
+  running. This order is intentional because apps need ingress and TLS.
+- A fresh cluster comes up from NixOS and Git. Flux installs the controllers,
   then their config, then the apps.
-- The host-tied Services (headscale, refinery's database) and the app repos'
-  `ci-deploy` RBAC can move to `k8s/` the way `k8s/wger/db.yaml` did, leaving
-  k3s's manifests directory to the Flux bootstrap.
+- The host-tied Services (headscale and refinery's database) and the app repos'
+  `ci-deploy` RBAC can move to `k8s/` like `k8s/wger/db.yaml` did. That leaves
+  k3s's manifests directory for the Flux bootstrap alone.
