@@ -71,4 +71,7 @@ spec:
           name: any
           annotations:
             kustomize.toolkit.fluxcd.io/prune: disabled
-  wait: true
+  # Apps need the issuers to exist, not to be Ready: an ACME outage during a
+  # re-registration shouldn't hold back every app. Applying already fails if
+  # cert-manager's CRDs are missing.
+  wait: false

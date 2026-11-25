@@ -17,13 +17,13 @@ spec:
         name: jetstack
       interval: 12h
   timeout: 10m
-  # Adopts the release k3s installed, as an upgrade of the same release. A
-  # failed install is left for a person rather than uninstalled, which would
-  # delete the CRDs and every Certificate with them.
+  # Adopts the release k3s installed as an upgrade of the same release, so
+  # the install settings only matter on a fresh cluster. Uninstalling keeps
+  # the CRDs and Certificates (crds.keep defaults to true).
   install:
     createNamespace: true
     remediation:
-      retries: 0
+      retries: 3
   upgrade:
     remediation:
       retries: 3
