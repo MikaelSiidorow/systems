@@ -149,7 +149,7 @@ in
     enable = true;
     role = "server";
     extraFlags = toString [
-      "--disable=traefik" # Deploy our own Traefik via HelmChart CRD
+      "--disable=traefik" # Flux deploys Traefik (k8s/infrastructure/)
       "--tls-san=100.64.0.1" # Allow API access over Tailscale VPN
       # The node keeps the host's old name: local-path volumes are pinned to
       # the node name, so a node called olympus would start without its data.
@@ -159,14 +159,13 @@ in
 
   # Auto-deploy infrastructure manifests via K3s
   systemd.tmpfiles.rules = [
-    # Helm never upgrades a chart's CRDs, so the traefik chart's CRDs are
-    # committed (see .github/scripts/traefik-crds.sh) and applied by k3s.
-    "L+ ${manifestDir}/traefik-crds.yaml - - - - ${./traefik-crds.yaml}"
-    "L+ ${manifestDir}/traefik-helmchart.yaml - - - - ${./traefik-helmchart.yaml}"
-    # Flux installs cert-manager and the ClusterIssuers (k8s/infrastructure/).
-    # Removing a file leaves what k3s applied; the HelmChart was marked
-    # unmanaged and deleted by hand, since deleting a managed one uninstalls
-    # the release (docs/adr/0001-nixos-bootstraps-only-flux.md).
+    # Flux installs Traefik, its CRDs, cert-manager and the ClusterIssuers
+    # (k8s/infrastructure/). Removing a file leaves what k3s applied; the
+    # HelmCharts were marked unmanaged and deleted by hand, since deleting a
+    # managed one uninstalls the release
+    # (docs/adr/0001-nixos-bootstraps-only-flux.md).
+    "r ${manifestDir}/traefik-crds.yaml - - - -"
+    "r ${manifestDir}/traefik-helmchart.yaml - - - -"
     "r ${manifestDir}/cert-manager-helmchart.yaml - - - -"
     "r ${manifestDir}/cluster-issuer.yaml - - - -"
     # Argo CD is gone; Flux deploys k8s/. Removing a file leaves what k3s

@@ -225,24 +225,6 @@ jobs:
             exit 0
           fi
           gh pr merge --auto --squash "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
-  # The committed Traefik CRDs must match the chart version pinned in
-  # traefik-helmchart.yaml, e.g. after a manual chart bump. Renovate
-  # regenerates them itself.
-  traefik-crds:
-    needs: changes
-    if: github.event_name == 'pull_request' && needs.changes.outputs.nixos == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check the committed Traefik CRDs
-        run: |
-          file=infra/nixos/hosts/olympus/traefik-crds.yaml
-          version=$(yq '.spec.version' infra/nixos/hosts/olympus/traefik-helmchart.yaml)
-          .github/scripts/traefik-crds.sh "$version" "$RUNNER_TEMP/traefik-crds.yaml"
-          if ! diff -q "$file" "$RUNNER_TEMP/traefik-crds.yaml" >/dev/null; then
-            echo "::error file=$file::Out of date for traefik chart $version. Run: .github/scripts/traefik-crds.sh $version"
-            exit 1
-          fi
   nix-cache:
     needs: changes
     if: github.event_name == 'push' && needs.changes.outputs.nixos == 'true'

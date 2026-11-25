@@ -48,15 +48,6 @@
       ]
     },
     {
-      "description": "k3s HelmCharts that the olympus NixOS config installs",
-      "customType": "regex",
-      "managerFilePatterns": ["/^infra/nixos/hosts/olympus/[^/]+-helmchart\\.yaml$/"],
-      "matchStrings": [
-        "chart: (?<depName>\\S+)\\s+repo: (?<registryUrl>\\S+)[\\s\\S]*?version: (?<currentValue>\\S+)"
-      ],
-      "datasourceTemplate": "helm"
-    },
-    {
       "description": "OCI k3s HelmCharts that the olympus NixOS config installs",
       "customType": "regex",
       "managerFilePatterns": ["/^infra/nixos/hosts/olympus/[^/]+-helmchart\\.yaml$/"],
@@ -100,17 +91,6 @@
       "matchManagers": ["github-actions"],
       "matchFileNames": [".github/workflows/deploy.yml", ".github/workflows/k8s-rollout.yml"],
       "automerge": false
-    },
-    {
-      "description": "Regenerate the committed Traefik CRDs in the same PR; Helm never upgrades them",
-      "matchManagers": ["custom.regex"],
-      "matchDepNames": ["traefik"],
-      "postUpgradeTasks": {
-        "commands": ["bash .github/scripts/traefik-crds.sh {{{newVersion}}}"],
-        "fileFilters": ["infra/nixos/hosts/olympus/traefik-crds.yaml"],
-        "executionMode": "update",
-        "installTools": { "helm": {} }
-      }
     },
     {
       "description": "Cluster, infra and cloud changes deploy on merge; never auto-merge",
