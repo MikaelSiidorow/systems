@@ -7,14 +7,13 @@ Operational reference: how changes reach each machine, first-time setup, cluster
 ```
 NixOS (k3s.nix)
   |
-  |-- Traefik (ingress)
   |-- Flux Operator + FluxInstance (GitOps)
   |-- flux-system/sops-age (olympus's age key, for SOPS)
   |
   v
 Flux (k8s/clusters/olympus/) syncs from git
   |
-  |-- k8s/infrastructure/controllers: cert-manager (TLS)
+  |-- k8s/infrastructure/controllers: Traefik (ingress), cert-manager (TLS)
   |-- k8s/infrastructure/configs: ClusterIssuers
   |-- k8s/refinery, k8s/wger, k8s/monitoring, k8s/gatus, ...
   |-- decrypts k8s/**/*.sops.yaml Secrets with olympus's age key
@@ -47,7 +46,7 @@ systems/
 │   ├── wger-ingress/        # wger public Ingress, applied after its bootstrap Job
 │   ├── monitoring/          # Observability HelmReleases
 │   ├── gatus/               # Status page
-│   ├── infrastructure/      # Shared controllers (cert-manager), then their config (ClusterIssuers)
+│   ├── infrastructure/      # Shared controllers (Traefik, cert-manager), then their config (ClusterIssuers)
 │   ├── flux-ui/             # Flux Operator status page (tailnet only)
 │   └── headscale/           # Headscale ingress
 ├── docs/                    # Architecture & observability docs
