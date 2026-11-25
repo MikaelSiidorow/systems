@@ -2,10 +2,11 @@
 {
   # Ships host metrics and the journal over OTLP to the cluster Alloy on
   # olympus (tailnet only), so a freeze is visible from outside the host.
-  # Local agents send OTLP to 127.0.0.1:4318 and share the same disk queue.
+  # Local agents send OTLP to 127.0.0.1:4318 and share the same disk queue;
+  # their raw OTLP is also archived in /var/lib/alloy/archive.
   services.alloy.enable = true;
 
-  # otelcol.storage.file is public preview.
+  # otelcol.storage.file and otelcol.exporter.file are public preview.
   services.alloy.extraFlags = [ "--stability.level=public-preview" ];
 
   environment.etc."alloy/config.alloy".text = ''
@@ -80,11 +81,13 @@
       }
 
       output {
-        metrics = [otelcol.processor.batch.default.input]
-        logs    = [otelcol.processor.batch.default.input]
-        traces  = [otelcol.processor.filter.t3code.input]
+        metrics = [otelcol.processor.batch.archive.input, otelcol.processor.batch.default.input]
+        logs    = [otelcol.processor.batch.archive.input, otelcol.processor.attributes.content.input]
+        traces  = [otelcol.processor.batch.archive.input, otelcol.processor.filter.t3code.input]
       }
     }
+
+    ${import ../../../../modules/agent-telemetry-alloy.nix "/var/lib/alloy/archive"}
 
     // T3 traces everything (~88k spans/h, mostly sqlite, git and housekeeping;
     // upstream t3code#28196). Keep only its turn spans, which Claude and Codex
@@ -99,7 +102,7 @@
       }
 
       output {
-        traces = [otelcol.processor.batch.default.input]
+        traces = [otelcol.processor.filter.content.input]
       }
     }
 
@@ -144,6 +147,9 @@
 
   # Monitoring must not add to the memory pressure it is there to report.
   systemd.services.alloy.serviceConfig.MemoryMax = "256M";
+
+  # The archive holds prompts and tool output: 0700 directories, 0600 files.
+  systemd.services.alloy.serviceConfig.UMask = "0077";
 
   # RAPL energy counters are root-only (CVE-2020-8694); let Alloy read them, so
   # the rapl collector reports CPU package power. Alloy re-serves them on
