@@ -1,7 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# NixOS (k3s.nix) still installs Traefik; its HelmRelease moves here once k3s
-# lets go of it.
 resources:
   - repositories.yaml
+  - traefik.yaml
   - cert-manager.yaml
