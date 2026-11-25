@@ -29,9 +29,14 @@ spec:
           annotations:
             kustomize.toolkit.fluxcd.io/prune: disabled
   # Waiting on everything here would count a chart repository's index outage
-  # as a failure and hold back every app. Health checks target the
-  # controllers' HelmReleases instead, once they move here.
+  # as a failure and hold back every app, so only the controllers' releases
+  # are health-checked.
   wait: false
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: cert-manager
+      namespace: flux-system
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -66,4 +71,7 @@ spec:
           name: any
           annotations:
             kustomize.toolkit.fluxcd.io/prune: disabled
-  wait: true
+  # Apps need the issuers to exist, not to be Ready: an ACME outage during a
+  # re-registration shouldn't hold back every app. Applying already fails if
+  # cert-manager's CRDs are missing.
+  wait: false
