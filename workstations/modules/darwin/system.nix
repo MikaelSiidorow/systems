@@ -11,6 +11,14 @@ let
     codex = inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
     # The Mac's own Alloy (workstations/hosts/mbp/telemetry.nix); nothing leaves it.
     otlpTracesUrl = "http://127.0.0.1:4318/v1/traces";
+    # T3 downloads its device tools (Settings > Integrations > Devices) with
+    # npm, and without npm on PATH falls back to `pnpm dlx npm`. Without a node
+    # on PATH, pnpm 12 downloads one from nodejs.org to run that npm. The slim
+    # node has no npm of its own, so pnpm stays in use.
+    extraPathPackages = [
+      pkgs.pnpm_12
+      pkgs.nodejs-slim_26
+    ];
   };
 in
 {

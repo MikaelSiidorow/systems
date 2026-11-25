@@ -10,6 +10,8 @@
   # while T3CODE_TELEMETRY_ENABLED is false. On the work Mac, only ever its local
   # collector.
   otlpTracesUrl ? null,
+  # More packages for the PATH T3 runs with, after the providers.
+  extraPathPackages ? [ ],
 }:
 let
   upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.t3code;
@@ -125,7 +127,8 @@ in
     pkgs.git-lfs
     pkgs.gh
   ]
-  ++ direnvProviders;
+  ++ direnvProviders
+  ++ extraPathPackages;
 }).overrideAttrs
   (previous: {
     passthru = previous.passthru // {
