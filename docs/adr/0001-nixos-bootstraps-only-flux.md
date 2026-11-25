@@ -50,9 +50,10 @@ from NixOS, then run these steps by hand in order:
 2. Strip the `wrangler.cattle.io/on-helm-chart-remove` finalizer from the
    HelmChart.
 3. Delete the HelmChart. The live release stays in place.
-4. Delete the chart's install leftovers in `kube-system`: the `helm-install-*`
-   Job, its ServiceAccount, its cluster-admin ClusterRoleBinding, and its
-   values Secret. Only the controller's own uninstall would remove them.
+4. Delete the chart's cluster-admin ClusterRoleBinding,
+   `helm-kube-system-<chart>`. The install Job, ServiceAccount, Secret and
+   ConfigMap carry ownerReferences to the HelmChart, so Kubernetes deletes
+   them with it. The ClusterRoleBinding has none and stays.
 
 k3s records ownership in `objectset.rio.cattle.io` annotations instead of
 ownerReferences, so no garbage collection happens. k3s's AddOn objects stay
