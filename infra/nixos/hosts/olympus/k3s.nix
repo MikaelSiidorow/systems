@@ -164,8 +164,9 @@ in
     "L+ ${manifestDir}/traefik-crds.yaml - - - - ${./traefik-crds.yaml}"
     "L+ ${manifestDir}/traefik-helmchart.yaml - - - - ${./traefik-helmchart.yaml}"
     # Flux installs cert-manager and the ClusterIssuers (k8s/infrastructure/).
-    # Removing a file leaves what k3s applied; the HelmChart was deleted by
-    # hand without its finalizer, which would have uninstalled the release.
+    # Removing a file leaves what k3s applied; the HelmChart was marked
+    # unmanaged and deleted by hand, since deleting a managed one uninstalls
+    # the release (docs/adr/0001-nixos-bootstraps-only-flux.md).
     "r ${manifestDir}/cert-manager-helmchart.yaml - - - -"
     "r ${manifestDir}/cluster-issuer.yaml - - - -"
     # Argo CD is gone; Flux deploys k8s/. Removing a file leaves what k3s
