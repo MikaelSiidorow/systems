@@ -48,7 +48,7 @@ systems/
 │   ├── gatus/               # Status page
 │   ├── infrastructure/      # Shared controllers (Traefik, cert-manager), then their config (ClusterIssuers)
 │   ├── flux-ui/             # Flux Operator status page (tailnet only)
-│   └── headscale/           # Headscale ingress
+│   └── headscale/           # Headscale Service (host) and ingress
 ├── docs/                    # Architecture & observability docs
 ├── bin/                     # Utility scripts (ssh)
 └── .github/workflows/

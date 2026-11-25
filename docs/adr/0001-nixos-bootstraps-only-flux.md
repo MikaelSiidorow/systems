@@ -1,6 +1,6 @@
 # NixOS bootstraps only Flux
 
-- Status: accepted, migrating
+- Status: accepted
 - Date: 2026-11-25
 
 ## Context
@@ -55,9 +55,11 @@ from NixOS, then run these steps by hand in order:
    ConfigMap carry ownerReferences to the HelmChart, so Kubernetes deletes
    them with it. The ClusterRoleBinding has none and stays.
 
-k3s records ownership in `objectset.rio.cattle.io` annotations instead of
-ownerReferences, so no garbage collection happens. k3s's AddOn objects stay
-until a test shows that deleting one leaves the objects it applied in place.
+k3s deletes what a manifest applied only when the manifest is disabled with
+`--disable`. Removing the file, adding a `.skip` file or deleting its AddOn
+object leaves the objects in place: k3s records ownership in
+`objectset.rio.cattle.io` annotations, not ownerReferences, so no garbage
+collection follows. Stale AddOn objects can be deleted.
 
 Flux HelmReleases also skip CRD upgrades by default. Traefik's HelmRelease sets
 `install.crds` and `upgrade.crds` to `CreateReplace`, which retires the
@@ -79,6 +81,6 @@ review like the monitoring stack.
   running. This order is intentional because apps need ingress and TLS.
 - A fresh cluster comes up from NixOS and Git. Flux installs the controllers,
   then their config, then the apps.
-- The host-tied Services (headscale and refinery's database) and the app repos'
-  `ci-deploy` RBAC can move to `k8s/` like `k8s/wger/db.yaml` did. That leaves
-  k3s's manifests directory for the Flux bootstrap alone.
+- The host-tied Services (headscale and the databases) and the app repos'
+  `ci-deploy` RBAC live in `k8s/` with their apps, so k3s's manifests
+  directory holds only the Flux bootstrap.

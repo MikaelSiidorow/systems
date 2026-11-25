@@ -1,0 +1,46 @@
+# The wger repo's CI restarts its Deployments with this account's token. The
+# token lives as long as the Secret. Renaming or retyping the Secret, or
+# deleting it or the account, replaces the token and breaks that CI, so Flux
+# never prunes either.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-deploy
+  namespace: wger
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-deploy-token
+  namespace: wger
+  annotations:
+    kubernetes.io/service-account.name: ci-deploy
+    kustomize.toolkit.fluxcd.io/prune: disabled
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-deploy
+  namespace: wger
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch"]
+    resourceNames: ["wger-web", "wger-celery-worker", "wger-celery-beat"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-deploy
+  namespace: wger
+subjects:
+  - kind: ServiceAccount
+    name: ci-deploy
+    namespace: wger
+roleRef:
+  kind: Role
+  name: ci-deploy
+  apiGroup: rbac.authorization.k8s.io

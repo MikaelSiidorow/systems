@@ -2,146 +2,6 @@
 
 let
   manifestDir = "/var/lib/rancher/k3s/server/manifests";
-
-  # Host service endpoints for services that run on olympus itself.
-  headscaleService = pkgs.writeText "headscale-service.yaml" ''
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      name: headscale
-    ---
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: headscale
-      namespace: headscale
-    spec:
-      ports:
-        - port: 8080
-          targetPort: 8080
-    ---
-    apiVersion: discovery.k8s.io/v1
-    kind: EndpointSlice
-    metadata:
-      name: headscale
-      namespace: headscale
-      labels:
-        kubernetes.io/service-name: headscale
-    addressType: IPv4
-    ports:
-      - port: 8080
-    endpoints:
-      - addresses:
-          - 10.42.0.1
-  '';
-
-  ciDeployRbac = pkgs.writeText "ci-deploy-rbac.yaml" ''
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: ci-deploy
-      namespace: refinery
-    ---
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: ci-deploy-token
-      namespace: refinery
-      annotations:
-        kubernetes.io/service-account.name: ci-deploy
-    type: kubernetes.io/service-account-token
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: Role
-    metadata:
-      name: ci-deploy
-      namespace: refinery
-    rules:
-      - apiGroups: ["apps"]
-        resources: ["deployments"]
-        verbs: ["get", "list", "watch", "patch"]
-        resourceNames: ["refinery-app", "refinery-zero"]
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: RoleBinding
-    metadata:
-      name: ci-deploy
-      namespace: refinery
-    subjects:
-      - kind: ServiceAccount
-        name: ci-deploy
-        namespace: refinery
-    roleRef:
-      kind: Role
-      name: ci-deploy
-      apiGroup: rbac.authorization.k8s.io
-    ---
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: ci-deploy
-      namespace: wger
-    ---
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: ci-deploy-token
-      namespace: wger
-      annotations:
-        kubernetes.io/service-account.name: ci-deploy
-    type: kubernetes.io/service-account-token
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: Role
-    metadata:
-      name: ci-deploy
-      namespace: wger
-    rules:
-      - apiGroups: ["apps"]
-        resources: ["deployments"]
-        verbs: ["get", "list", "watch", "patch"]
-        resourceNames: ["wger-web", "wger-celery-worker", "wger-celery-beat"]
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: RoleBinding
-    metadata:
-      name: ci-deploy
-      namespace: wger
-    subjects:
-      - kind: ServiceAccount
-        name: ci-deploy
-        namespace: wger
-    roleRef:
-      kind: Role
-      name: ci-deploy
-      apiGroup: rbac.authorization.k8s.io
-  '';
-
-  refineryDbService = pkgs.writeText "refinery-db-service.yaml" ''
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: refinery-db
-      namespace: refinery
-    spec:
-      ports:
-        - port: 5432
-          targetPort: 5432
-    ---
-    apiVersion: discovery.k8s.io/v1
-    kind: EndpointSlice
-    metadata:
-      name: refinery-db
-      namespace: refinery
-      labels:
-        kubernetes.io/service-name: refinery-db
-    addressType: IPv4
-    ports:
-      - port: 5432
-    endpoints:
-      - addresses:
-          - 10.42.0.1
-  '';
 in
 {
   # K3s - Lightweight Kubernetes
@@ -157,28 +17,25 @@ in
     ];
   };
 
-  # Auto-deploy infrastructure manifests via K3s
+  # k3s applies only the Flux bootstrap; Flux deploys everything else from
+  # k8s/ (docs/adr/0001-nixos-bootstraps-only-flux.md).
   systemd.tmpfiles.rules = [
-    # Flux installs Traefik, its CRDs, cert-manager and the ClusterIssuers
-    # (k8s/infrastructure/). Removing a file leaves what k3s applied; the
-    # HelmCharts were marked unmanaged and deleted by hand, since deleting a
-    # managed one uninstalls the release
-    # (docs/adr/0001-nixos-bootstraps-only-flux.md).
+    "L+ ${manifestDir}/flux-operator-helmchart.yaml - - - - ${./flux-operator-helmchart.yaml}"
+    "L+ ${manifestDir}/flux-instance.yaml - - - - ${./flux-instance.yaml}"
+    # Manifests k3s used to apply. Removing a file leaves what k3s applied
+    # from it. Flux took over what is still needed; Argo CD was uninstalled
+    # by hand, and the other HelmCharts were detached by hand so deleting
+    # them didn't uninstall their releases.
     "r ${manifestDir}/traefik-crds.yaml - - - -"
     "r ${manifestDir}/traefik-helmchart.yaml - - - -"
     "r ${manifestDir}/cert-manager-helmchart.yaml - - - -"
     "r ${manifestDir}/cluster-issuer.yaml - - - -"
-    # Argo CD is gone; Flux deploys k8s/. Removing a file leaves what k3s
-    # applied from it, so the release was uninstalled by hand.
     "r ${manifestDir}/argocd-helmchart.yaml - - - -"
     "r ${manifestDir}/argocd-bootstrap.yaml - - - -"
-    "L+ ${manifestDir}/flux-operator-helmchart.yaml - - - - ${./flux-operator-helmchart.yaml}"
-    "L+ ${manifestDir}/flux-instance.yaml - - - - ${./flux-instance.yaml}"
-    "L+ ${manifestDir}/headscale-service.yaml - - - - ${headscaleService}"
-    "L+ ${manifestDir}/refinery-db-service.yaml - - - - ${refineryDbService}"
-    # wger's namespace and database service are in k8s/wger, deployed by Flux.
+    "r ${manifestDir}/headscale-service.yaml - - - -"
+    "r ${manifestDir}/refinery-db-service.yaml - - - -"
     "r ${manifestDir}/wger-db-service.yaml - - - -"
-    "L+ ${manifestDir}/ci-deploy-rbac.yaml - - - - ${ciDeployRbac}"
+    "r ${manifestDir}/ci-deploy-rbac.yaml - - - -"
   ];
 
   # Hand olympus's host age key to Flux so kustomize-controller can decrypt

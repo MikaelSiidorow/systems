@@ -10,6 +10,7 @@ resources:
   - wger-admin-bootstrap.sops.yaml
   - wger-email.sops.yaml
   - db.yaml
+  - ci-deploy.yaml
   - storage.yaml
   - services.yaml
   - redis.yaml
