@@ -136,6 +136,13 @@
         "k8s/monitoring/**"
       ],
       "automerge": false
+    },
+    {
+      "description": "Ingress and TLS for every app; see docs/adr/0001-nixos-bootstraps-only-flux.md",
+      "matchFileNames": [
+        "k8s/infrastructure/**"
+      ],
+      "automerge": false
     }
   ],
   "nix": {

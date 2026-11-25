@@ -9,6 +9,8 @@ spec:
   # Waits for the bootstrap and PowerSync setup Jobs, and wger-web's
   # migrations on a fresh database.
   timeout: 20m
+  dependsOn:
+    - name: infrastructure-configs
   sourceRef:
     kind: GitRepository
     name: flux-system

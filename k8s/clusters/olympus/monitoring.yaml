@@ -9,6 +9,8 @@ spec:
   # Each HelmRelease may take its own 10m timeout, and loki, tempo and alloy
   # wait for kube-prometheus-stack.
   timeout: 30m
+  dependsOn:
+    - name: infrastructure-configs
   sourceRef:
     kind: GitRepository
     name: flux-system
