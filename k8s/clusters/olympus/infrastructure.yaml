@@ -28,7 +28,10 @@ spec:
           name: any
           annotations:
             kustomize.toolkit.fluxcd.io/prune: disabled
-  wait: true
+  # Waiting on everything here would count a chart repository's index outage
+  # as a failure and hold back every app. Health checks target the
+  # controllers' HelmReleases instead, once they move here.
+  wait: false
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

@@ -44,6 +44,15 @@ namespace. k3s records ownership in `objectset.rio.cattle.io` annotations, not
 ownerReferences, so no garbage collection follows. AddOn objects stay until
 deleting one is shown to leave its objects alone.
 
+Flux's HelmReleases skip CRD upgrades by default too, so Traefik's sets
+`install.crds` and `upgrade.crds` to `CreateReplace`; that is what retires
+the committed CRD file. cert-manager templates its CRDs (`crds.enabled`), so
+Helm already upgrades them.
+
+`infrastructure-controllers` health-checks only its HelmReleases rather than
+waiting on everything it applies, so a chart repository's index outage
+doesn't count as a failure.
+
 Traefik and cert-manager updates wait for review, like the monitoring stack,
 until dependency triage is automated.
 
@@ -51,10 +60,12 @@ until dependency triage is automated.
 
 - One path for every cluster dependency: Flux applies it and Renovate's flux
   manager bumps it.
-- A failing controller upgrade holds back app syncs until it is fixed or
-  rolled back. That is the intended order: apps need ingress and TLS.
+- A failing controller upgrade, or a config that fails to apply or decrypt,
+  holds back every app's syncs until it is fixed or rolled back. Running
+  workloads keep running. That is the intended order: apps need ingress and
+  TLS.
 - A fresh cluster comes up from NixOS plus Git: Flux installs the controllers,
   then their config, then the apps.
-- The host-tied Services (headscale, refinery's database) can move to `k8s/`
-  the way `k8s/wger/db.yaml` did, leaving k3s's manifests directory to the
-  Flux bootstrap.
+- The host-tied Services (headscale, refinery's database) and the app repos'
+  `ci-deploy` RBAC can move to `k8s/` the way `k8s/wger/db.yaml` did, leaving
+  k3s's manifests directory to the Flux bootstrap.
