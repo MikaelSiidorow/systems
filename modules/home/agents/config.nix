@@ -170,6 +170,7 @@ let
           metrics_exporter = otlp "/v1/metrics";
           # Written either way, since the merge never removes a key.
           log_user_prompt = telemetry.content;
+          log_agent_responses = telemetry.content;
         }
         // lib.optionalAttrs (!telemetry.toolDetails) {
           # Codex has no switch for tool arguments (the command); local
@@ -519,7 +520,7 @@ in
           content = lib.mkOption {
             type = lib.types.bool;
             default = false;
-            description = "Export prompts, Claude's responses and Claude's tool output. The host collector keeps them off the cluster.";
+            description = "Export prompts, responses and Claude's tool output. The host collector keeps them off the cluster.";
           };
           grafana = lib.mkOption {
             type = lib.types.nullOr lib.types.str;

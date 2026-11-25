@@ -9,9 +9,11 @@ archiveDir: ''
   // Raw archive: every signal as the agents sent it, before the T3 filter and
   // content stripping, so it keeps prompts and tool output. Each file is a run
   // of records, a 4-byte big-endian length then a zstd frame holding one
-  // OTLP/JSON export request. Files rotate at 100 MB and go after 90 days;
-  // the backup counts cap the archive at about 19 GB in all. Batches of 10s
-  // compress better and keep a slow disk from stalling the receiver.
+  // OTLP/JSON export request. Files rotate by size only, and rotated files
+  // go after 90 days or past the backup count, which caps the archive at
+  // about 16 GB in all; a quiet file can hold older data until it rotates.
+  // Batches of 10s compress better. A write error drops the archive batch
+  // only, but a hung disk stalls the receiver once the batch queue fills.
   otelcol.processor.batch "archive" {
     timeout = "10s"
 
@@ -37,8 +39,9 @@ archiveDir: ''
     path        = "${archiveDir}/logs.otlp"
     compression = "zstd"
 
+    // Small, so prompts rotate and expire sooner.
     rotation {
-      max_megabytes = 100
+      max_megabytes = 10
       max_days      = 90
       max_backups   = 20
     }
@@ -49,7 +52,7 @@ archiveDir: ''
     compression = "zstd"
 
     rotation {
-      max_megabytes = 100
+      max_megabytes = 10
       max_days      = 90
       max_backups   = 20
     }
@@ -71,10 +74,12 @@ archiveDir: ''
     }
   }
 
-  // Exact names only, so metadata like prompt_length stays.
+  // Exact names only, so metadata like prompt_length stays. Beyond the
+  // content settings, this covers Claude's detailed beta tracing and raw API
+  // bodies, should a shell turn them on.
   otelcol.processor.attributes "content" {
     action {
-      pattern = "^(prompt|prompt_text|user_prompt|response)$"
+      pattern = "^(prompt|prompt_text|user_prompt|response|response\\.model_output|body|system_prompt|system_prompt_preview|user_system_prompt|new_context|system_reminders)$"
       action  = "delete"
     }
 
