@@ -37,10 +37,21 @@ Apps keep a Kustomization each, so one broken app doesn't hold back the
 others. There is no separate platform layer: monitoring is an app that
 depends on the configs like the rest.
 
-Moving a k3s HelmChart to Flux detaches it first (remove the manifest, strip
-the HelmChart's `wrangler.cattle.io/on-helm-chart-remove` finalizer, delete
-it), then adopts the live release with a HelmRelease of the same name and
-namespace. k3s records ownership in `objectset.rio.cattle.io` annotations, not
+Moving a k3s HelmChart to Flux detaches it first, then adopts the live
+release with a HelmRelease of the same name and namespace. Detaching removes
+the manifest, then by hand:
+
+1. Annotates the HelmChart `helmcharts.helm.cattle.io/unmanaged`, so k3s's
+   helm-controller ignores it. Without this, its remove handler puts back the
+   `wrangler.cattle.io/on-helm-chart-remove` finalizer as soon as it is
+   stripped, and deleting the chart runs `helm uninstall`.
+2. Strips that finalizer and deletes the HelmChart. The release stays.
+3. Deletes the chart's install leftovers in `kube-system` (the
+   `helm-install-*` Job, its ServiceAccount, its cluster-admin
+   ClusterRoleBinding and its values Secret). Only the controller's own
+   uninstall would have removed them.
+
+k3s records ownership in `objectset.rio.cattle.io` annotations, not
 ownerReferences, so no garbage collection follows. AddOn objects stay until
 deleting one is shown to leave its objects alone.
 
