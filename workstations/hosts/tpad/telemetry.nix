@@ -1,7 +1,8 @@
 # Claude Code and Codex export to a local Alloy queue, which forwards to the
 # cluster Alloy over the tailnet like Hestia's (infra/nixos/hosts/hestia/monitoring.nix).
 # The laptop is often offline, so batches wait on disk and retry for a day.
-{ pkgs, ... }:
+# Raw OTLP is also archived in ~/.local/state/alloy/archive.
+{ config, pkgs, ... }:
 let
   alloyConfig = pkgs.writeText "config.alloy" ''
     otelcol.receiver.otlp "agents" {
@@ -10,11 +11,13 @@ let
       }
 
       output {
-        metrics = [otelcol.processor.batch.default.input]
-        logs    = [otelcol.processor.batch.default.input]
-        traces  = [otelcol.processor.batch.default.input]
+        metrics = [otelcol.processor.batch.archive.input, otelcol.processor.batch.default.input]
+        logs    = [otelcol.processor.batch.archive.input, otelcol.processor.attributes.content.input]
+        traces  = [otelcol.processor.batch.archive.input, otelcol.processor.filter.content.input]
       }
     }
+
+    ${import ../../../modules/agent-telemetry-alloy.nix "${config.xdg.stateHome}/alloy/archive"}
 
     otelcol.processor.batch "default" {
       output {
@@ -62,12 +65,14 @@ in
   systemd.user.services.alloy = {
     Unit.Description = "Alloy queue for agent telemetry";
     Service = {
-      # otelcol.storage.file is public preview. State and the queue live in
-      # ~/.local/state/alloy.
+      # otelcol.storage.file and otelcol.exporter.file are public preview.
+      # State, the queue and the archive live in ~/.local/state/alloy.
       ExecStart = "${pkgs.grafana-alloy}/bin/alloy run --stability.level=public-preview --storage.path=%S/alloy --disable-reporting ${alloyConfig}";
       StateDirectory = "alloy";
       Restart = "on-failure";
       MemoryMax = "256M";
+      # The archive holds prompts and tool output.
+      UMask = "0077";
     };
     Install.WantedBy = [ "default.target" ];
   };

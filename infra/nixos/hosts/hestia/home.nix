@@ -32,10 +32,12 @@
       home.stateVersion = "26.05";
 
       # Agent traces and events go to the local Alloy queue, which forwards
-      # them to the cluster with the host metrics.
+      # them to the cluster with the host metrics. Content stays in the
+      # host's archive; Alloy strips it before forwarding.
       agents.telemetry = {
         endpoint = "http://127.0.0.1:4318";
         host = "hestia";
+        content = true;
       };
       # Full transcripts for later analysis; tpad's arrive in ~/agent-transcripts/tpad.
       agents.keepTranscripts = true;

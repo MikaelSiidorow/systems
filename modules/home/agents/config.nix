@@ -58,6 +58,11 @@ let
           # Bash commands, MCP and skill names, and branch and SHA on commits.
           # Off is written out, since the merge never removes a key.
           OTEL_LOG_TOOL_DETAILS = if telemetry.toolDetails then "1" else "0";
+          # Tool output as a tool.output span event (60 KB cap) and prompt
+          # text; responses follow the prompt setting. Here, not in the
+          # process environment, which this block overrides.
+          OTEL_LOG_TOOL_CONTENT = if telemetry.content then "1" else "0";
+          OTEL_LOG_USER_PROMPTS = if telemetry.content then "1" else "0";
         }
         // lib.optionalAttrs (grafana != null) {
           GRAFANA_URL = grafana;
@@ -163,12 +168,13 @@ let
           exporter = otlp "/v1/logs";
           trace_exporter = otlp "/v1/traces";
           metrics_exporter = otlp "/v1/metrics";
+          # Written either way, since the merge never removes a key.
+          log_user_prompt = telemetry.content;
         }
         // lib.optionalAttrs (!telemetry.toolDetails) {
           # Codex has no switch for tool arguments (the command); local
           # collectors drop them (workstations/hosts/mbp/telemetry.nix).
           tool_result.max_bytes = 0;
-          log_user_prompt = false;
         };
     }
   );
@@ -508,7 +514,12 @@ in
           toolDetails = lib.mkOption {
             type = lib.types.bool;
             default = true;
-            description = "Export Bash commands and tool details. Off also keeps Codex tool output and prompts out.";
+            description = "Export Bash commands and tool details. Off also keeps Codex tool output out.";
+          };
+          content = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Export prompts, Claude's responses and Claude's tool output. The host collector keeps them off the cluster.";
           };
           grafana = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
