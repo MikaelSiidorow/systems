@@ -38,7 +38,7 @@ Low-risk first, then `infra/` flake bumps, then majors one at a time, the ingres
 - Flux: every Kustomization and HelmRelease Ready at the new revision (`kubectl -n flux-system get kustomizations,helmreleases`); a failed chart upgrade rolls back and shows in the HelmRelease's events.
 - Pods: nothing outside `Running`/`Completed`; note new restarts. A k3s upgrade restarts the DNS, so pods that resolve a DB on startup restart once.
 - Memory: for each upgraded container, compare `container_memory_working_set_bytes` with its limit, and check `anon` vs `file` in the cgroup's `memory.stat`. A container with almost no `file` left sits at its limit and thrashes; raise the limit in a follow-up PR with the numbers.
-- k3s HelmCharts (traefik, cert-manager, flux-operator): `kubectl -n kube-system get helmchart <name>` and the `helm-install-<name>` job logs.
+- k3s HelmCharts (traefik, flux-operator): `kubectl -n kube-system get helmchart <name>` and the `helm-install-<name>` job logs.
 - Ingress changes: `curl` each Ingress host over https and http (expect the same codes as before, http → 301).
 - Monitoring changes: Prometheus targets up, rule groups loaded, Alertmanager config still has the Telegram receiver.
 
