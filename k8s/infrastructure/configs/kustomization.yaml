@@ -1,6 +1,5 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# NixOS (k3s.nix) still applies the ClusterIssuers; for now this holds the
-# DNS-01 token the letsencrypt-dns issuer reads.
 resources:
   - cloudflare-api-token.sops.yaml
+  - cluster-issuers.yaml
