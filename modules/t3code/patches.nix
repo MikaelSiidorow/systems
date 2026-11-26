@@ -17,6 +17,7 @@ in
     t3pOrElseSucceed = "Effect.js:orElseSucceed";
     t3pCurrentSpan = "Effect.js:currentSpan";
     t3pAnnotateCurrentSpan = "Effect.js:annotateCurrentSpan";
+    t3pFnUntraced = "Effect.js:fnUntraced";
   };
 
   patches = [
@@ -51,6 +52,39 @@ in
       find = "const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) {";
       replace = "const offerOutgoingUntraced = offerOutgoing; const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) { const trace = method === \"turn/start\" || method === \"turn/steer\" ? yield* ${spanTrace} : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });";
     }
+    {
+      # The agent's own telemetry carries no T3 thread, and later Claude turns
+      # stay in turn 1's trace. T3 picks Claude's session ID, so record it on
+      # every turn's span.
+      why = "Map each T3 thread to Claude's session.id on every turn.";
+      find = "const startTurn = fn\\(\"ClaudeAdapterV2\\.startTurn\"\\)\\(function\\* \\(turnInput\\) \\{\\s*modelCatalog = yield\\* loadModelCatalog;\\s*const startedAt = yield\\* now;\\s*const nativeThreadId = yield\\* getNativeThreadId\\(turnInput\\.providerThread\\);";
+      regex = true;
+      replace = "const startTurn = fn(\"ClaudeAdapterV2.startTurn\")(function* (turnInput) { modelCatalog = yield* loadModelCatalog; const startedAt = yield* now; const nativeThreadId = yield* getNativeThreadId(turnInput.providerThread); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": turnInput.threadId, \"claude.session_id\": nativeThreadId });";
+    }
+    {
+      # Codex's shared app-server records no request field but the trace
+      # context on its spans or events; its thread ID is conversation.id.
+      why = "Map each T3 thread to Codex's conversation.id on every turn.";
+      find = "const startNativeTurn = fn\\(\"CodexAdapterV2\\.startNativeTurn\"\\)\\(function\\* \\(turnInput, codexInput\\) \\{\\s*const threadId = yield\\* getNativeThreadId\\(turnInput\\.providerThread\\);";
+      regex = true;
+      replace = "const startNativeTurn = fn(\"CodexAdapterV2.startNativeTurn\")(function* (turnInput, codexInput) { const threadId = yield* getNativeThreadId(turnInput.providerThread); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": turnInput.threadId, \"codex.conversation_id\": threadId });";
+    }
+  ]
+  # About a third of T3's spans (upstream t3code#28196). Their children parent
+  # to the caller instead.
+  ++
+    map
+      (name: {
+        why = "Stop tracing ${name}, which T3 runs constantly.";
+        find = "fn(\"${name}\")(";
+        replace = "t3pFnUntraced(";
+      })
+      [
+        "NonBlockingSpawner.spawn"
+        "processRunner.runProcessCore"
+        "ClaudeAgentSdkQueryRunner.trackDescendants"
+      ]
+  ++ [
     {
       why = "Name taskIds in the background-wait prompt; agents that skip the schema call t3_background_wait with taskId or nothing.";
       find = "with its task ID before you end your turn";
