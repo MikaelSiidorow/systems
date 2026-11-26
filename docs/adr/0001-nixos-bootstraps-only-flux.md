@@ -66,6 +66,13 @@ Flux HelmReleases also skip CRD upgrades by default. Traefik's HelmRelease sets
 committed CRD file. cert-manager templates its CRDs via `crds.enabled`, so Helm
 already upgrades them.
 
+The Traefik and cert-manager HelmReleases carry
+`kustomize.toolkit.fluxcd.io/prune: disabled`. Pruning a HelmRelease
+uninstalls its release, so reverting a commit or deleting the file would take
+ingress or TLS down. To retire one, remove it from Git, then delete the
+HelmRelease by hand. Deleting it uninstalls the release unless it was
+suspended first (`flux suspend helmrelease`).
+
 `infrastructure-controllers` health-checks only its HelmReleases instead of
 waiting on everything it applies. Otherwise, a chart repository index outage
 would count as a failure.

@@ -29,6 +29,8 @@ Everything else waits for review: majors, the monitoring stack, `k8s/infrastruct
 
 For chart majors, read the chart's upgrade notes (README "Upgrading" or UPGRADE.md) and `helm template` it with our values where it renders.
 
+For Traefik, also diff its CRDs between the two chart versions. Flux replaces them before upgrading the release, and a Helm rollback leaves the new CRDs in place, so a rollback is only safe when the old Traefik accepts them.
+
 ## Merge order
 
 Low-risk first, then `infra/` flake bumps, then majors one at a time, the ingress (traefik) last. Merge with `--squash`.
