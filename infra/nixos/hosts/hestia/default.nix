@@ -40,6 +40,7 @@ in
     ./home-assistant.nix
     ./monitoring.nix
     ./reverse-proxy.nix
+    ./saha.nix
     ./zigbee.nix
   ];
 
