@@ -55,11 +55,18 @@ in
     {
       # The agent's own telemetry carries no T3 thread, and later Claude turns
       # stay in turn 1's trace. T3 picks Claude's session ID, so record it on
-      # every turn's span.
+      # every turn's span. clearedNativeSessions holds the ID Claude reported
+      # when it differs (after the open retry below).
       why = "Map each T3 thread to Claude's session.id on every turn.";
       find = "const startTurn = fn\\(\"ClaudeAdapterV2\\.startTurn\"\\)\\(function\\* \\(turnInput\\) \\{\\s*modelCatalog = yield\\* loadModelCatalog;\\s*const startedAt = yield\\* now;\\s*const nativeThreadId = yield\\* getNativeThreadId\\(turnInput\\.providerThread\\);";
       regex = true;
-      replace = "const startTurn = fn(\"ClaudeAdapterV2.startTurn\")(function* (turnInput) { modelCatalog = yield* loadModelCatalog; const startedAt = yield* now; const nativeThreadId = yield* getNativeThreadId(turnInput.providerThread); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": turnInput.threadId, \"claude.session_id\": nativeThreadId });";
+      replace = "const startTurn = fn(\"ClaudeAdapterV2.startTurn\")(function* (turnInput) { modelCatalog = yield* loadModelCatalog; const startedAt = yield* now; const nativeThreadId = yield* getNativeThreadId(turnInput.providerThread); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": turnInput.threadId, \"claude.session_id\": clearedNativeSessions.get(nativeThreadId) ?? nativeThreadId });";
+    }
+    {
+      # A first turn's startTurn span still has the original ID.
+      why = "Record the new Claude session ID when open retries after an MCP registration timeout.";
+      find = "const sessionId = yield* random.uuidV4();\n\t\t\t\treturn yield* openQuery({";
+      replace = "const sessionId = yield* random.uuidV4(); yield* t3pAnnotateCurrentSpan({ \"claude.session_id\": sessionId });\n\t\t\t\treturn yield* openQuery({";
     }
     {
       # Codex's shared app-server records no request field but the trace
@@ -81,10 +88,15 @@ in
       })
       [
         "NonBlockingSpawner.spawn"
-        "processRunner.runProcessCore"
         "ClaudeAgentSdkQueryRunner.trackDescendants"
       ]
   ++ [
+    {
+      # Its annotation would otherwise land on the caller, such as a turn span.
+      why = "Stop tracing processRunner.runProcessCore, which T3 runs constantly.";
+      find = "fn(\"processRunner.runProcessCore\")(function* (spawner, input) {\n\tyield* annotateCurrentSpan(\"process.command\", commandName(input.command));";
+      replace = "t3pFnUntraced(function* (spawner, input) {";
+    }
     {
       why = "Name taskIds in the background-wait prompt; agents that skip the schema call t3_background_wait with taskId or nothing.";
       find = "with its task ID before you end your turn";
