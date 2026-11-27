@@ -15,6 +15,7 @@ let
 in
 {
   imports = [
+    ./backups.nix
     ./disko.nix
     ./k3s.nix
     ./headscale.nix
