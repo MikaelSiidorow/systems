@@ -5,24 +5,26 @@ let
   postgres = config.services.postgresql.package;
   dumpDir = "/var/backup/postgresql";
 
+  # Runs a command as postgres without the rest-server login the unit's
+  # environment file sets.
+  asPostgres = "${pkgs.coreutils}/bin/env -u RESTIC_REST_USERNAME -u RESTIC_REST_PASSWORD ${pkgs.util-linux}/bin/runuser -u postgres --";
+
   # One custom-format dump per database, plus the roles. Uncompressed, so
   # restic can deduplicate unchanged data between nights and compress it itself.
   dumpPostgres = pkgs.writeShellScript "dump-postgres" ''
     set -euo pipefail
-    psql() { ${pkgs.util-linux}/bin/runuser -u postgres -- ${postgres}/bin/psql "$@"; }
 
     rm -rf ${dumpDir}
     install -d -m 0700 -o postgres -g postgres ${dumpDir}
 
-    ${pkgs.util-linux}/bin/runuser -u postgres -- \
-      ${postgres}/bin/pg_dumpall --globals-only --file=${dumpDir}/globals.sql
+    ${asPostgres} ${postgres}/bin/pg_dumpall --globals-only --file=${dumpDir}/globals.sql </dev/null
 
-    psql --no-align --tuples-only --set=ON_ERROR_STOP=1 \
-      --command="SELECT datname FROM pg_database WHERE NOT datistemplate" \
-      | while read -r db; do
-          ${pkgs.util-linux}/bin/runuser -u postgres -- \
-            ${postgres}/bin/pg_dump --format=custom --compress=0 \
-            --file="${dumpDir}/$db.dump" "$db"
+    ${asPostgres} ${postgres}/bin/psql --no-align --tuples-only --set=ON_ERROR_STOP=1 \
+      --command="SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn ORDER BY datname" \
+      </dev/null \
+      | while IFS= read -r db; do
+          ${asPostgres} ${postgres}/bin/pg_dump --format=custom --compress=0 \
+            --file="${dumpDir}/$db.dump" "$db" </dev/null
         done
   '';
 in
@@ -40,6 +42,9 @@ in
     environmentFile = config.sops.templates."restic-rest-server.env".path;
     initialize = true;
     backupPrepareCommand = "${dumpPostgres}";
+    # The dumps hold every row and the role password hashes; keep them on
+    # disk only while restic reads them.
+    backupCleanupCommand = "rm -rf ${dumpDir}";
     paths = [ dumpDir ];
     # Hestia prunes; the rest-server is append-only, so olympus cannot.
     pruneOpts = [ ];
@@ -51,7 +56,10 @@ in
   };
 
   systemd.services.restic-backups-hestia = {
-    after = [ "postgresql.service" ];
+    after = [
+      "postgresql.service"
+      "tailscaled.service"
+    ];
     requires = [ "postgresql.service" ];
   };
 }
