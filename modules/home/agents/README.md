@@ -9,6 +9,7 @@ Home-manager module that installs Claude Code, Codex and (on Linux) OpenCode, an
 - [`codex/rules/`](codex/rules/): Codex command rules, such as pre-approved read-only `gh` calls.
 - [`antigravity/otel-hook.sh`](antigravity/otel-hook.sh): Antigravity hook that sends OTLP spans on hosts with `agents.telemetry`, since `agy` has no OTel export.
 - [`claude-code/statusline-command.sh`](claude-code/statusline-command.sh): the Claude Code status line.
+- [`claude-code/bash-wait-guard.sh`](claude-code/bash-wait-guard.sh): a `PreToolUse` hook that denies foreground Bash calls whose timeout outlives the prompt cache (over 270 s in a subagent, 55 minutes in the main loop), so a long wait doesn't make the next turn rewrite the whole context.
 - [`packages.nix`](packages.nix): the CLIs themselves (from the `claude-code-nix`, `codex-cli-nix` and `opencode-nix` flake inputs) and shell aliases such as `c`, `cco` and `crew`.
 
 ## Skills
