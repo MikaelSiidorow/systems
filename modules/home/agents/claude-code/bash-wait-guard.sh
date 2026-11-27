@@ -1,10 +1,11 @@
-# PreToolUse hook on Bash: deny foreground calls whose timeout outlives the
-# prompt cache. The next model call would then rewrite the whole context.
-# Subagent caches last 5 minutes and the main loop's about an hour. Only
-# subagent payloads carry agent_id.
+# PreToolUse hook on Bash: deny foreground calls whose timeout runs longer
+# than the prompt cache (5 minutes in subagents, about an hour in the main
+# loop), so the next turn does not rewrite the full context. Only subagent
+# payloads include agent_id.
 #
-# A foreground call ends at its tool timeout (default BASH_DEFAULT_TIMEOUT_MS,
-# 2 minutes), whatever the command, so the timeout alone bounds the wait.
+# Foreground calls stop at their tool timeout (BASH_DEFAULT_TIMEOUT_MS, or
+# 2 minutes if unset) regardless of the command, so checking the timeout is
+# enough.
 input=$(cat)
 
 read -r background agent timeout < <(
@@ -30,7 +31,7 @@ timeout_ms=${timeout:-${BASH_DEFAULT_TIMEOUT_MS:-120000}}
 seconds=$((timeout_ms / 1000))
 [ "$seconds" -le "$limit" ] && exit 0
 
-reason="Blocked: a foreground Bash call of up to ${seconds}s outlives the prompt cache (${lifetime}), so the next turn would rewrite the whole context. Keep the timeout at or under ${limit}s: wait in bounded steps such as \`timeout $((limit - 30)) <wait>\` and check again, or start long work such as a build with run_in_background and poll its output or watch it with Monitor."
+reason="Blocked: foreground Bash timeout (${seconds}s) exceeds the ${limit}s limit. The prompt cache expires after ${lifetime}, forcing the next turn to rewrite the full context. Keep the timeout at or under ${limit}s (wait in bounded steps with \`timeout $((limit - 30)) <cmd>\`), or use run_in_background and poll or watch with Monitor."
 
 jq -n --arg reason "$reason" '{
   hookSpecificOutput: {

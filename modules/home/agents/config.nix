@@ -32,7 +32,7 @@ let
           type = "command";
           command = "~/.claude/statusline-command.sh";
         };
-        # A stable path, so the list union keeps one entry across switches.
+        # Use a stable path so the list union does not add duplicates on switch.
         hooks.PreToolUse = [
           {
             matcher = "Bash";
@@ -265,7 +265,7 @@ let
     }
   );
 
-  # Denies foreground Bash waits that outlive the prompt cache.
+  # Denies foreground Bash timeouts that would expire the prompt cache.
   claudeBashWaitGuard = pkgs.writeShellApplication {
     name = "bash-wait-guard";
     runtimeInputs = [ pkgs.jq ];
