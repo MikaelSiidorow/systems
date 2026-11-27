@@ -8,12 +8,21 @@
 # enough.
 input=$(cat)
 
-read -r background agent timeout < <(
-  jq -r '[
-    .tool_input.run_in_background // false,
-    (if .agent_id then "subagent" else "main" end),
-    .tool_input.timeout // ""
-  ] | @tsv' <<<"$input"
+# Resolve the timeout the way Claude Code does: a missing or zero timeout
+# takes the default, and BASH_MAX_TIMEOUT_MS caps it. Numbers may arrive as
+# strings or fractions, so jq parses them and rounds up to whole ms.
+read -r background agent timeout_ms < <(
+  jq -r --arg default "${BASH_DEFAULT_TIMEOUT_MS:-}" --arg max "${BASH_MAX_TIMEOUT_MS:-}" '
+    def ms($fallback):
+      (if type == "number" then . else tonumber? end // 0) as $n
+      | if $n > 0 then $n else $fallback end;
+    ($max | ms(600000)) as $cap
+    | ($default | ms(120000)) as $fallback
+    | [
+        (.tool_input.run_in_background // false | tostring),
+        (if .agent_id then "subagent" else "main" end),
+        ([(.tool_input.timeout | ms($fallback)), $cap] | min | ceil)
+      ] | @tsv' <<<"$input"
 ) || exit 0
 
 [ "$background" = true ] && exit 0
@@ -26,10 +35,9 @@ else
   lifetime="about an hour"
 fi
 
-timeout_ms=${timeout:-${BASH_DEFAULT_TIMEOUT_MS:-120000}}
 [[ $timeout_ms =~ ^[0-9]+$ ]] || exit 0
-seconds=$((timeout_ms / 1000))
-[ "$seconds" -le "$limit" ] && exit 0
+[ "$timeout_ms" -le $((limit * 1000)) ] && exit 0
+seconds=$(((timeout_ms + 999) / 1000))
 
 reason="Blocked: foreground Bash timeout (${seconds}s) exceeds the ${limit}s limit. The prompt cache expires after ${lifetime}, forcing the next turn to rewrite the full context. Keep the timeout at or under ${limit}s (wait in bounded steps with \`timeout $((limit - 30)) <cmd>\`), or use run_in_background and poll or watch with Monitor."
 
