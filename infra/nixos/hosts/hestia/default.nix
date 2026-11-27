@@ -32,6 +32,7 @@ in
 {
   imports = [
     ./ares-port.nix
+    ./backups.nix
     ./cli-proxy-api.nix
     ./dev.nix
     ./gpu.nix
