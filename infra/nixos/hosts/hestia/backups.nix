@@ -15,7 +15,15 @@ in
     # Each login reaches only the repository under its own name (/olympus/).
     privateRepos = true;
     htpasswd-file = config.sops.secrets.restic-rest-server-htpasswd.path;
+    # Append-only still accepts unlimited uploads, and the repository shares
+    # the root filesystem. Cap it so a compromised olympus cannot fill the disk.
+    extraFlags = [ "--max-size=${toString (50 * 1024 * 1024 * 1024)}" ];
   };
+
+  # Pick up a changed htpasswd at once, not at rest-server's next reload check.
+  systemd.services.restic-rest-server.restartTriggers = [
+    config.sops.secrets.restic-rest-server-htpasswd.sopsFileHash
+  ];
 
   # bcrypt `htpasswd -B` entry for the olympus login.
   sops.secrets.restic-rest-server-htpasswd = {

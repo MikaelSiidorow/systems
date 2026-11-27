@@ -104,7 +104,8 @@ three minutes below 10 W it closes it again. Follow it with
 
 Hestia receives olympus's nightly restic backups ([ADR 0003](../../../../docs/adr/0003-backups-with-restic.md)).
 `restic-rest-server` listens on `100.64.0.3:8000`, append-only, and keeps the
-repositories in `/var/lib/restic`. Each login reaches only the repository under
+repositories in `/var/lib/restic`, capped at 50 GiB together so a runaway
+client cannot fill the root filesystem. Each login reaches only the repository under
 its own name. The headscale ACL lets only olympus and your own devices reach
 the port.
 

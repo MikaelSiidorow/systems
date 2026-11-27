@@ -29,8 +29,11 @@ them, and it holds no R2 credentials. Besides your own devices, the tailnet ACL 
 hestia handles all deletions. It prunes both repositories as the `restic` user,
 reading its own repository from disk instead of through the rest-server. Files
 written as any other user would lock the rest-server out of its own repository. Unlike olympus,
-hestia is not reachable from the internet. Both repositories keep 7 daily, 4
-weekly, and 6 monthly snapshots.
+hestia is not reachable from the internet. Both repositories keep one
+snapshot a day for the last 7 days, one a week for the last month and one a
+month for the last 6 months (`--keep-within-daily 7d --keep-within-weekly 1m
+--keep-within-monthly 6m`). The windows are measured in time, not counted, so
+a compromised olympus cannot push the real snapshots out by adding empty ones.
 
 Before restic runs, olympus dumps each database with `pg_dump` and copies
 Headscale's SQLite database with `.backup` so every snapshot is consistent. A
