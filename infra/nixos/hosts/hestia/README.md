@@ -105,11 +105,13 @@ three minutes below 10 W it closes it again. Follow it with
 Hestia receives olympus's nightly restic backups ([ADR 0003](../../../../docs/adr/0003-backups-with-restic.md)).
 `restic-rest-server` listens on `100.64.0.3:8000`, append-only, and keeps the
 repositories in `/var/lib/restic`. Each login reaches only the repository under
-its own name. The headscale ACL lets only olympus reach the port.
+its own name. The headscale ACL lets only olympus and your own devices reach
+the port.
 
 The logins are bcrypt `htpasswd` entries in the `restic-rest-server-htpasswd`
 key of `secrets/hestia.yaml`. Make olympus's with `htpasswd -nB olympus`, and
-keep its password in Bitwarden.
+keep its password in Bitwarden. Use letters and digits only: olympus reads it
+from an environment file, where quotes, `$` or spaces would break.
 
 ## Local reverse proxy
 

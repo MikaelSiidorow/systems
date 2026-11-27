@@ -6,7 +6,8 @@ let
 in
 {
   # Append-only: olympus can add snapshots but never delete them. Pruning runs
-  # locally as root against the repository directory, not through the server.
+  # locally as the restic user against the repository directory, not through
+  # the server, so every file stays readable by the server.
   services.restic.server = {
     enable = true;
     listenAddress = "${tailnetAddress}:${toString port}";
@@ -16,9 +17,6 @@ in
     htpasswd-file = config.sops.secrets.restic-rest-server-htpasswd.path;
   };
 
-  # The tailnet address can appear after the socket starts listening.
-  systemd.sockets.restic-rest-server.socketConfig.FreeBind = true;
-
   # bcrypt `htpasswd -B` entry for the olympus login.
   sops.secrets.restic-rest-server-htpasswd = {
     owner = "restic";
@@ -26,6 +24,6 @@ in
     mode = "0400";
   };
 
-  # The headscale ACL limits this port to tag:infra (olympus).
+  # The headscale ACL lets olympus (tag:infra) and your own devices reach this.
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ port ];
 }

@@ -23,11 +23,12 @@ olympus ── restic backup ──▶ hestia rest-server (append-only, tailnet 
 
 olympus writes only through hestia's rest-server, which runs in append-only
 mode. A compromised olympus can add snapshots, but it cannot delete or rewrite
-them, and it holds no R2 credentials. The tailnet ACL lets only `tag:infra`
+them, and it holds no R2 credentials. Besides your own devices, the tailnet ACL lets only `tag:infra`
 (olympus) reach the rest-server, and the rest-server also requires a login.
 
-hestia handles all deletions. It prunes both repositories as root, reading its
-own repository from disk instead of through the rest-server. Unlike olympus,
+hestia handles all deletions. It prunes both repositories as the `restic` user,
+reading its own repository from disk instead of through the rest-server. Files
+written as any other user would lock the rest-server out of its own repository. Unlike olympus,
 hestia is not reachable from the internet. Both repositories keep 7 daily, 4
 weekly, and 6 monthly snapshots.
 
