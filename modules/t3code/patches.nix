@@ -66,7 +66,7 @@ in
       # A first turn's startTurn span still has the original ID.
       why = "Record the new Claude session ID when open retries after an MCP registration timeout.";
       find = "const sessionId = yield* random.uuidV4();\n\t\t\t\treturn yield* openQuery({";
-      replace = "const sessionId = yield* random.uuidV4(); yield* t3pAnnotateCurrentSpan({ \"claude.session_id\": sessionId });\n\t\t\t\treturn yield* openQuery({";
+      replace = "const sessionId = yield* random.uuidV4(); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": input.threadId, \"claude.session_id\": sessionId });\n\t\t\t\treturn yield* openQuery({";
     }
     {
       # Codex's shared app-server records no request field but the trace
