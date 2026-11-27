@@ -3,6 +3,10 @@ kind: HelmRelease
 metadata:
   name: traefik
   namespace: flux-system
+  annotations:
+    # Pruning this HelmRelease would uninstall the release. Removing it from
+    # Git leaves it in place; delete it by hand (docs/adr/0001).
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   interval: 1h
   releaseName: traefik
