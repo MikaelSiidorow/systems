@@ -50,6 +50,12 @@ let
           dst = [ "100.64.0.27:22" ];
         }
         {
+          # olympus sends its nightly restic backups to Hestia's rest-server.
+          action = "accept";
+          src = [ "tag:infra" ];
+          dst = [ "tag:home-subnet-router:8000" ];
+        }
+        {
           # The deploy smoke test checks the tailnet-only Ingress hosts.
           action = "accept";
           src = [ "tag:ci" ];
