@@ -9,15 +9,16 @@
 input=$(cat)
 
 # Resolve the timeout the way Claude Code does: a missing or zero timeout
-# takes the default, and BASH_MAX_TIMEOUT_MS caps it. Numbers may arrive as
-# strings or fractions, so jq parses them and rounds up to whole ms.
+# takes the default, a negative one ends at once, and the larger of
+# BASH_MAX_TIMEOUT_MS and the default caps it. Numbers may arrive as strings
+# or fractions, so jq parses them and rounds up to whole ms.
 read -r background agent timeout_ms < <(
   jq -r --arg default "${BASH_DEFAULT_TIMEOUT_MS:-}" --arg max "${BASH_MAX_TIMEOUT_MS:-}" '
     def ms($fallback):
-      (if type == "number" then . else tonumber? end // 0) as $n
-      | if $n > 0 then $n else $fallback end;
-    ($max | ms(600000)) as $cap
-    | ($default | ms(120000)) as $fallback
+      (if type == "number" then . else (tostring | gsub("[\\s,]"; "") | tonumber)? end // 0) as $n
+      | if $n > 0 then $n elif $n < 0 then 0 else $fallback end;
+    ($default | ms(120000)) as $fallback
+    | ([($max | ms(600000)), $fallback] | max) as $cap
     | [
         (.tool_input.run_in_background // false | tostring),
         (if .agent_id then "subagent" else "main" end),
