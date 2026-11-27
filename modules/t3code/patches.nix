@@ -17,6 +17,7 @@ in
     t3pOrElseSucceed = "Effect.js:orElseSucceed";
     t3pCurrentSpan = "Effect.js:currentSpan";
     t3pAnnotateCurrentSpan = "Effect.js:annotateCurrentSpan";
+    t3pFnUntraced = "Effect.js:fnUntraced";
   };
 
   patches = [
@@ -50,6 +51,51 @@ in
       why = "Parent Codex app-server turns to the turn span through the JSON-RPC envelope (pingdotgg/t3code#31694).";
       find = "const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) {";
       replace = "const offerOutgoingUntraced = offerOutgoing; const request = fn(\"CodexAppServerProtocol.request\")(function* (method, payload) { const trace = method === \"turn/start\" || method === \"turn/steer\" ? yield* ${spanTrace} : void 0; const offerOutgoing = (message) => offerOutgoingUntraced(trace === void 0 ? message : { ...message, trace });";
+    }
+    {
+      # The agent's own telemetry carries no T3 thread, and later Claude turns
+      # stay in turn 1's trace. T3 picks Claude's session ID, so record it on
+      # every turn's span. clearedNativeSessions holds the ID Claude reported
+      # when it differs (after the open retry below).
+      why = "Map each T3 thread to Claude's session.id on every turn.";
+      find = "const startTurn = fn\\(\"ClaudeAdapterV2\\.startTurn\"\\)\\(function\\* \\(turnInput\\) \\{\\s*modelCatalog = yield\\* loadModelCatalog;\\s*const startedAt = yield\\* now;\\s*const nativeThreadId = yield\\* getNativeThreadId\\(turnInput\\.providerThread\\);";
+      regex = true;
+      replace = "const startTurn = fn(\"ClaudeAdapterV2.startTurn\")(function* (turnInput) { modelCatalog = yield* loadModelCatalog; const startedAt = yield* now; const nativeThreadId = yield* getNativeThreadId(turnInput.providerThread); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": turnInput.threadId, \"claude.session_id\": clearedNativeSessions.get(nativeThreadId) ?? nativeThreadId });";
+    }
+    {
+      # A first turn's startTurn span still has the original ID.
+      why = "Record the new Claude session ID when open retries after an MCP registration timeout.";
+      find = "const sessionId = yield* random.uuidV4();\n\t\t\t\treturn yield* openQuery({";
+      replace = "const sessionId = yield* random.uuidV4(); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": input.threadId, \"claude.session_id\": sessionId });\n\t\t\t\treturn yield* openQuery({";
+    }
+    {
+      # Codex's shared app-server records no request field but the trace
+      # context on its spans or events; its thread ID is conversation.id.
+      why = "Map each T3 thread to Codex's conversation.id on every turn.";
+      find = "const startNativeTurn = fn\\(\"CodexAdapterV2\\.startNativeTurn\"\\)\\(function\\* \\(turnInput, codexInput\\) \\{\\s*const threadId = yield\\* getNativeThreadId\\(turnInput\\.providerThread\\);";
+      regex = true;
+      replace = "const startNativeTurn = fn(\"CodexAdapterV2.startNativeTurn\")(function* (turnInput, codexInput) { const threadId = yield* getNativeThreadId(turnInput.providerThread); yield* t3pAnnotateCurrentSpan({ \"orchestration_v2.thread_id\": turnInput.threadId, \"codex.conversation_id\": threadId });";
+    }
+  ]
+  # About a third of T3's spans (upstream t3code#28196). Their children parent
+  # to the caller instead.
+  ++
+    map
+      (name: {
+        why = "Stop tracing ${name}, which T3 runs constantly.";
+        find = "fn(\"${name}\")(";
+        replace = "t3pFnUntraced(";
+      })
+      [
+        "NonBlockingSpawner.spawn"
+        "ClaudeAgentSdkQueryRunner.trackDescendants"
+      ]
+  ++ [
+    {
+      # Its annotation would otherwise land on the caller, such as a turn span.
+      why = "Stop tracing processRunner.runProcessCore, which T3 runs constantly.";
+      find = "fn(\"processRunner.runProcessCore\")(function* (spawner, input) {\n\tyield* annotateCurrentSpan(\"process.command\", commandName(input.command));";
+      replace = "t3pFnUntraced(function* (spawner, input) {";
     }
     {
       why = "Name taskIds in the background-wait prompt; agents that skip the schema call t3_background_wait with taskId or nothing.";
