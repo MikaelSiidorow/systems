@@ -32,6 +32,19 @@ let
           type = "command";
           command = "~/.claude/statusline-command.sh";
         };
+        # Use a stable path so the list union does not add duplicates on switch.
+        hooks.PreToolUse = [
+          {
+            matcher = "Bash";
+            hooks = [
+              {
+                type = "command";
+                command = "~/.claude/hooks/bash-wait-guard";
+                timeout = 5;
+              }
+            ];
+          }
+        ];
         theme = "dark";
         verbose = true;
         autoMemoryEnabled = false;
@@ -251,6 +264,13 @@ let
         };
     }
   );
+
+  # Denies foreground Bash timeouts that would expire the prompt cache.
+  claudeBashWaitGuard = pkgs.writeShellApplication {
+    name = "bash-wait-guard";
+    runtimeInputs = [ pkgs.jq ];
+    text = builtins.readFile ./claude-code/bash-wait-guard.sh;
+  };
 
   codexPython = pkgs.python3.withPackages (ps: [ ps.tomlkit ]);
 
@@ -547,6 +567,7 @@ in
       // {
         ".claude/CLAUDE.md".source = ./shared/AGENTS.md;
         ".codex/AGENTS.md".source = ./shared/AGENTS.md;
+        ".claude/hooks/bash-wait-guard".source = lib.getExe claudeBashWaitGuard;
         ".codex/rules/nix-managed.rules".source = ./codex/rules/nix-managed.rules;
         ".claude/statusline-command.sh" = {
           source = ./claude-code/statusline-command.sh;
