@@ -1,10 +1,25 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  # saha.nix adds the Saha exporter when services.saha-export is on. Saha gets
+  # every signal as sent, before the T3 filter and content stripping.
+  saha = lib.optionalString config.services.saha-export.enable "otelcol.processor.batch.saha.input, ";
+in
 {
   # Ships host metrics and the journal over OTLP to the cluster Alloy on
   # olympus (tailnet only), so a freeze is visible from outside the host.
   # Local agents send OTLP to 127.0.0.1:4318 and share the same disk queue;
   # their raw OTLP is also archived in /var/lib/alloy/archive.
   services.alloy.enable = true;
+
+  # Also send agent telemetry to Saha's dev ingest (saha.nix). Turn it off
+  # when Saha will be down for more than a few hours: once its queue is full,
+  # Alloy logs a dropped batch every second.
+  services.saha-export.enable = true;
 
   # otelcol.storage.file and otelcol.exporter.file are public preview.
   services.alloy.extraFlags = [ "--stability.level=public-preview" ];
@@ -81,9 +96,9 @@
       }
 
       output {
-        metrics = [otelcol.processor.batch.archive.input, otelcol.processor.batch.default.input]
-        logs    = [otelcol.processor.batch.archive.input, otelcol.processor.attributes.content.input]
-        traces  = [otelcol.processor.batch.archive.input, otelcol.processor.filter.t3code.input]
+        metrics = [otelcol.processor.batch.archive.input, ${saha}otelcol.processor.batch.default.input]
+        logs    = [otelcol.processor.batch.archive.input, ${saha}otelcol.processor.attributes.content.input]
+        traces  = [otelcol.processor.batch.archive.input, ${saha}otelcol.processor.filter.t3code.input]
       }
     }
 

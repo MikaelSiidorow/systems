@@ -53,7 +53,7 @@ To turn telemetry off on a host, unset the option and delete the `OTEL_*`, `CLAU
 
 `agents.telemetry.content` (off by default; on for Hestia and tpad) makes the agents export content too: Claude's prompts and responses (`OTEL_LOG_USER_PROMPTS`) and tool output (`OTEL_LOG_TOOL_CONTENT`, a `tool.output` span event on the tool span with Bash output, Read and Write contents and diffs, cut at 60 KB), and Codex's prompts and responses (`log_user_prompt`, `log_agent_responses`). Claude's settings go in the `env` block of `~/.claude/settings.json`, which overrides the process environment, and turning the option off writes `0`, since the merge never removes a key.
 
-Content never reaches the cluster, where Grafana is readable without a login by every tailnet device, CI runners included. Hestia's and tpad's Alloy drop the `tool.output` span events and the `prompt`, `prompt_text`, `user_prompt` and `response` attributes before forwarding (`modules/agent-telemetry-alloy.nix`). They also drop the system prompt, context and request and response bodies that Claude's detailed beta tracing (`ENABLE_BETA_TRACING_DETAILED`) and `OTEL_LOG_RAW_API_BODIES` would add if a shell turned them on. Anything else a future agent version adds under a new name would pass, so recheck the list when turning on a new content setting. Commands, tool input, error text and Codex tool output snippets still go to the cluster, as before. Content lives only in the host's archive (below) and the transcripts.
+Content never reaches the cluster, where Grafana is readable without a login by every tailnet device, CI runners included. Hestia's and tpad's Alloy drop the `tool.output` span events and the `prompt`, `prompt_text`, `user_prompt` and `response` attributes before forwarding (`modules/agent-telemetry-alloy.nix`). They also drop the system prompt, context and request and response bodies that Claude's detailed beta tracing (`ENABLE_BETA_TRACING_DETAILED`) and `OTEL_LOG_RAW_API_BODIES` would add if a shell turned them on. Anything else a future agent version adds under a new name would pass, so recheck the list when turning on a new content setting. Commands, tool input, error text and Codex tool output snippets still go to the cluster, as before. Content lives only in the host's archive (below), the transcripts and, on Hestia, Saha.
 
 ### Raw archive
 
@@ -73,6 +73,14 @@ for path in sys.argv[1:]:
             frame = f.read(struct.unpack(">I", header)[0])
             print(zstandard.ZstdDecompressor().decompressobj().decompress(frame).decode())
 ```
+
+### Saha
+
+Saha is an agent-session console under development. On Hestia its ingest runs as a dev process on `127.0.0.1:4319`, not as a service. With `services.saha-export.enable` (`infra/nixos/hosts/hestia/saha.nix`, on in `monitoring.nix`), Hestia's Alloy sends it every agent signal as the agents sent it, before the T3 span filter and content stripping. It goes over loopback only, so content stays on the host, as with the archive.
+
+- **Token**: a bearer token from `infra/secrets/saha.yaml` (sops), decrypted to `/run/secrets/saha-ingest-token`, readable by the user, and passed to Alloy as the systemd credential `saha-ingest-token`. It must match the hash Saha stores for its ingest user (`dev`). To rotate: generate a token, `sops infra/secrets/saha.yaml` to replace it (no trailing newline), store its hash in Saha, then deploy; sops-nix restarts Alloy. Batches sent with the old token in between get a 401 and are dropped, not retried.
+- **Saha down**: batches wait on disk in the shared `otelcol.storage.file.queue`, in files of their own (the storage keys them by exporter and signal, so the cluster queue is unaffected). The queue is capped at 512 MiB, about 6 hours of unfiltered T3 spans; each batch in flight retries for 6 hours. Once the queue is full, Alloy drops each new batch and logs an error for it, about one a second. The archive keeps everything, so replay it to fill a gap. If Saha will be down for more than a few hours, turn the option off and deploy.
+- **Turning it off**: setting the option to false removes the exporter and the credential. Its queue files (named after `otelcol.exporter.otlphttp.saha`) stay under `/var/lib/alloy/data-alloy` until deleted by hand.
 
 ### Transcripts
 

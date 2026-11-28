@@ -30,6 +30,12 @@ creation_rules:
       - age:
           - *mikael
           - *hestia
+  # Saha's ingest token: Hestia's Alloy sends it to Saha's dev ingest.
+  - path_regex: ^infra/secrets/saha\.yaml$
+    key_groups:
+      - age:
+          - *mikael_pq
+          - *hestia
   - path_regex: ^openwrt/secrets/openwrt\.yaml$
     key_groups:
       - age:
